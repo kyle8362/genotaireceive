@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (Mobile LINE v28)</title>
+    <title>案件進度追蹤系統 (Import v29)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -14,8 +14,7 @@
             --primary: #0f766e; --primary-light: #ccfbf1; --bg: #f3f4f6;
             --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
-            --genesis: #7e22ce;
-            --line-green: #06c755;
+            --genesis: #7e22ce; --line-green: #06c755;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
@@ -42,7 +41,8 @@
         .btn-perm { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
         .btn-stats { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
         .btn-settings { background: #f0fdfa; color: #0f766e; border: 1px solid #ccfbf1; } 
-        
+        .btn-import { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; } /* Import Button */
+
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
         .search-box input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
@@ -147,6 +147,10 @@
         .ngs-row input, .ngs-row select { width: 100%; padding: 8px; border: 1px solid #5eead4; border-radius: 4px; font-size: 0.95rem; }
         #ngs-extraction-fields, #ngs-qc-fields { margin-top: 10px; padding-left: 10px; border-left: 3px solid #0d9488; display: none; }
 
+        /* Import Area */
+        #importTextarea { width: 100%; height: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: monospace; font-size: 0.9rem; white-space: pre; overflow: auto; }
+        .import-guide { font-size: 0.8rem; color: #666; margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 4px; }
+
         .modal-btns { display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem; }
         .btn { padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; }
         .btn-cancel { background: #f3f4f6; color: #4b5563; }
@@ -229,6 +233,7 @@
         </div>
         <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
         <div class="admin-btn btn-settings" id="salesSettingsBtn" onclick="openSalesSettings()">⚙️ NGS 業務設定</div>
+        <div class="admin-btn btn-import" id="importBtn" onclick="openImportModal()">📥 批量匯入任務</div>
         <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="openStatsModal()">📊 任務完成統整</div>
         
         <div class="sidebar-section">
@@ -265,6 +270,26 @@
         <div class="task-container" id="taskListContainer"></div>
         <button class="fab" onclick="openModal()">+</button>
     </main>
+</div>
+
+<div class="modal-overlay" id="importModal">
+    <div class="modal-card" style="width: 600px;">
+        <h3 style="margin-top:0; color:#047857;">📥 批量匯入任務 (Excel/CSV)</h3>
+        <div class="import-guide">
+            <strong>使用說明：</strong><br>
+            請直接從 Excel 複製資料並貼上至下方。<br>
+            <div style="margin-top:5px; display:flex; gap:5px;">
+                <button onclick="setTemplate('general')" style="font-size:0.8rem; cursor:pointer;">📋 一般任務範本</button>
+                <button onclick="setTemplate('ngs')" style="font-size:0.8rem; cursor:pointer;">🧬 NGS 任務範本</button>
+            </div>
+        </div>
+        <textarea id="importTextarea" placeholder="請在此貼上資料..."></textarea>
+        <div style="margin-top:10px; font-size:0.8rem; color:#666;">* 第一行必須是標題列 (Header)</div>
+        <div class="modal-btns">
+            <button class="btn btn-cancel" onclick="document.getElementById('importModal').style.display='none'">取消</button>
+            <button class="btn btn-save" onclick="processImport()">開始匯入</button>
+        </div>
+    </div>
 </div>
 
 <div class="modal-overlay" id="taskModal">
@@ -688,6 +713,90 @@
         document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
         document.getElementById('statsPanelBtn').style.display = canConfig ? 'block' : 'none';
         document.getElementById('salesSettingsBtn').style.display = canConfig ? 'block' : 'none';
+        document.getElementById('importBtn').style.display = canManage ? 'block' : 'none';
+    }
+
+    /* --- IMPORT LOGIC --- */
+    function openImportModal() {
+        document.getElementById('importModal').style.display = 'flex';
+        document.getElementById('importTextarea').value = '';
+    }
+
+    function setTemplate(type) {
+        let header = '';
+        if (type === 'general') {
+            header = '分類(可不填)\t任務標題(必填)';
+        } else {
+            // NGS Header
+            header = '分類(NGS收件)\t單位\t主持人\t需求(萃取/QC)\t種類(Sample/Nucleic)\t溫度\t歸還\t數量\t實驗\t平台\t業務';
+        }
+        document.getElementById('importTextarea').value = header + "\n";
+        document.getElementById('importTextarea').focus();
+    }
+
+    async function processImport() {
+        const raw = document.getElementById('importTextarea').value.trim();
+        if(!raw) return alert("請輸入內容");
+        
+        const rows = raw.split('\n');
+        if (rows.length < 2) return alert("請至少包含標題列與一筆資料");
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // Simple parser (tab or comma)
+        const isTab = rows[0].includes('\t');
+        const separator = isTab ? '\t' : ',';
+
+        for (let i = 1; i < rows.length; i++) {
+            const cols = rows[i].split(separator).map(c => c.trim());
+            if(cols.length === 0 || cols[0] === '') continue;
+
+            const cat = cols[0] || '定序收件';
+            let title = cols[1] || '未命名任務';
+            let details = null;
+
+            // NGS Logic
+            if (cat === 'NGS收件' && cols.length >= 10) {
+                // Mapping: 0:Cat, 1:Unit, 2:PI, 3:Needs, 4:Type, 5:Temp, 6:Return, 7:Count, 8:Exp, 9:Plat, 10:Sales
+                // Note: The template helper puts "Unit" at col 1 in the logic below if user used the button
+                // Let's assume standard order based on the "setTemplate" helper
+                const unit = cols[1];
+                const pi = cols[2];
+                const needs = cols[3];
+                
+                details = {
+                    unit: unit, pi: pi, needs: needs,
+                    temp: cols[5], returnBack: cols[6], sampleCount: cols[7],
+                    expType: cols[8], platform: cols[9], sales: cols[10]
+                };
+
+                if (needs === '萃取') details.sampleType = cols[4];
+                else details.nucleicType = cols[4];
+
+                title = `${unit}-${pi}-${details.expType||details.nucleicType} 收件`;
+            }
+
+            try {
+                await db.collection('tasks').add({
+                    category: cat,
+                    title: title,
+                    details: details,
+                    date: state.currentDate,
+                    completed: false,
+                    isDeleted: false,
+                    logs: [{ type: '匯入', desc: '批量匯入', user: state.currentUser.name, time: new Date().toISOString() }],
+                    createdAt: new Date().toISOString()
+                });
+                successCount++;
+            } catch(e) {
+                console.error(e);
+                failCount++;
+            }
+        }
+        
+        alert(`匯入完成！成功: ${successCount}, 失敗: ${failCount}`);
+        document.getElementById('importModal').style.display = 'none';
     }
 
     /* --- SALES SETTINGS --- */
