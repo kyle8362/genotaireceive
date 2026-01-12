@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>案件進度追蹤系統 (Mobile v18)</title>
+    <title>案件進度追蹤系統 (Genesis v19)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -13,6 +13,7 @@
             --primary: #0f766e; --primary-light: #ccfbf1; --bg: #f3f4f6;
             --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
+            --genesis: #7e22ce; /* Purple for Creator */
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
@@ -25,30 +26,15 @@
         .auth-box { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 320px; text-align: center; border: 1px solid var(--border); position: relative; }
         .auth-tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--warning); color: white; padding: 2px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; display: none; }
         .auth-box.admin-view .auth-tag { display: block; }
-        .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; } /* font-size 16px prevents iOS zoom */
+        .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
         .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
         .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
         .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
         /* Layout */
         #app-screen { display: flex; width: 100%; height: 100%; position: relative; }
-        
-        /* Mobile Menu Button */
-        #mobile-menu-btn {
-            display: none; /* Hidden on desktop */
-            position: absolute; top: 15px; left: 15px; z-index: 1100;
-            background: white; border: 1px solid var(--border); border-radius: 8px;
-            padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            color: var(--primary);
-        }
-
-        /* Sidebar Overlay */
-        #sidebar-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 900;
-            backdrop-filter: blur(2px);
-        }
-
+        #mobile-menu-btn { display: none; position: absolute; top: 15px; left: 15px; z-index: 1100; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: var(--primary); }
+        #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 900; backdrop-filter: blur(2px); }
         aside { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1.5rem; box-sizing: border-box; transition: transform 0.3s ease; }
         
         .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
@@ -60,13 +46,10 @@
         
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
-        
         .search-box input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
         .search-item { padding: 8px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .search-item:hover { background: #f9fafb; color: var(--primary); }
-        .search-date { font-size: 0.75rem; color: #9ca3af; }
-
         .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
         .history-item { padding: 10px; cursor: pointer; border-radius: 6px; color: var(--text-main); margin-bottom: 4px; display: flex; justify-content: space-between; }
         .history-item:hover { background: #f8fafc; }
@@ -76,7 +59,6 @@
         header { margin-bottom: 2rem; }
         header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
         .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
-        
         .overall-progress-container { margin-top: 15px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; }
         .progress-label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: #4b5563; }
         .progress-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
@@ -97,10 +79,12 @@
         .category-group.deleted-section .task-item { background-color: #fff1f2; opacity: 0.8; }
 
         .task-item { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: flex-start; transition: all 0.2s; border-left: 4px solid transparent; position: relative; }
+        .task-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .task-item[data-cat="定序收件"] { border-left-color: #3b82f6; }
         .task-item[data-cat="引子送件"] { border-left-color: #8b5cf6; }
         .task-item[data-cat="產前收件"] { border-left-color: #ec4899; }
         .task-item[data-cat="業務交辦事項"] { border-left-color: #f59e0b; }
+        .task-item[data-cat="NGS收件"] { border-left-color: #0d9488; }
         .task-item.completed-item { border-left-color: #9ca3af; }
         .task-item.deleted-item { border-left-color: #ef4444; }
 
@@ -124,6 +108,9 @@
         .task-item.completed-item .task-checkbox::after { content: '✓'; color: white; font-size: 14px; }
         .task-item.completed-item .task-title { color: #9ca3af; text-decoration: line-through; cursor: default; font-weight: normal; }
 
+        /* NGS Detail Badge */
+        .ngs-badge { display: inline-block; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #fdfdfd; margin-right: 5px; margin-top: 3px; color: #555; }
+
         .action-area { display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .btn-icon { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 2px 8px; color: #9ca3af; border-radius: 4px; }
         .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); }
@@ -145,11 +132,19 @@
         .separator { width: 1px; height: 20px; background: #cbd5e1; margin: 0 4px; }
         select.tool-select { padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; }
         
-        #inputTitle { width: 100%; min-height: 100px; padding: 15px; border: 1px solid #d1d5db; border-radius: 0 0 6px 6px; box-sizing: border-box; font-size: 1rem; background: white; outline: none; overflow-y: auto; }
+        #inputTitle { width: 100%; min-height: 80px; padding: 15px; border: 1px solid #d1d5db; border-radius: 0 0 6px 6px; box-sizing: border-box; font-size: 1rem; background: white; outline: none; overflow-y: auto; }
         #inputTitle:focus { border-color: var(--primary); }
         .input-group { margin-bottom: 1.2rem; }
         .input-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; }
         .input-group select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+        .input-group input[type="text"] { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
+
+        /* NGS FORM STYLES */
+        #ngs-form-container { background: #f0fdfa; padding: 15px; border: 1px solid #ccfbf1; border-radius: 8px; margin-bottom: 15px; display: none; }
+        .ngs-row { margin-bottom: 10px; }
+        .ngs-row label { font-size: 0.85rem; color: #0f766e; font-weight: 600; margin-bottom: 4px; display: block; }
+        .ngs-row input, .ngs-row select { width: 100%; padding: 8px; border: 1px solid #5eead4; border-radius: 4px; font-size: 0.95rem; }
+        #ngs-extraction-fields { margin-top: 10px; padding-left: 10px; border-left: 3px solid #0d9488; display: none; }
 
         .modal-btns { display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem; }
         .btn { padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; }
@@ -161,9 +156,12 @@
         .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .user-name { font-weight: 600; font-size: 1rem; }
         .user-role-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; border: 1px solid #ddd;}
+        
+        .role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; font-weight: bold; } /* GENESIS */
         .role-senior { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
         .role-admin { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
         .role-user { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+        
         .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
         .user-edit-row input { flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
         .user-edit-row select { padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
@@ -188,23 +186,15 @@
         .log-content { color: var(--text-main); }
         .log-user { font-weight: 600; color: var(--primary); }
 
-        /* --- MOBILE RESPONSIVE STYLES --- */
         @media (max-width: 768px) {
             #mobile-menu-btn { display: block; }
             #sidebar-overlay { display: none; }
             #sidebar-overlay.active { display: block; }
-
-            aside {
-                position: fixed; top: 0; left: 0; height: 100%; width: 280px;
-                z-index: 1000; transform: translateX(-100%);
-                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            }
+            aside { position: fixed; top: 0; left: 0; height: 100%; width: 280px; z-index: 1000; transform: translateX(-100%); box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
             aside.open { transform: translateX(0); }
-
             main { padding-top: 70px; width: 100%; }
             .mode-switch-container { top: 10px; right: 10px; }
             .mode-btn { padding: 5px 10px; font-size: 0.8rem; }
-            
             .task-item { flex-direction: column; }
             .task-content { padding-right: 0; margin-bottom: 10px; }
             .action-area { flex-direction: row; width: 100%; justify-content: flex-end; }
@@ -283,6 +273,67 @@
 <div class="modal-overlay" id="taskModal">
     <div class="modal-card">
         <h2 style="margin-top:0; color:#111827;" id="modalTitle">新增案件/任務</h2>
+        
+        <div class="input-group">
+            <label>歸屬項目</label>
+            <select id="inputCategory" onchange="handleCategoryChange()">
+                <option value="定序收件">📂 定序收件</option>
+                <option value="引子送件">🚀 引子送件</option>
+                <option value="產前收件">📦 產前收件</option>
+                <option value="業務交辦事項">📋 業務交辦事項</option>
+                <option value="NGS收件">🧬 NGS 收件 (需填詳細資料)</option>
+            </select>
+        </div>
+
+        <div id="ngs-form-container">
+            <h4 style="margin-top:0; color:#0f766e;">📝 NGS 詳細資料 (必填)</h4>
+            <div class="ngs-row">
+                <label>1. 單位</label>
+                <input type="text" id="ngsUnit" placeholder="輸入單位">
+            </div>
+            <div class="ngs-row">
+                <label>2. 主持人</label>
+                <input type="text" id="ngsPI" placeholder="輸入主持人">
+            </div>
+            <div class="ngs-row">
+                <label>3. 樣本處理需求</label>
+                <select id="ngsNeeds" onchange="handleNgsNeedsChange()">
+                    <option value="">請選擇</option>
+                    <option value="萃取">萃取 (Extraction)</option>
+                    <option value="QC">QC</option>
+                </select>
+            </div>
+            <div id="ngs-extraction-fields">
+                <div class="ngs-row">
+                    <label>4-1.1 檢體種類</label>
+                    <select id="ngsSampleTypeSelect" onchange="handleSampleTypeChange()">
+                        <option value="Cell">Cell</option>
+                        <option value="Blood">Blood</option>
+                        <option value="Tissue">Tissue</option>
+                        <option value="Plant">Plant</option>
+                        <option value="其他">其他 (手動輸入)</option>
+                    </select>
+                    <input type="text" id="ngsSampleTypeInput" placeholder="請輸入檢體種類" style="display:none; margin-top:5px;">
+                </div>
+                <div class="ngs-row">
+                    <label>4-1.2 保存溫度</label>
+                    <select id="ngsTemp">
+                        <option value="常溫">常溫</option>
+                        <option value="4°C">4°C</option>
+                        <option value="-20°C">-20°C</option>
+                        <option value="-80°C">-80°C</option>
+                    </select>
+                </div>
+                <div class="ngs-row">
+                    <label>4-1.3 歸還</label>
+                    <select id="ngsReturn">
+                        <option value="是">是</option>
+                        <option value="否">否</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="input-group">
             <label>任務內容 (選取文字可編輯樣式)</label>
             <div class="editor-toolbar">
@@ -308,15 +359,7 @@
             </div>
             <div id="inputTitle" contenteditable="true" placeholder="輸入內容..."></div>
         </div>
-        <div class="input-group">
-            <label>歸屬項目</label>
-            <select id="inputCategory">
-                <option value="定序收件">📂 定序收件</option>
-                <option value="引子送件">🚀 引子送件</option>
-                <option value="產前收件">📦 產前收件</option>
-                <option value="業務交辦事項">📋 業務交辦事項</option>
-            </select>
-        </div>
+        
         <div class="modal-btns">
             <button class="btn btn-cancel" onclick="closeModal()">取消</button>
             <button class="btn btn-save" id="btnSaveTask" onclick="saveTask()">確認</button>
@@ -335,7 +378,10 @@
 <div class="modal-overlay" id="userModal">
     <div class="modal-card" style="width: 650px;">
         <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👥 成員權限管理</h3>
-        <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">高級管理者可編輯所有資料及查看密碼；管理者僅能核准新帳號。</p>
+        <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">
+            <span style="color:#7e22ce; font-weight:bold;">🟣 創世神</span>：最高權限，不可被修改。<br>
+            高級管理者可編輯資料；管理者僅能核准。
+        </p>
         <ul class="user-list" id="userListDisplay"></ul>
         <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('userModal').style.display='none'">關閉</button></div>
     </div>
@@ -371,7 +417,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項"];
+    const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
     let state = {
         currentUser: null, authMode: 'general', currentDate: getTodayStr(),
         tasks: [], users: [], history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
@@ -445,16 +491,17 @@
             // ADMIN LOGIN
             if (state.authMode === 'admin') {
                 if (u === 'Admin' && p === 'Abcd1234') {
+                    // Check if Admin exists in DB, if not create as CREATOR (Genesis)
                     const q = await db.collection('users').where('username', '==', 'Admin').get();
                     if(q.empty) {
-                        await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
+                        await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'creator', remarks: '創世神' });
                     }
-                    loginSuccess('Admin', 'senior');
+                    loginSuccess('Admin', 'creator');
                 } else {
                     const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
                     if (!q.empty) {
                         const user = q.docs[0].data();
-                        if (user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
+                        if (user.isApproved && (user.role === 'admin' || user.role === 'senior' || user.role === 'creator')) {
                             loginSuccess(user.username, user.role);
                         } else {
                             alert('權限不足或帳密錯誤 (僅管理者可從此處登入)');
@@ -513,15 +560,17 @@
     function updateUIForRole() {
         if(!state.currentUser) return;
         let roleName = '';
-        if(state.currentUser.role === 'senior') roleName = ' (高級管理者)';
+        if(state.currentUser.role === 'creator') roleName = ' (創世神)';
+        else if(state.currentUser.role === 'senior') roleName = ' (高級管理者)';
         else if(state.currentUser.role === 'admin') roleName = ' (管理者)';
         
         document.getElementById('displayUsername').innerText = state.currentUser.name + roleName;
         document.getElementById('userAvatar').innerText = state.currentUser.name[0].toUpperCase();
         
-        const canManage = state.currentUser.role === 'senior' || state.currentUser.role === 'admin';
+        const canManage = ['creator','senior','admin'].includes(state.currentUser.role);
         document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
-        document.getElementById('statsPanelBtn').style.display = state.currentUser.role === 'senior' ? 'block' : 'none';
+        // Stats only for Creator & Senior
+        document.getElementById('statsPanelBtn').style.display = ['creator','senior'].includes(state.currentUser.role) ? 'block' : 'none';
     }
 
     /* --- SEARCH --- */
@@ -540,6 +589,37 @@
             resultsContainer.appendChild(li);
         });
         if(matched.length === 0) resultsContainer.innerHTML = '<li class="search-item" style="color:#999; cursor:default;">無相符結果</li>';
+    }
+
+    /* --- NGS FORM LOGIC --- */
+    function handleCategoryChange() {
+        const cat = document.getElementById('inputCategory').value;
+        const ngsForm = document.getElementById('ngs-form-container');
+        if (cat === 'NGS收件') {
+            ngsForm.style.display = 'block';
+        } else {
+            ngsForm.style.display = 'none';
+        }
+    }
+
+    function handleNgsNeedsChange() {
+        const needs = document.getElementById('ngsNeeds').value;
+        const subFields = document.getElementById('ngs-extraction-fields');
+        if (needs === '萃取') {
+            subFields.style.display = 'block';
+        } else {
+            subFields.style.display = 'none';
+        }
+    }
+
+    function handleSampleTypeChange() {
+        const type = document.getElementById('ngsSampleTypeSelect').value;
+        const input = document.getElementById('ngsSampleTypeInput');
+        if (type === '其他') {
+            input.style.display = 'block';
+        } else {
+            input.style.display = 'none';
+        }
     }
 
     /* --- STATS --- */
@@ -601,32 +681,42 @@
     /* --- USER MANAGEMENT --- */
     function openUserModal() {
         const list = document.getElementById('userListDisplay');
-        const role = state.currentUser.role;
+        const myRole = state.currentUser.role;
         list.innerHTML = '';
         if (state.users.length === 0) list.innerHTML = '<li style="padding:10px; color:#666;">目前無一般使用者帳號。</li>';
 
         state.users.forEach(user => {
             const li = document.createElement('li'); li.className = 'user-item';
             const isApproved = user.isApproved;
+            
             let badgeClass = 'role-user'; let badgeText = '一般者';
-            if(user.role === 'senior') { badgeClass = 'role-senior'; badgeText = '高級管理者'; }
+            if(user.role === 'creator') { badgeClass = 'role-creator'; badgeText = '🟣 創世神'; }
+            else if(user.role === 'senior') { badgeClass = 'role-senior'; badgeText = '高級管理者'; }
             else if(user.role === 'admin') { badgeClass = 'role-admin'; badgeText = '管理者'; }
             if(!isApproved) { badgeClass = ''; badgeText = '待審核'; }
 
+            // Genesis Protection Logic
+            const isTargetCreator = user.role === 'creator';
+            const isMe = user.username === state.currentUser.name;
+            
             let controlsHtml = '';
-            if (role === 'senior') {
+
+            // CREATOR CAN EDIT ALL (Except maybe self destructive actions, but we allow edit)
+            if (myRole === 'creator') {
                 const selUser = user.role === 'user' ? 'selected' : '';
                 const selAdmin = user.role === 'admin' ? 'selected' : '';
                 const selSenior = user.role === 'senior' ? 'selected' : '';
+                const selCreator = user.role === 'creator' ? 'selected' : '';
+                
                 const pwdId = `pwd_${user.docId}`;
                 
+                // Allow role change only if not Creator (to prevent accidental demotion) OR allow it
+                const roleSelect = isTargetCreator ? `<select disabled><option selected>創世神</option></select>` : 
+                    `<select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select>`;
+
                 controlsHtml = `
                     <div class="user-edit-row">
-                        <select id="role_${user.docId}">
-                            <option value="user" ${selUser}>一般者</option>
-                            <option value="admin" ${selAdmin}>管理者</option>
-                            <option value="senior" ${selSenior}>高級管理者</option>
-                        </select>
+                        ${roleSelect}
                         <input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}">
                     </div>
                     <div class="user-edit-row">
@@ -636,13 +726,52 @@
                     </div>
                     <div style="text-align:right;">
                         <button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>
-                        <button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>
+                        ${ !isTargetCreator ? `<button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>` : '' }
                     </div>
                 `;
-            } else if (role === 'admin') {
-                let actionBtn = !isApproved ? `<button class="btn-approve" onclick="approveUserSimple('${user.docId}')">核准申請</button>` : `<span style="color:#10b981; font-size:0.85rem;">已核准</span>`;
-                controlsHtml = `<div class="user-edit-row"><span class="readonly-text">角色: ${badgeText}</span><span class="readonly-text" style="margin-left:15px;">備註: ${user.remarks || '(無)'}</span></div><div style="text-align:right;">${actionBtn}</div>`;
+            } 
+            // SENIOR ADMIN
+            else if (myRole === 'senior') {
+                if (isTargetCreator) {
+                    controlsHtml = `<div class="user-edit-row"><span style="color:purple; font-weight:bold;">此為最高權限帳號，無法編輯。</span></div>`;
+                } else {
+                    // Similar to Creator but cannot set role to Creator
+                    const selUser = user.role === 'user' ? 'selected' : '';
+                    const selAdmin = user.role === 'admin' ? 'selected' : '';
+                    const selSenior = user.role === 'senior' ? 'selected' : '';
+                    const pwdId = `pwd_${user.docId}`;
+
+                    controlsHtml = `
+                        <div class="user-edit-row">
+                            <select id="role_${user.docId}">
+                                <option value="user" ${selUser}>一般者</option>
+                                <option value="admin" ${selAdmin}>管理者</option>
+                                <option value="senior" ${selSenior}>高級管理者</option>
+                            </select>
+                            <input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}">
+                        </div>
+                        <div class="user-edit-row">
+                            <span class="readonly-text" style="min-width:60px;">密碼:</span>
+                            <input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;">
+                            <button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button>
+                        </div>
+                        <div style="text-align:right;">
+                            <button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>
+                            <button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>
+                        </div>
+                    `;
+                }
             }
+            // REGULAR ADMIN
+            else if (myRole === 'admin') {
+                if (isTargetCreator || user.role === 'senior') {
+                    controlsHtml = `<div class="user-edit-row"><span class="readonly-text">權限高於或等於您，無法檢視詳細資料。</span></div>`;
+                } else {
+                    let actionBtn = !isApproved ? `<button class="btn-approve" onclick="approveUserSimple('${user.docId}')">核准申請</button>` : `<span style="color:#10b981; font-size:0.85rem;">已核准</span>`;
+                    controlsHtml = `<div class="user-edit-row"><span class="readonly-text">角色: ${badgeText}</span><span class="readonly-text" style="margin-left:15px;">備註: ${user.remarks || '(無)'}</span></div><div style="text-align:right;">${actionBtn}</div>`;
+                }
+            }
+
             li.innerHTML = `<div class="user-header"><div><span class="user-name">${user.username}</span><span class="user-role-badge ${badgeClass}">${badgeText}</span></div></div>${controlsHtml}`;
             list.appendChild(li);
         });
@@ -661,7 +790,7 @@
             .then(() => alert('資料已更新'));
     }
     function deleteUser(docId) {
-        if (!confirm('高級管理員操作：確定要刪除此帳號嗎？')) return;
+        if (!confirm('確定要刪除此帳號嗎？')) return;
         db.collection('users').doc(docId).delete().then(() => openUserModal());
     }
     function approveUserSimple(docId) {
@@ -736,13 +865,26 @@
         } else if (isOverdue) {
             metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`;
         }
+
+        // Show NGS Details if available
+        let ngsInfoHtml = '';
+        if (task.details) {
+            ngsInfoHtml += `<div style="margin-top:5px; padding:5px; background:#f0fdfa; border-radius:4px; font-size:0.8rem; color:#0f766e;">
+                <div><span class="ngs-badge">單位</span> ${task.details.unit}</div>
+                <div><span class="ngs-badge">主持人</span> ${task.details.pi}</div>
+                <div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
+            if(task.details.needs === '萃取') {
+                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | ${task.details.temp} | 歸還:${task.details.returnBack}</div>`;
+            }
+            ngsInfoHtml += `</div>`;
+        }
         
         let actionBtn = task.isDeleted 
             ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>`
             : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
             
         const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
-        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${metaHtml}</div><div class="action-area"><div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
+        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area"><div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
         return div;
     }
 
@@ -758,12 +900,44 @@
     function saveTask() {
         const htmlContent = document.getElementById('inputTitle').innerHTML.trim();
         const category = document.getElementById('inputCategory').value;
-        if(document.getElementById('inputTitle').innerText.trim() === '' && !htmlContent.includes('<img')) return alert('請輸入內容');
+        const textContent = document.getElementById('inputTitle').innerText.trim();
+        
+        // VALIDATION
+        if(textContent === '' && !htmlContent.includes('<img')) return alert('請輸入任務內容');
+        
+        // NGS Specific Validation & Data Collection
+        let details = null;
+        if (category === 'NGS收件') {
+            const unit = document.getElementById('ngsUnit').value.trim();
+            const pi = document.getElementById('ngsPI').value.trim();
+            const needs = document.getElementById('ngsNeeds').value;
+            
+            if (!unit || !pi || !needs) return alert('請完整填寫 NGS 詳細資料 (單位、主持人、需求)');
+            
+            details = { unit, pi, needs };
+            
+            if (needs === '萃取') {
+                const sTypeSelect = document.getElementById('ngsSampleTypeSelect').value;
+                const sTypeInput = document.getElementById('ngsSampleTypeInput').value.trim();
+                const temp = document.getElementById('ngsTemp').value;
+                const ret = document.getElementById('ngsReturn').value;
+                
+                let finalType = sTypeSelect;
+                if (sTypeSelect === '其他') {
+                    if(!sTypeInput) return alert('請輸入其他檢體種類');
+                    finalType = sTypeInput;
+                }
+                
+                details.sampleType = finalType;
+                details.temp = temp;
+                details.returnBack = ret;
+            }
+        }
 
         if(state.editingTaskId) {
-            updateTaskDb(state.editingTaskId, { title: htmlContent, category: category }, '修改', '編輯任務內容/分類');
+            updateTaskDb(state.editingTaskId, { title: htmlContent, category: category, details: details }, '修改', '編輯任務內容/分類');
         } else {
-            const newTask = { title: htmlContent, category: category, date: state.currentDate, completed: false, isDeleted: false, logs: [], createdAt: new Date().toISOString() };
+            const newTask = { title: htmlContent, category: category, date: state.currentDate, completed: false, isDeleted: false, logs: [], createdAt: new Date().toISOString(), details: details };
             newTask.logs.push({ type: '建立', desc: `建立任務於 [${category}]`, user: state.currentUser.name, time: new Date().toISOString() });
             db.collection('tasks').add(newTask);
         }
@@ -806,13 +980,47 @@
     function openModal(taskId=null) {
         const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle');
         document.getElementById('taskModal').style.display='flex'; editor.focus();
+        
+        // Reset Form
+        document.getElementById('ngs-form-container').style.display = 'none';
+        document.getElementById('ngsUnit').value = '';
+        document.getElementById('ngsPI').value = '';
+        document.getElementById('ngsNeeds').value = '';
+        document.getElementById('ngs-extraction-fields').style.display = 'none';
+        
         if(taskId) {
             state.editingTaskId=taskId; const t=state.tasks.find(x=>x.id===taskId);
             document.getElementById('modalTitle').innerText='編輯任務內容'; editor.innerHTML=t.title; document.getElementById('inputCategory').value=t.category;
             document.getElementById('btnSaveTask').innerText='保存修改';
+            
+            // Populate NGS Data if exists
+            if (t.category === 'NGS收件' && t.details) {
+                document.getElementById('ngs-form-container').style.display = 'block';
+                document.getElementById('ngsUnit').value = t.details.unit || '';
+                document.getElementById('ngsPI').value = t.details.pi || '';
+                document.getElementById('ngsNeeds').value = t.details.needs || '';
+                
+                if (t.details.needs === '萃取') {
+                    document.getElementById('ngs-extraction-fields').style.display = 'block';
+                    document.getElementById('ngsTemp').value = t.details.temp || '常溫';
+                    document.getElementById('ngsReturn').value = t.details.returnBack || '否';
+                    
+                    const type = t.details.sampleType;
+                    const options = ['Cell','Blood','Tissue','Plant'];
+                    if (options.includes(type)) {
+                        document.getElementById('ngsSampleTypeSelect').value = type;
+                        document.getElementById('ngsSampleTypeInput').style.display = 'none';
+                    } else {
+                        document.getElementById('ngsSampleTypeSelect').value = '其他';
+                        document.getElementById('ngsSampleTypeInput').style.display = 'block';
+                        document.getElementById('ngsSampleTypeInput').value = type;
+                    }
+                }
+            }
         } else {
             state.editingTaskId=null; document.getElementById('modalTitle').innerText='新增案件/任務'; editor.innerHTML='';
             document.getElementById('btnSaveTask').innerText='確認新增';
+            document.getElementById('inputCategory').value = '定序收件'; // reset
         }
     }
     function closeModal() { document.getElementById('taskModal').style.display='none'; state.editingTaskId=null; }
