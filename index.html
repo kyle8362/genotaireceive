@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>案件進度追蹤系統 (Fix v13)</title>
-
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <title>案件進度追蹤系統 (Debug v14)</title>
 
     <style>
         :root {
@@ -15,6 +12,16 @@
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+
+        /* DEBUG CONSOLE */
+        #debug-console {
+            position: fixed; bottom: 10px; right: 10px; width: 300px; height: 150px;
+            background: rgba(0,0,0,0.85); color: #0f0; font-family: monospace; font-size: 12px;
+            padding: 10px; border-radius: 8px; z-index: 9999; overflow-y: auto;
+            pointer-events: none; /* Let clicks pass through */
+        }
+        .log-err { color: #ff4444; }
+        .log-warn { color: #ffbb33; }
 
         /* Auth Screen */
         #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
@@ -25,8 +32,8 @@
         .auth-tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--warning); color: white; padding: 2px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; display: none; }
         .auth-box.admin-view .auth-tag { display: block; }
         .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
-        .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; }
-        .auth-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
+        .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
         .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
         /* Layout */
@@ -117,7 +124,6 @@
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
-        /* Modals */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal-card { background: white; padding: 2rem; border-radius: 12px; width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; }
         
@@ -173,6 +179,8 @@
     </style>
 </head>
 <body>
+
+<div id="debug-console">等待初始化...</div>
 
 <div id="auth-screen">
     <div class="mode-switch-container">
@@ -311,7 +319,17 @@
 </div>
 
 <script>
-    // --- FIREBASE CONFIGURATION (Verified) ---
+    // --- 1. Debugger Utility ---
+    function logToScreen(msg, type='info') {
+        const consoleEl = document.getElementById('debug-console');
+        const now = new Date().toLocaleTimeString();
+        const colorClass = type === 'error' ? 'log-err' : (type === 'warn' ? 'log-warn' : '');
+        consoleEl.innerHTML += `<div class="${colorClass}">[${now}] ${msg}</div>`;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+        console.log(msg); // Also log to real console
+    }
+
+    // --- 2. Firebase Init ---
     const firebaseConfig = {
       apiKey: "AIzaSyBPcmgaT4f3nfyJrJOXnAeYCwH19SwZvCA",
       authDomain: "tasktrack-app-206f8.firebaseapp.com",
@@ -322,9 +340,25 @@
       measurementId: "G-7JHGQW385H"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    let db;
+    try {
+        logToScreen("正在初始化 Firebase...");
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        logToScreen("Firebase 初始化成功！", 'success');
+        
+        // Test connection
+        db.collection('test').get().then(() => {
+            logToScreen("資料庫連線測試：成功", 'success');
+        }).catch(err => {
+            logToScreen("資料庫連線失敗: " + err.message, 'error');
+        });
 
+    } catch (e) {
+        logToScreen("Firebase 載入失敗: " + e.message, 'error');
+    }
+
+    // --- 3. App State ---
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項"];
     let state = {
         currentUser: null, authMode: 'general', currentDate: getTodayStr(),
@@ -335,24 +369,23 @@
     function formatDoc(cmd, value) { document.execCommand(cmd, false, value); document.getElementById('inputTitle').focus(); }
 
     /* --- REAL-TIME LISTENERS --- */
-    // Listen for users immediately
-    db.collection('users').onSnapshot(snapshot => {
-        state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-        // Refresh UI if needed
-        if(document.getElementById('userModal').style.display === 'flex') openUserModal();
-        if(state.currentUser) {
-            // Hot-update role
-            const me = state.users.find(u => u.username === state.currentUser.name);
-            if(me) { state.currentUser.role = me.role; updateUIForRole(); }
-        }
-    }, err => console.error("User sync error:", err));
+    if (db) {
+        db.collection('tasks').onSnapshot(snapshot => {
+            state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderTasks();
+        }, err => logToScreen("同步任務失敗: " + err.message, 'error'));
 
-    db.collection('tasks').onSnapshot(snapshot => {
-        state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderTasks();
-    }, err => console.error("Task sync error:", err));
+        db.collection('users').onSnapshot(snapshot => {
+            state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+            if(document.getElementById('userModal').style.display === 'flex') openUserModal();
+            if(state.currentUser) {
+                const me = state.users.find(u => u.username === state.currentUser.name);
+                if(me) { state.currentUser.role = me.role; updateUIForRole(); }
+            }
+        }, err => logToScreen("同步使用者失敗: " + err.message, 'error'));
+    }
 
-    /* --- Auth --- */
+    /* --- Auth Logic --- */
     function switchMode(mode) {
         state.authMode = mode;
         document.getElementById('btnModeGeneral').className = mode === 'general' ? 'mode-btn active' : 'mode-btn';
@@ -382,7 +415,7 @@
         }
     }
 
-    // FIXED HANDLE AUTH (Async/Await)
+    // FIXED & DIAGNOSTIC HANDLE AUTH
     async function handleAuth() {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value.trim();
@@ -390,20 +423,38 @@
         const btn = document.getElementById('btnAuthAction');
 
         if(!u || !p) return alert('請輸入帳號密碼');
+        if(!db) return alert('資料庫尚未連線，請檢查右下角狀態');
+
         btn.disabled = true;
+        btn.innerText = '處理中...';
+        logToScreen(`正在處理 ${u} 的請求...`);
+
+        // Force Timeout to prevent button sticking
+        const timeoutId = setTimeout(() => {
+            if(btn.disabled) {
+                btn.disabled = false;
+                btn.innerText = '登入';
+                logToScreen("操作超時 (5秒)，請檢查網路或重試", 'warn');
+                alert("連線超時，請檢查網路連線");
+            }
+        }, 8000); // 8 seconds timeout
 
         try {
             // ADMIN LOGIN
             if (state.authMode === 'admin') {
                 if (u === 'Admin' && p === 'Abcd1234') {
-                    // Check if Admin record exists, create if not
+                    // Check if Admin exists
+                    logToScreen("檢查 Admin 帳號...");
                     const q = await db.collection('users').where('username', '==', 'Admin').get();
                     if(q.empty) {
+                        logToScreen("Admin 不存在，建立中...");
                         await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
                     }
+                    clearTimeout(timeoutId);
                     loginSuccess('Admin', 'senior');
                 } else {
                     const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                    clearTimeout(timeoutId);
                     if (!q.empty) {
                         const user = q.docs[0].data();
                         if (user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
@@ -424,11 +475,12 @@
                     if (!q.empty) throw new Error('帳號已存在');
                     
                     await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
+                    clearTimeout(timeoutId);
                     alert('註冊成功！待管理員核准後方可登入。');
                     toggleAuthMode();
                 } else {
-                    // Force refresh fetch for login
                     const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                    clearTimeout(timeoutId);
                     if (q.empty) {
                         alert('帳號或密碼錯誤');
                     } else {
@@ -442,16 +494,19 @@
                 }
             }
         } catch (e) {
+            clearTimeout(timeoutId);
             alert(e.message || '發生錯誤');
-            console.error(e);
+            logToScreen("錯誤: " + e.message, 'error');
         } finally {
             btn.disabled = false;
+            btn.innerText = title.includes('註冊') ? '註冊' : '登入';
         }
     }
 
     function loginSuccess(username, role) {
         state.currentUser = { name: username, role: role };
         localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser));
+        logToScreen("登入成功！進入系統...");
         initApp();
     }
     function logout() { localStorage.removeItem('tt_current_user'); location.reload(); }
@@ -751,9 +806,8 @@
         });
     }
     
-    // Check local storage only if no conflict
     const storedUser = localStorage.getItem('tt_current_user');
-    if(storedUser && !state.currentUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
+    if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
     
     function openModal(taskId=null) {
         const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle');
