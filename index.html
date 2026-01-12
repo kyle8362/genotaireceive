@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>案件進度追蹤系統 (Genesis v20)</title>
+    <title>案件進度追蹤系統 (NGS Pro v21)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -13,7 +13,7 @@
             --primary: #0f766e; --primary-light: #ccfbf1; --bg: #f3f4f6;
             --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
-            --genesis: #7e22ce; /* Genesis Purple */
+            --genesis: #7e22ce;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
@@ -144,7 +144,7 @@
         .ngs-row { margin-bottom: 10px; }
         .ngs-row label { font-size: 0.85rem; color: #0f766e; font-weight: 600; margin-bottom: 4px; display: block; }
         .ngs-row input, .ngs-row select { width: 100%; padding: 8px; border: 1px solid #5eead4; border-radius: 4px; font-size: 0.95rem; }
-        #ngs-extraction-fields { margin-top: 10px; padding-left: 10px; border-left: 3px solid #0d9488; display: none; }
+        #ngs-extraction-fields, #ngs-qc-fields { margin-top: 10px; padding-left: 10px; border-left: 3px solid #0d9488; display: none; }
 
         .modal-btns { display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem; }
         .btn { padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; }
@@ -157,7 +157,7 @@
         .user-name { font-weight: 600; font-size: 1rem; }
         .user-role-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; border: 1px solid #ddd;}
         
-        .role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; font-weight: bold; } /* GENESIS */
+        .role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; font-weight: bold; }
         .role-senior { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
         .role-admin { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
         .role-user { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
@@ -289,24 +289,25 @@
             <h4 style="margin-top:0; color:#0f766e;">📝 NGS 詳細資料 (必填)</h4>
             <div class="ngs-row">
                 <label>1. 單位</label>
-                <input type="text" id="ngsUnit" placeholder="輸入單位">
+                <input type="text" id="ngsUnit" placeholder="輸入單位" oninput="generateNgsTitle()">
             </div>
             <div class="ngs-row">
                 <label>2. 主持人</label>
-                <input type="text" id="ngsPI" placeholder="輸入主持人">
+                <input type="text" id="ngsPI" placeholder="輸入主持人" oninput="generateNgsTitle()">
             </div>
             <div class="ngs-row">
                 <label>3. 樣本處理需求</label>
-                <select id="ngsNeeds" onchange="handleNgsNeedsChange()">
+                <select id="ngsNeeds" onchange="handleNgsNeedsChange(); generateNgsTitle()">
                     <option value="">請選擇</option>
                     <option value="萃取">萃取 (Extraction)</option>
                     <option value="QC">QC</option>
                 </select>
             </div>
+            
             <div id="ngs-extraction-fields">
                 <div class="ngs-row">
                     <label>4-1.1 檢體種類</label>
-                    <select id="ngsSampleTypeSelect" onchange="handleSampleTypeChange()">
+                    <select id="ngsSampleTypeSelect" onchange="handleDropdownChange('ngsSampleTypeSelect', 'ngsSampleTypeInput')">
                         <option value="Cell">Cell</option>
                         <option value="Blood">Blood</option>
                         <option value="Tissue">Tissue</option>
@@ -330,6 +331,66 @@
                         <option value="是">是</option>
                         <option value="否">否</option>
                     </select>
+                </div>
+                <div class="ngs-row">
+                    <label>4-1.4 樣本數量</label>
+                    <input type="text" id="ngsCount" placeholder="填寫數量">
+                </div>
+                <div class="ngs-row">
+                    <label>4-1.5 後續實驗種類</label>
+                    <select id="ngsExpTypeSelect" onchange="handleDropdownChange('ngsExpTypeSelect', 'ngsExpTypeInput'); generateNgsTitle()">
+                        <option value="">請選擇</option>
+                        <option value="Seq Only">Seq Only</option>
+                        <option value="DGE">DGE</option>
+                        <option value="Small RNA">Small RNA</option>
+                        <option value="WES">WES</option>
+                        <option value="WGS">WGS</option>
+                        <option value="PIPseq">PIPseq</option>
+                        <option value="Amplicon Sequence">Amplicon Sequence</option>
+                        <option value="細菌WGS">細菌WGS</option>
+                        <option value="metagenome">metagenome</option>
+                        <option value="16s">16s</option>
+                        <option value="16sFL">16sFL</option>
+                        <option value="Olink">Olink</option>
+                        <option value="10x">10x</option>
+                        <option value="RADseq">RADseq</option>
+                        <option value="其他">其他 (手動輸入)</option>
+                    </select>
+                    <input type="text" id="ngsExpTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;" oninput="generateNgsTitle()">
+                </div>
+                <div class="ngs-row">
+                    <label>4-1.6 實驗平台</label>
+                    <select id="ngsPlatformSelect" onchange="handleDropdownChange('ngsPlatformSelect', 'ngsPlatformInput')">
+                        <option value="Novaseq X Plus">Novaseq X Plus</option>
+                        <option value="Miseq">Miseq</option>
+                        <option value="PacBio">PacBio</option>
+                        <option value="Nanopore">Nanopore</option>
+                        <option value="Olink">Olink</option>
+                        <option value="其他">其他 (手動輸入)</option>
+                    </select>
+                    <input type="text" id="ngsPlatformInput" placeholder="輸入平台" style="display:none; margin-top:5px;">
+                </div>
+                <div class="ngs-row">
+                    <label>4-1.7 負責業務</label>
+                    <select id="ngsSales">
+                        <option value="Jeff">Jeff</option>
+                        <option value="廖軒逵">廖軒逵</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="ngs-qc-fields">
+                <div class="ngs-row">
+                    <label>4-2.1 核酸種類</label>
+                    <select id="ngsNucleicTypeSelect" onchange="handleDropdownChange('ngsNucleicTypeSelect', 'ngsNucleicTypeInput'); generateNgsTitle()">
+                        <option value="">請選擇</option>
+                        <option value="DNA">DNA</option>
+                        <option value="RNA">RNA</option>
+                        <option value="Library">Library</option>
+                        <option value="miRNA">miRNA</option>
+                        <option value="其他">其他 (手動輸入)</option>
+                    </select>
+                    <input type="text" id="ngsNucleicTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;" oninput="generateNgsTitle()">
                 </div>
             </div>
         </div>
@@ -611,21 +672,39 @@
 
     function handleNgsNeedsChange() {
         const needs = document.getElementById('ngsNeeds').value;
-        const subFields = document.getElementById('ngs-extraction-fields');
-        if (needs === '萃取') {
-            subFields.style.display = 'block';
-        } else {
-            subFields.style.display = 'none';
-        }
+        const exFields = document.getElementById('ngs-extraction-fields');
+        const qcFields = document.getElementById('ngs-qc-fields');
+        
+        exFields.style.display = (needs === '萃取') ? 'block' : 'none';
+        qcFields.style.display = (needs === 'QC') ? 'block' : 'none';
     }
 
-    function handleSampleTypeChange() {
-        const type = document.getElementById('ngsSampleTypeSelect').value;
-        const input = document.getElementById('ngsSampleTypeInput');
-        if (type === '其他') {
-            input.style.display = 'block';
-        } else {
-            input.style.display = 'none';
+    function handleDropdownChange(selectId, inputId) {
+        const val = document.getElementById(selectId).value;
+        document.getElementById(inputId).style.display = (val === '其他') ? 'block' : 'none';
+    }
+
+    // AUTO TITLE GENERATOR
+    function generateNgsTitle() {
+        const cat = document.getElementById('inputCategory').value;
+        if (cat !== 'NGS收件') return;
+
+        const unit = document.getElementById('ngsUnit').value.trim();
+        const pi = document.getElementById('ngsPI').value.trim();
+        const needs = document.getElementById('ngsNeeds').value;
+        
+        let subType = '';
+        
+        if (needs === '萃取') {
+            const sel = document.getElementById('ngsExpTypeSelect').value;
+            subType = (sel === '其他') ? document.getElementById('ngsExpTypeInput').value.trim() : sel;
+        } else if (needs === 'QC') {
+            const sel = document.getElementById('ngsNucleicTypeSelect').value;
+            subType = (sel === '其他') ? document.getElementById('ngsNucleicTypeInput').value.trim() : sel;
+        }
+
+        if (unit && pi && subType) {
+            document.getElementById('inputTitle').innerText = `${unit}-${pi}-${subType} 收件`;
         }
     }
 
@@ -702,74 +781,34 @@
             else if(user.role === 'admin') { badgeClass = 'role-admin'; badgeText = '管理者'; }
             if(!isApproved) { badgeClass = ''; badgeText = '待審核'; }
 
-            // Genesis Protection Logic
             const isTargetCreator = user.role === 'creator';
-            const isMe = user.username === state.currentUser.name;
-            
             let controlsHtml = '';
 
-            // CREATOR CAN EDIT ALL (Except maybe self destructive actions, but we allow edit)
             if (myRole === 'creator') {
                 const selUser = user.role === 'user' ? 'selected' : '';
                 const selAdmin = user.role === 'admin' ? 'selected' : '';
                 const selSenior = user.role === 'senior' ? 'selected' : '';
-                const selCreator = user.role === 'creator' ? 'selected' : '';
-                
                 const pwdId = `pwd_${user.docId}`;
                 
-                // Allow role change only if not Creator (to prevent accidental demotion) OR allow it
                 const roleSelect = isTargetCreator ? `<select disabled><option selected>創世神</option></select>` : 
                     `<select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select>`;
 
                 controlsHtml = `
-                    <div class="user-edit-row">
-                        ${roleSelect}
-                        <input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}">
-                    </div>
-                    <div class="user-edit-row">
-                        <span class="readonly-text" style="min-width:60px;">密碼:</span>
-                        <input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;">
-                        <button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button>
-                    </div>
-                    <div style="text-align:right;">
-                        <button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>
-                        ${ !isTargetCreator ? `<button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>` : '' }
-                    </div>
-                `;
+                    <div class="user-edit-row">${roleSelect}<input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}"></div>
+                    <div class="user-edit-row"><span class="readonly-text" style="min-width:60px;">密碼:</span><input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;"><button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button></div>
+                    <div style="text-align:right;"><button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>${ !isTargetCreator ? `<button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>` : '' }</div>`;
             } 
-            // SENIOR ADMIN
             else if (myRole === 'senior') {
                 if (isTargetCreator) {
                     controlsHtml = `<div class="user-edit-row"><span style="color:purple; font-weight:bold;">此為最高權限帳號，無法編輯。</span></div>`;
                 } else {
-                    // Similar to Creator but cannot set role to Creator
                     const selUser = user.role === 'user' ? 'selected' : '';
                     const selAdmin = user.role === 'admin' ? 'selected' : '';
                     const selSenior = user.role === 'senior' ? 'selected' : '';
                     const pwdId = `pwd_${user.docId}`;
-
-                    controlsHtml = `
-                        <div class="user-edit-row">
-                            <select id="role_${user.docId}">
-                                <option value="user" ${selUser}>一般者</option>
-                                <option value="admin" ${selAdmin}>管理者</option>
-                                <option value="senior" ${selSenior}>高級管理者</option>
-                            </select>
-                            <input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}">
-                        </div>
-                        <div class="user-edit-row">
-                            <span class="readonly-text" style="min-width:60px;">密碼:</span>
-                            <input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;">
-                            <button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button>
-                        </div>
-                        <div style="text-align:right;">
-                            <button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>
-                            <button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>
-                        </div>
-                    `;
+                    controlsHtml = `<div class="user-edit-row"><select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select><input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}"></div><div class="user-edit-row"><span class="readonly-text" style="min-width:60px;">密碼:</span><input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;"><button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button></div><div style="text-align:right;"><button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button><button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button></div>`;
                 }
             }
-            // REGULAR ADMIN
             else if (myRole === 'admin') {
                 if (isTargetCreator || user.role === 'senior') {
                     controlsHtml = `<div class="user-edit-row"><span class="readonly-text">權限高於或等於您，無法檢視詳細資料。</span></div>`;
@@ -793,8 +832,7 @@
     function updateUser(docId) {
         const role = document.getElementById(`role_${docId}`).value;
         const note = document.getElementById(`note_${docId}`).value;
-        db.collection('users').doc(docId).update({ role: role, remarks: note, isApproved: true })
-            .then(() => alert('資料已更新'));
+        db.collection('users').doc(docId).update({ role: role, remarks: note, isApproved: true }).then(() => alert('資料已更新'));
     }
     function deleteUser(docId) {
         if (!confirm('確定要刪除此帳號嗎？')) return;
@@ -881,7 +919,11 @@
                 <div><span class="ngs-badge">主持人</span> ${task.details.pi}</div>
                 <div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
             if(task.details.needs === '萃取') {
-                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | ${task.details.temp} | 歸還:${task.details.returnBack}</div>`;
+                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div>
+                <div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div>
+                <div><span class="ngs-badge">業務</span> ${task.details.sales}</div>`;
+            } else if (task.details.needs === 'QC') {
+                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType}</div>`;
             }
             ngsInfoHtml += `</div>`;
         }
@@ -904,6 +946,12 @@
             updateTaskDb(id, updateData, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態');
         }
     }
+    
+    function getDropdownOrInput(selectId, inputId) {
+        const sel = document.getElementById(selectId).value;
+        return (sel === '其他') ? document.getElementById(inputId).value.trim() : sel;
+    }
+
     function saveTask() {
         const htmlContent = document.getElementById('inputTitle').innerHTML.trim();
         const category = document.getElementById('inputCategory').value;
@@ -919,25 +967,24 @@
             const pi = document.getElementById('ngsPI').value.trim();
             const needs = document.getElementById('ngsNeeds').value;
             
-            if (!unit || !pi || !needs) return alert('請完整填寫 NGS 詳細資料 (單位、主持人、需求)');
+            if (!unit || !pi || !needs) return alert('請完整填寫 NGS 詳細資料');
             
             details = { unit, pi, needs };
             
             if (needs === '萃取') {
-                const sTypeSelect = document.getElementById('ngsSampleTypeSelect').value;
-                const sTypeInput = document.getElementById('ngsSampleTypeInput').value.trim();
-                const temp = document.getElementById('ngsTemp').value;
-                const ret = document.getElementById('ngsReturn').value;
+                details.sampleType = getDropdownOrInput('ngsSampleTypeSelect', 'ngsSampleTypeInput');
+                details.temp = document.getElementById('ngsTemp').value;
+                details.returnBack = document.getElementById('ngsReturn').value;
+                details.sampleCount = document.getElementById('ngsCount').value.trim();
+                details.expType = getDropdownOrInput('ngsExpTypeSelect', 'ngsExpTypeInput');
+                details.platform = getDropdownOrInput('ngsPlatformSelect', 'ngsPlatformInput');
+                details.sales = document.getElementById('ngsSales').value;
                 
-                let finalType = sTypeSelect;
-                if (sTypeSelect === '其他') {
-                    if(!sTypeInput) return alert('請輸入其他檢體種類');
-                    finalType = sTypeInput;
-                }
+                if (!details.sampleType || !details.sampleCount || !details.expType || !details.platform) return alert('請完整填寫萃取詳細資料');
                 
-                details.sampleType = finalType;
-                details.temp = temp;
-                details.returnBack = ret;
+            } else if (needs === 'QC') {
+                details.nucleicType = getDropdownOrInput('ngsNucleicTypeSelect', 'ngsNucleicTypeInput');
+                if (!details.nucleicType) return alert('請選擇核酸種類');
             }
         }
 
@@ -994,13 +1041,13 @@
         document.getElementById('ngsPI').value = '';
         document.getElementById('ngsNeeds').value = '';
         document.getElementById('ngs-extraction-fields').style.display = 'none';
+        document.getElementById('ngs-qc-fields').style.display = 'none';
         
         if(taskId) {
             state.editingTaskId=taskId; const t=state.tasks.find(x=>x.id===taskId);
             document.getElementById('modalTitle').innerText='編輯任務內容'; editor.innerHTML=t.title; document.getElementById('inputCategory').value=t.category;
             document.getElementById('btnSaveTask').innerText='保存修改';
             
-            // Populate NGS Data if exists
             if (t.category === 'NGS收件' && t.details) {
                 document.getElementById('ngs-form-container').style.display = 'block';
                 document.getElementById('ngsUnit').value = t.details.unit || '';
@@ -1011,23 +1058,30 @@
                     document.getElementById('ngs-extraction-fields').style.display = 'block';
                     document.getElementById('ngsTemp').value = t.details.temp || '常溫';
                     document.getElementById('ngsReturn').value = t.details.returnBack || '否';
+                    document.getElementById('ngsCount').value = t.details.sampleCount || '';
+                    document.getElementById('ngsSales').value = t.details.sales || 'Jeff';
                     
-                    const type = t.details.sampleType;
-                    const options = ['Cell','Blood','Tissue','Plant'];
-                    if (options.includes(type)) {
-                        document.getElementById('ngsSampleTypeSelect').value = type;
-                        document.getElementById('ngsSampleTypeInput').style.display = 'none';
-                    } else {
-                        document.getElementById('ngsSampleTypeSelect').value = '其他';
-                        document.getElementById('ngsSampleTypeInput').style.display = 'block';
-                        document.getElementById('ngsSampleTypeInput').value = type;
-                    }
+                    const setDropdown = (selId, inpId, val, opts) => {
+                        if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; }
+                        else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; }
+                    };
+                    
+                    setDropdown('ngsSampleTypeSelect', 'ngsSampleTypeInput', t.details.sampleType, ['Cell','Blood','Tissue','Plant']);
+                    setDropdown('ngsExpTypeSelect', 'ngsExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']);
+                    setDropdown('ngsPlatformSelect', 'ngsPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']);
+                } else if (t.details.needs === 'QC') {
+                    document.getElementById('ngs-qc-fields').style.display = 'block';
+                    const setDropdown = (selId, inpId, val, opts) => {
+                        if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; }
+                        else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; }
+                    };
+                    setDropdown('ngsNucleicTypeSelect', 'ngsNucleicTypeInput', t.details.nucleicType, ['DNA','RNA','Library','miRNA']);
                 }
             }
         } else {
             state.editingTaskId=null; document.getElementById('modalTitle').innerText='新增案件/任務'; editor.innerHTML='';
             document.getElementById('btnSaveTask').innerText='確認新增';
-            document.getElementById('inputCategory').value = '定序收件'; // reset
+            document.getElementById('inputCategory').value = '定序收件'; 
         }
     }
     function closeModal() { document.getElementById('taskModal').style.display='none'; state.editingTaskId=null; }
