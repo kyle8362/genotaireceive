@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>案件進度追蹤系統 (Stable v12)</title>
+    <title>案件進度追蹤系統 (Fix v13)</title>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -117,6 +117,7 @@
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
+        /* Modals */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal-card { background: white; padding: 2rem; border-radius: 12px; width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; }
         
@@ -310,7 +311,7 @@
 </div>
 
 <script>
-    // --- FIREBASE CONFIGURATION (Must be correct) ---
+    // --- FIREBASE CONFIGURATION (Verified) ---
     const firebaseConfig = {
       apiKey: "AIzaSyBPcmgaT4f3nfyJrJOXnAeYCwH19SwZvCA",
       authDomain: "tasktrack-app-206f8.firebaseapp.com",
@@ -321,7 +322,6 @@
       measurementId: "G-7JHGQW385H"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -335,22 +335,24 @@
     function formatDoc(cmd, value) { document.execCommand(cmd, false, value); document.getElementById('inputTitle').focus(); }
 
     /* --- REAL-TIME LISTENERS --- */
-    db.collection('tasks').onSnapshot(snapshot => {
-        state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderTasks();
-    });
+    // Listen for users immediately
     db.collection('users').onSnapshot(snapshot => {
         state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+        // Refresh UI if needed
         if(document.getElementById('userModal').style.display === 'flex') openUserModal();
         if(state.currentUser) {
+            // Hot-update role
             const me = state.users.find(u => u.username === state.currentUser.name);
             if(me) { state.currentUser.role = me.role; updateUIForRole(); }
         }
-    }, (error) => {
-        console.error("Error fetching users:", error);
-    });
+    }, err => console.error("User sync error:", err));
 
-    /* --- Auth Logic (Fixed for Async) --- */
+    db.collection('tasks').onSnapshot(snapshot => {
+        state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderTasks();
+    }, err => console.error("Task sync error:", err));
+
+    /* --- Auth --- */
     function switchMode(mode) {
         state.authMode = mode;
         document.getElementById('btnModeGeneral').className = mode === 'general' ? 'mode-btn active' : 'mode-btn';
@@ -380,7 +382,7 @@
         }
     }
 
-    // NEW HANDLE AUTH (Direct DB Query)
+    // FIXED HANDLE AUTH (Async/Await)
     async function handleAuth() {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value.trim();
@@ -388,27 +390,26 @@
         const btn = document.getElementById('btnAuthAction');
 
         if(!u || !p) return alert('請輸入帳號密碼');
-        btn.disabled = true; // Disable button to prevent double clicks
+        btn.disabled = true;
 
         try {
             // ADMIN LOGIN
             if (state.authMode === 'admin') {
                 if (u === 'Admin' && p === 'Abcd1234') {
-                    // Check if Admin exists, if not create
-                    const snapshot = await db.collection('users').where('username', '==', 'Admin').get();
-                    if(snapshot.empty) {
+                    // Check if Admin record exists, create if not
+                    const q = await db.collection('users').where('username', '==', 'Admin').get();
+                    if(q.empty) {
                         await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
                     }
                     loginSuccess('Admin', 'senior');
                 } else {
-                    // Regular Admin/Senior logging in via Admin panel
-                    const snapshot = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    if (!snapshot.empty) {
-                        const user = snapshot.docs[0].data();
+                    const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                    if (!q.empty) {
+                        const user = q.docs[0].data();
                         if (user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
                             loginSuccess(user.username, user.role);
                         } else {
-                            alert('權限不足或帳密錯誤 (僅管理者可從此處登入)');
+                            alert('權限不足或帳密錯誤');
                         }
                     } else {
                         alert('權限不足或帳密錯誤');
@@ -419,21 +420,19 @@
             else {
                 if (title.includes('註冊')) {
                     if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
-                    
-                    const snapshot = await db.collection('users').where('username', '==', u).get();
-                    if (!snapshot.empty) throw new Error('帳號已存在');
+                    const q = await db.collection('users').where('username', '==', u).get();
+                    if (!q.empty) throw new Error('帳號已存在');
                     
                     await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
                     alert('註冊成功！待管理員核准後方可登入。');
                     toggleAuthMode();
                 } else {
-                    // Login: Query DB directly instead of checking local array
-                    const snapshot = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    
-                    if (snapshot.empty) {
+                    // Force refresh fetch for login
+                    const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                    if (q.empty) {
                         alert('帳號或密碼錯誤');
                     } else {
-                        const user = snapshot.docs[0].data();
+                        const user = q.docs[0].data();
                         if (!user.isApproved) {
                             alert('⚠️ 您的帳號尚未通過審核。');
                         } else {
@@ -442,9 +441,9 @@
                     }
                 }
             }
-        } catch (error) {
-            alert(error.message);
-            console.error("Auth Error:", error);
+        } catch (e) {
+            alert(e.message || '發生錯誤');
+            console.error(e);
         } finally {
             btn.disabled = false;
         }
@@ -456,8 +455,7 @@
         initApp();
     }
     function logout() { localStorage.removeItem('tt_current_user'); location.reload(); }
-    function checkLogin() { const stored = localStorage.getItem('tt_current_user'); if (stored) { state.currentUser = JSON.parse(stored); initApp(); } }
-
+    
     function initApp() {
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('app-screen').style.display = 'flex';
@@ -660,7 +658,6 @@
             container.appendChild(group);
         });
 
-        // Completed
         const completed = dayTasks.filter(t => t.completed && !t.isDeleted);
         if (completed.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group completed-section';
@@ -669,7 +666,6 @@
             completed.forEach(t => group.appendChild(createTaskElement(t)));
             container.appendChild(group);
         }
-        // Deleted
         const deleted = dayTasks.filter(t => t.isDeleted);
         if (deleted.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group deleted-section';
@@ -703,7 +699,6 @@
         return div;
     }
 
-    /* --- DB OPERATIONS --- */
     function toggleTask(id) {
         const task = state.tasks.find(t => t.id === id);
         if(task) {
@@ -756,9 +751,9 @@
         });
     }
     
-    // Check if user is logged in
+    // Check local storage only if no conflict
     const storedUser = localStorage.getItem('tt_current_user');
-    if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
+    if(storedUser && !state.currentUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
     
     function openModal(taskId=null) {
         const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle');
