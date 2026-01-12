@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>案件進度追蹤系統 (NGS Pro v21)</title>
+    <title>案件進度追蹤系統 (NGS Final v22)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -391,6 +391,67 @@
                         <option value="其他">其他 (手動輸入)</option>
                     </select>
                     <input type="text" id="ngsNucleicTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;" oninput="generateNgsTitle()">
+                </div>
+                <div class="ngs-row">
+                    <label>4-2.2 保存溫度</label>
+                    <select id="ngsQcTemp">
+                        <option value="常溫">常溫</option>
+                        <option value="4°C">4°C</option>
+                        <option value="-20°C">-20°C</option>
+                        <option value="-80°C">-80°C</option>
+                    </select>
+                </div>
+                <div class="ngs-row">
+                    <label>4-2.3 歸還</label>
+                    <select id="ngsQcReturn">
+                        <option value="是">是</option>
+                        <option value="否">否</option>
+                    </select>
+                </div>
+                <div class="ngs-row">
+                    <label>4-2.4 樣本數量</label>
+                    <input type="text" id="ngsQcCount" placeholder="填寫數量">
+                </div>
+                <div class="ngs-row">
+                    <label>4-2.5 後續實驗種類</label>
+                    <select id="ngsQcExpTypeSelect" onchange="handleDropdownChange('ngsQcExpTypeSelect', 'ngsQcExpTypeInput')">
+                        <option value="">請選擇</option>
+                        <option value="Seq Only">Seq Only</option>
+                        <option value="DGE">DGE</option>
+                        <option value="Small RNA">Small RNA</option>
+                        <option value="WES">WES</option>
+                        <option value="WGS">WGS</option>
+                        <option value="PIPseq">PIPseq</option>
+                        <option value="Amplicon Sequence">Amplicon Sequence</option>
+                        <option value="細菌WGS">細菌WGS</option>
+                        <option value="metagenome">metagenome</option>
+                        <option value="16s">16s</option>
+                        <option value="16sFL">16sFL</option>
+                        <option value="Olink">Olink</option>
+                        <option value="10x">10x</option>
+                        <option value="RADseq">RADseq</option>
+                        <option value="其他">其他 (手動輸入)</option>
+                    </select>
+                    <input type="text" id="ngsQcExpTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;">
+                </div>
+                <div class="ngs-row">
+                    <label>4-2.6 實驗平台</label>
+                    <select id="ngsQcPlatformSelect" onchange="handleDropdownChange('ngsQcPlatformSelect', 'ngsQcPlatformInput')">
+                        <option value="Novaseq X Plus">Novaseq X Plus</option>
+                        <option value="Miseq">Miseq</option>
+                        <option value="PacBio">PacBio</option>
+                        <option value="Nanopore">Nanopore</option>
+                        <option value="Olink">Olink</option>
+                        <option value="其他">其他 (手動輸入)</option>
+                    </select>
+                    <input type="text" id="ngsQcPlatformInput" placeholder="輸入平台" style="display:none; margin-top:5px;">
+                </div>
+                <div class="ngs-row">
+                    <label>4-2.7 負責業務</label>
+                    <select id="ngsQcSales">
+                        <option value="Jeff">Jeff</option>
+                        <option value="廖軒逵">廖軒逵</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -788,8 +849,8 @@
                 const selUser = user.role === 'user' ? 'selected' : '';
                 const selAdmin = user.role === 'admin' ? 'selected' : '';
                 const selSenior = user.role === 'senior' ? 'selected' : '';
-                const pwdId = `pwd_${user.docId}`;
                 
+                const pwdId = `pwd_${user.docId}`;
                 const roleSelect = isTargetCreator ? `<select disabled><option selected>創世神</option></select>` : 
                     `<select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select>`;
 
@@ -918,12 +979,15 @@
                 <div><span class="ngs-badge">單位</span> ${task.details.unit}</div>
                 <div><span class="ngs-badge">主持人</span> ${task.details.pi}</div>
                 <div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
+            
             if(task.details.needs === '萃取') {
                 ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div>
                 <div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div>
-                <div><span class="ngs-badge">業務</span> ${task.details.sales}</div>`;
+                <div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
             } else if (task.details.needs === 'QC') {
-                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType}</div>`;
+                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div>
+                <div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div>
+                <div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
             }
             ngsInfoHtml += `</div>`;
         }
@@ -971,20 +1035,28 @@
             
             details = { unit, pi, needs };
             
-            if (needs === '萃取') {
-                details.sampleType = getDropdownOrInput('ngsSampleTypeSelect', 'ngsSampleTypeInput');
-                details.temp = document.getElementById('ngsTemp').value;
-                details.returnBack = document.getElementById('ngsReturn').value;
-                details.sampleCount = document.getElementById('ngsCount').value.trim();
-                details.expType = getDropdownOrInput('ngsExpTypeSelect', 'ngsExpTypeInput');
-                details.platform = getDropdownOrInput('ngsPlatformSelect', 'ngsPlatformInput');
-                details.sales = document.getElementById('ngsSales').value;
+            // Common fields for Extraction AND QC (based on prompt v22 update)
+            if (needs === '萃取' || needs === 'QC') {
+                const prefix = needs === '萃取' ? 'ngs' : 'ngsQc';
                 
-                if (!details.sampleType || !details.sampleCount || !details.expType || !details.platform) return alert('請完整填寫萃取詳細資料');
-                
-            } else if (needs === 'QC') {
-                details.nucleicType = getDropdownOrInput('ngsNucleicTypeSelect', 'ngsNucleicTypeInput');
-                if (!details.nucleicType) return alert('請選擇核酸種類');
+                // Specific Type field
+                if (needs === '萃取') {
+                    details.sampleType = getDropdownOrInput('ngsSampleTypeSelect', 'ngsSampleTypeInput');
+                    if (!details.sampleType) return alert('請填寫檢體種類');
+                } else {
+                    details.nucleicType = getDropdownOrInput('ngsNucleicTypeSelect', 'ngsNucleicTypeInput');
+                    if (!details.nucleicType) return alert('請填寫核酸種類');
+                }
+
+                // Shared fields (Logic mapped to correct IDs)
+                details.temp = document.getElementById(prefix + 'Temp').value;
+                details.returnBack = document.getElementById(prefix + 'Return').value;
+                details.sampleCount = document.getElementById(prefix + 'Count').value.trim();
+                details.expType = getDropdownOrInput(prefix + 'ExpTypeSelect', prefix + 'ExpTypeInput');
+                details.platform = getDropdownOrInput(prefix + 'PlatformSelect', prefix + 'PlatformInput');
+                details.sales = document.getElementById(prefix + 'Sales').value;
+
+                if (!details.sampleCount || !details.expType || !details.platform) return alert('請完整填寫詳細資料 (數量、實驗、平台)');
             }
         }
 
@@ -1054,28 +1126,30 @@
                 document.getElementById('ngsPI').value = t.details.pi || '';
                 document.getElementById('ngsNeeds').value = t.details.needs || '';
                 
+                const setVal = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val||''; }
+                const setDropdown = (selId, inpId, val, opts) => {
+                    if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; }
+                    else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; }
+                };
+
                 if (t.details.needs === '萃取') {
                     document.getElementById('ngs-extraction-fields').style.display = 'block';
-                    document.getElementById('ngsTemp').value = t.details.temp || '常溫';
-                    document.getElementById('ngsReturn').value = t.details.returnBack || '否';
-                    document.getElementById('ngsCount').value = t.details.sampleCount || '';
-                    document.getElementById('ngsSales').value = t.details.sales || 'Jeff';
-                    
-                    const setDropdown = (selId, inpId, val, opts) => {
-                        if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; }
-                        else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; }
-                    };
-                    
+                    setVal('ngsTemp', t.details.temp);
+                    setVal('ngsReturn', t.details.returnBack);
+                    setVal('ngsCount', t.details.sampleCount);
+                    setVal('ngsSales', t.details.sales);
                     setDropdown('ngsSampleTypeSelect', 'ngsSampleTypeInput', t.details.sampleType, ['Cell','Blood','Tissue','Plant']);
                     setDropdown('ngsExpTypeSelect', 'ngsExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']);
                     setDropdown('ngsPlatformSelect', 'ngsPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']);
                 } else if (t.details.needs === 'QC') {
                     document.getElementById('ngs-qc-fields').style.display = 'block';
-                    const setDropdown = (selId, inpId, val, opts) => {
-                        if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; }
-                        else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; }
-                    };
+                    setVal('ngsQcTemp', t.details.temp);
+                    setVal('ngsQcReturn', t.details.returnBack);
+                    setVal('ngsQcCount', t.details.sampleCount);
+                    setVal('ngsQcSales', t.details.sales);
                     setDropdown('ngsNucleicTypeSelect', 'ngsNucleicTypeInput', t.details.nucleicType, ['DNA','RNA','Library','miRNA']);
+                    setDropdown('ngsQcExpTypeSelect', 'ngsQcExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']);
+                    setDropdown('ngsQcPlatformSelect', 'ngsQcPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']);
                 }
             }
         } else {
