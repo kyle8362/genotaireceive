@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
     <meta name="robots" content="noindex, nofollow">
-    
-    <title>案件進度追蹤系統 (Private v23)</title>
+    <title>案件進度追蹤系統 (Unified v24)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -21,14 +19,9 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
 
-        /* Auth Screen */
+        /* Auth Screen (Unified) */
         #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 2000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .mode-switch-container { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; }
-        .mode-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
-        .mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
         .auth-box { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 320px; text-align: center; border: 1px solid var(--border); position: relative; }
-        .auth-tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--warning); color: white; padding: 2px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; display: none; }
-        .auth-box.admin-view .auth-tag { display: block; }
         .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
         .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
         .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
@@ -43,9 +36,12 @@
         .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
         .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; flex-shrink: 0; }
         .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
+        
+        /* Admin Buttons */
         .admin-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: none; font-size: 0.9rem; }
         .btn-perm { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
         .btn-stats { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
+        .btn-settings { background: #f0fdfa; color: #0f766e; border: 1px solid #ccfbf1; } /* New Button Style */
         
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
@@ -154,8 +150,10 @@
         .btn-cancel { background: #f3f4f6; color: #4b5563; }
         .btn-save { background: var(--primary); color: white; }
 
-        .user-list { list-style: none; padding: 0; margin: 0; }
-        .user-item { display: flex; flex-direction: column; padding: 15px; border-bottom: 1px solid #eee; background: #fafafa; border-radius: 6px; margin-bottom: 10px; }
+        .user-list, .settings-list { list-style: none; padding: 0; margin: 0; }
+        .user-item, .setting-item { display: flex; flex-direction: column; padding: 15px; border-bottom: 1px solid #eee; background: #fafafa; border-radius: 6px; margin-bottom: 10px; }
+        .setting-item { flex-direction: row; justify-content: space-between; align-items: center; }
+        
         .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .user-name { font-weight: 600; font-size: 1rem; }
         .user-role-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; border: 1px solid #ddd;}
@@ -196,8 +194,6 @@
             aside { position: fixed; top: 0; left: 0; height: 100%; width: 280px; z-index: 1000; transform: translateX(-100%); box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
             aside.open { transform: translateX(0); }
             main { padding-top: 70px; width: 100%; }
-            .mode-switch-container { top: 10px; right: 10px; }
-            .mode-btn { padding: 5px 10px; font-size: 0.8rem; }
             .task-item { flex-direction: column; }
             .task-content { padding-right: 0; margin-bottom: 10px; }
             .action-area { flex-direction: row; width: 100%; justify-content: flex-end; }
@@ -211,12 +207,7 @@
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div id="auth-screen">
-    <div class="mode-switch-container">
-        <button class="mode-btn active" id="btnModeGeneral" onclick="switchMode('general')">一般模式</button>
-        <button class="mode-btn" id="btnModeAdmin" onclick="switchMode('admin')">管理模式</button>
-    </div>
     <div class="auth-box" id="authBox">
-        <div class="auth-tag">ADMIN MODE</div>
         <h2 id="auth-title" style="color:#0f766e">系統登入</h2>
         <input type="text" id="username" placeholder="帳號" autofocus>
         <input type="password" id="password" placeholder="密碼">
@@ -235,6 +226,7 @@
             </div>
         </div>
         <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
+        <div class="admin-btn btn-settings" id="salesSettingsBtn" onclick="openSalesSettings()">⚙️ NGS 業務設定</div>
         <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="openStatsModal()">📊 任務完成統整</div>
         
         <div class="sidebar-section">
@@ -375,11 +367,7 @@
                 </div>
                 <div class="ngs-row">
                     <label>4-1.7 負責業務</label>
-                    <select id="ngsSales">
-                        <option value="Jeff">Jeff</option>
-                        <option value="廖軒逵">廖軒逵</option>
-                    </select>
-                </div>
+                    <select id="ngsSales"></select> </div>
             </div>
 
             <div id="ngs-qc-fields">
@@ -451,11 +439,7 @@
                 </div>
                 <div class="ngs-row">
                     <label>4-2.7 負責業務</label>
-                    <select id="ngsQcSales">
-                        <option value="Jeff">Jeff</option>
-                        <option value="廖軒逵">廖軒逵</option>
-                    </select>
-                </div>
+                    <select id="ngsQcSales"></select> </div>
             </div>
         </div>
 
@@ -489,6 +473,19 @@
             <button class="btn btn-cancel" onclick="closeModal()">取消</button>
             <button class="btn btn-save" id="btnSaveTask" onclick="saveTask()">確認</button>
         </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="salesSettingsModal">
+    <div class="modal-card" style="width: 450px;">
+        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">⚙️ NGS 負責業務設定</h3>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <input type="text" id="newSalesName" placeholder="輸入新業務姓名" style="flex-grow:1; padding:8px; border:1px solid #ccc; border-radius:4px;">
+            <button class="btn btn-save" onclick="addSalesOption()">新增</button>
+        </div>
+        <ul class="settings-list" id="salesOptionList">
+            </ul>
+        <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('salesSettingsModal').style.display='none'">關閉</button></div>
     </div>
 </div>
 
@@ -544,8 +541,8 @@
 
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
     let state = {
-        currentUser: null, authMode: 'general', currentDate: getTodayStr(),
-        tasks: [], users: [], history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
+        currentUser: null, currentDate: getTodayStr(),
+        tasks: [], users: [], salesOptions: [], history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
     };
 
     function getTodayStr() { return new Date().toISOString().split('T')[0]; }
@@ -566,7 +563,7 @@
         state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
         if(document.getElementById('userModal').style.display === 'flex') openUserModal();
         
-        // FORCE LOGOUT LOGIC
+        // FORCE LOGOUT
         if (state.currentUser) {
             const me = state.users.find(u => u.username === state.currentUser.name);
             if (!me) {
@@ -578,37 +575,29 @@
                 updateUIForRole();
             }
         }
-    }, (error) => {
-        console.error("Error fetching users:", error);
+    });
+    
+    // Listen for Settings
+    db.collection('settings').doc('ngs_sales').onSnapshot(doc => {
+        if(doc.exists) {
+            state.salesOptions = doc.data().list || ['Jeff', '廖軒逵'];
+        } else {
+            // Init default if not exists
+            state.salesOptions = ['Jeff', '廖軒逵'];
+            db.collection('settings').doc('ngs_sales').set({ list: state.salesOptions });
+        }
+        if(document.getElementById('salesSettingsModal').style.display === 'flex') openSalesSettings();
     });
 
-    /* --- Auth Logic --- */
-    function switchMode(mode) {
-        state.authMode = mode;
-        document.getElementById('btnModeGeneral').className = mode === 'general' ? 'mode-btn active' : 'mode-btn';
-        document.getElementById('btnModeAdmin').className = mode === 'admin' ? 'mode-btn active' : 'mode-btn';
-        const box = document.getElementById('authBox');
-        const link = document.getElementById('switchAuthLink');
-        const title = document.getElementById('auth-title');
-        const btn = document.getElementById('btnAuthAction');
-
-        if (mode === 'admin') {
-            box.classList.add('admin-view'); link.style.display = 'none';
-            title.innerText = '管理員登入'; btn.innerText = '登入';
-        } else {
-            box.classList.remove('admin-view'); link.style.display = 'block';
-            title.innerText = '系統登入'; btn.innerText = '登入';
-        }
-    }
-
+    /* --- Auth Logic (Unified) --- */
     function toggleAuthMode() {
-        if(state.authMode === 'admin') return;
         const title = document.getElementById('auth-title');
         const btn = document.getElementById('btnAuthAction');
+        const link = document.getElementById('switchAuthLink');
         if (title.innerText.includes('登入')) {
-            title.innerText = '註冊新帳號'; btn.innerText = '註冊';
+            title.innerText = '註冊新帳號'; btn.innerText = '註冊'; link.innerText = '已有帳號？登入';
         } else {
-            title.innerText = '系統登入'; btn.innerText = '登入';
+            title.innerText = '系統登入'; btn.innerText = '登入'; link.innerText = '沒有帳號？註冊新帳號';
         }
     }
 
@@ -622,47 +611,30 @@
         btn.disabled = true;
 
         try {
-            // ADMIN LOGIN
-            if (state.authMode === 'admin') {
+            if (title.includes('註冊')) {
+                // Register
+                if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
+                const q = await db.collection('users').where('username', '==', u).get();
+                if (!q.empty) throw new Error('帳號已存在');
+                
+                await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
+                alert('註冊成功！待管理員核准後方可登入。');
+                toggleAuthMode();
+            } else {
+                // Login
                 if (u === 'Admin' && p === 'Abcd1234') {
-                    // Check if Admin exists in DB, if not create as CREATOR (Genesis)
+                    // Admin Backdoor / Auto-heal
                     const q = await db.collection('users').where('username', '==', 'Admin').get();
                     if(q.empty) {
                         await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'creator', remarks: '創世神' });
                     } else {
-                        // FORCE UPDATE to CREATOR if not already (Self-healing for existing Admin)
+                        // Ensure role is creator
                         const docId = q.docs[0].id;
-                        const userData = q.docs[0].data();
-                        if (userData.role !== 'creator') {
-                            await db.collection('users').doc(docId).update({ role: 'creator' });
-                        }
+                        if(q.docs[0].data().role !== 'creator') await db.collection('users').doc(docId).update({ role: 'creator' });
                     }
                     loginSuccess('Admin', 'creator');
                 } else {
-                    const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    if (!q.empty) {
-                        const user = q.docs[0].data();
-                        if (user.isApproved && (user.role === 'admin' || user.role === 'senior' || user.role === 'creator')) {
-                            loginSuccess(user.username, user.role);
-                        } else {
-                            alert('權限不足或帳密錯誤 (僅管理者可從此處登入)');
-                        }
-                    } else {
-                        alert('權限不足或帳密錯誤');
-                    }
-                }
-            } 
-            // GENERAL LOGIN / REGISTER
-            else {
-                if (title.includes('註冊')) {
-                    if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
-                    const q = await db.collection('users').where('username', '==', u).get();
-                    if (!q.empty) throw new Error('帳號已存在');
-                    
-                    await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
-                    alert('註冊成功！待管理員核准後方可登入。');
-                    toggleAuthMode();
-                } else {
+                    // Regular Login
                     const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
                     if (q.empty) {
                         alert('帳號或密碼錯誤');
@@ -709,9 +681,67 @@
         document.getElementById('userAvatar').innerText = state.currentUser.name[0].toUpperCase();
         
         const canManage = ['creator','senior','admin'].includes(state.currentUser.role);
+        const canConfig = ['creator','senior'].includes(state.currentUser.role);
+        
         document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
-        // Stats only for Creator & Senior
-        document.getElementById('statsPanelBtn').style.display = ['creator','senior'].includes(state.currentUser.role) ? 'block' : 'none';
+        document.getElementById('statsPanelBtn').style.display = canConfig ? 'block' : 'none';
+        document.getElementById('salesSettingsBtn').style.display = canConfig ? 'block' : 'none';
+    }
+
+    /* --- SALES SETTINGS --- */
+    function openSalesSettings() {
+        const list = document.getElementById('salesOptionList');
+        list.innerHTML = '';
+        state.salesOptions.forEach((opt, index) => {
+            const li = document.createElement('li');
+            li.className = 'setting-item';
+            li.innerHTML = `
+                <span>${opt}</span>
+                <div>
+                    <button class="btn-icon" onclick="editSalesOption(${index})">✏️</button>
+                    <button class="btn-icon" style="color:red;" onclick="deleteSalesOption(${index})">🗑️</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+        document.getElementById('salesSettingsModal').style.display = 'flex';
+    }
+
+    function saveSalesSettings() {
+        db.collection('settings').doc('ngs_sales').update({ list: state.salesOptions });
+    }
+
+    function addSalesOption() {
+        const input = document.getElementById('newSalesName');
+        const val = input.value.trim();
+        if(val) {
+            state.salesOptions.push(val);
+            saveSalesSettings();
+            input.value = '';
+        }
+    }
+
+    function deleteSalesOption(index) {
+        if(confirm('確定刪除此業務選項？')) {
+            state.salesOptions.splice(index, 1);
+            saveSalesSettings();
+        }
+    }
+
+    function editSalesOption(index) {
+        const newVal = prompt("修改業務姓名:", state.salesOptions[index]);
+        if(newVal && newVal.trim() !== "") {
+            state.salesOptions[index] = newVal.trim();
+            saveSalesSettings();
+        }
+    }
+
+    function populateSalesDropdowns() {
+        const optsHtml = state.salesOptions.map(s => `<option value="${s}">${s}</option>`).join('');
+        const s1 = document.getElementById('ngsSales');
+        const s2 = document.getElementById('ngsQcSales');
+        if(s1) s1.innerHTML = optsHtml;
+        if(s2) s2.innerHTML = optsHtml;
     }
 
     /* --- SEARCH --- */
@@ -757,7 +787,6 @@
         document.getElementById(inputId).style.display = (val === '其他') ? 'block' : 'none';
     }
 
-    // AUTO TITLE GENERATOR
     function generateNgsTitle() {
         const cat = document.getElementById('inputCategory').value;
         if (cat !== 'NGS收件') return;
@@ -1116,6 +1145,9 @@
     if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
     
     function openModal(taskId=null) {
+        // Prepare Dropdowns first
+        populateSalesDropdowns();
+
         const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle');
         document.getElementById('taskModal').style.display='flex'; editor.focus();
         
