@@ -2,8 +2,8 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>案件進度追蹤系統 (Final v17)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>案件進度追蹤系統 (Mobile v18)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -14,39 +14,53 @@
             --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
         }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
 
         /* Auth Screen */
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 2000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
         .mode-switch-container { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; }
         .mode-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
         .mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .auth-box { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 320px; text-align: center; border: 1px solid var(--border); position: relative; }
+        .auth-box { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 320px; text-align: center; border: 1px solid var(--border); position: relative; }
         .auth-tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--warning); color: white; padding: 2px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; display: none; }
         .auth-box.admin-view .auth-tag { display: block; }
-        .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+        .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; } /* font-size 16px prevents iOS zoom */
         .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
         .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
         .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
         /* Layout */
-        #app-screen { display: flex; width: 100%; height: 100%; }
-        aside { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1.5rem; box-sizing: border-box; }
-        .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-        .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; }
-        .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
+        #app-screen { display: flex; width: 100%; height: 100%; position: relative; }
         
-        /* Admin Buttons */
+        /* Mobile Menu Button */
+        #mobile-menu-btn {
+            display: none; /* Hidden on desktop */
+            position: absolute; top: 15px; left: 15px; z-index: 1100;
+            background: white; border: 1px solid var(--border); border-radius: 8px;
+            padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            color: var(--primary);
+        }
+
+        /* Sidebar Overlay */
+        #sidebar-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 900;
+            backdrop-filter: blur(2px);
+        }
+
+        aside { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1.5rem; box-sizing: border-box; transition: transform 0.3s ease; }
+        
+        .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+        .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; flex-shrink: 0; }
+        .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
         .admin-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: none; font-size: 0.9rem; }
         .btn-perm { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-        .btn-perm:hover { background: #ffedd5; }
         .btn-stats { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
-        .btn-stats:hover { background: #dbeafe; }
         
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
-        input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; }
+        input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
         
-        /* Search Box */
         .search-box input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
         .search-item { padding: 8px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
@@ -63,13 +77,11 @@
         header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
         .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
         
-        /* Progress */
         .overall-progress-container { margin-top: 15px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; }
         .progress-label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: #4b5563; }
         .progress-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--success); transition: width 0.5s ease; }
 
-        /* Tasks */
         .task-container { max-width: 900px; padding-bottom: 100px; }
         .category-group { margin-bottom: 2.5rem; }
         .category-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -85,7 +97,6 @@
         .category-group.deleted-section .task-item { background-color: #fff1f2; opacity: 0.8; }
 
         .task-item { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: flex-start; transition: all 0.2s; border-left: 4px solid transparent; position: relative; }
-        .task-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .task-item[data-cat="定序收件"] { border-left-color: #3b82f6; }
         .task-item[data-cat="引子送件"] { border-left-color: #8b5cf6; }
         .task-item[data-cat="產前收件"] { border-left-color: #ec4899; }
@@ -103,7 +114,7 @@
 
         .task-checkbox { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 5px; margin-right: 15px; cursor: pointer; flex-shrink: 0; display: grid; place-items: center; transition: 0.2s; margin-top: 3px; }
         .task-checkbox:hover { border-color: var(--primary); }
-        .task-content { flex-grow: 1; display: flex; flex-direction: column; padding-right: 30px; }
+        .task-content { flex-grow: 1; display: flex; flex-direction: column; padding-right: 10px; }
         .task-title { font-size: 1rem; line-height: 1.5; word-break: break-all; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
         .task-title:hover { background: #f3f4f6; color: var(--primary); } 
         .task-meta { font-size: 0.8rem; color: var(--text-light); margin-top: 6px; line-height: 1.4; }
@@ -121,15 +132,15 @@
         .history-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #9ca3af; font-weight: bold; font-size: 18px; }
         .history-dot:hover { background: #e5e7eb; color: var(--primary); }
 
-        .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; }
+        .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
         /* Modals */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
-        .modal-card { background: white; padding: 2rem; border-radius: 12px; width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2100; justify-content: center; align-items: center; }
+        .modal-card { background: white; padding: 2rem; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; }
         
         .editor-toolbar { display: flex; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-bottom: none; border-radius: 6px 6px 0 0; align-items: center; }
-        .tool-btn { padding: 4px 8px; border: 1px solid #cbd5e1; background: white; border-radius: 4px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; }
+        .tool-btn { padding: 4px 8px; border: 1px solid #cbd5e1; background: white; border-radius: 4px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; margin-bottom: 4px;}
         .color-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid #ddd; }
         .separator { width: 1px; height: 20px; background: #cbd5e1; margin: 0 4px; }
         select.tool-select { padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; }
@@ -161,7 +172,6 @@
         .btn-reject { background: #ef4444; color: white; padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; margin-left: 5px;}
         .btn-icon-eye { background:none; border:none; cursor:pointer; padding:5px; font-size:1rem; }
 
-        /* Stats */
         .stats-filter-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .stats-filter-row input, .stats-filter-row select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
         .stats-result-area { max-height: 400px; overflow-y: auto; }
@@ -177,10 +187,35 @@
         .log-time { color: var(--text-light); min-width: 120px; font-size: 0.8rem; }
         .log-content { color: var(--text-main); }
         .log-user { font-weight: 600; color: var(--primary); }
-        @media (max-width: 768px) { aside { display: none; } #app-screen { flex-direction: column; } .modal-card { width: 90%; } }
+
+        /* --- MOBILE RESPONSIVE STYLES --- */
+        @media (max-width: 768px) {
+            #mobile-menu-btn { display: block; }
+            #sidebar-overlay { display: none; }
+            #sidebar-overlay.active { display: block; }
+
+            aside {
+                position: fixed; top: 0; left: 0; height: 100%; width: 280px;
+                z-index: 1000; transform: translateX(-100%);
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            }
+            aside.open { transform: translateX(0); }
+
+            main { padding-top: 70px; width: 100%; }
+            .mode-switch-container { top: 10px; right: 10px; }
+            .mode-btn { padding: 5px 10px; font-size: 0.8rem; }
+            
+            .task-item { flex-direction: column; }
+            .task-content { padding-right: 0; margin-bottom: 10px; }
+            .action-area { flex-direction: row; width: 100%; justify-content: flex-end; }
+            .fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 28px; }
+        }
     </style>
 </head>
 <body>
+
+<button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div id="auth-screen">
     <div class="mode-switch-container">
@@ -226,7 +261,6 @@
             <ul class="history-list" id="historyList"></ul>
         </div>
     </aside>
-
     <main>
         <header>
             <div class="date-header" id="headerDateDisplay"></div>
@@ -322,7 +356,7 @@
 </div>
 
 <script>
-    // --- FIREBASE CONFIGURATION (Paste yours here) ---
+    // --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
       apiKey: "AIzaSyBPcmgaT4f3nfyJrJOXnAeYCwH19SwZvCA",
       authDomain: "tasktrack-app-206f8.firebaseapp.com",
@@ -346,6 +380,12 @@
     function getTodayStr() { return new Date().toISOString().split('T')[0]; }
     function formatDoc(cmd, value) { document.execCommand(cmd, false, value); document.getElementById('inputTitle').focus(); }
 
+    /* --- MOBILE MENU --- */
+    function toggleSidebar() {
+        document.querySelector('aside').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('active');
+    }
+
     /* --- REAL-TIME LISTENERS --- */
     db.collection('tasks').onSnapshot(snapshot => {
         state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -353,16 +393,16 @@
     });
     db.collection('users').onSnapshot(snapshot => {
         state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-        // If user modal or stats modal is open, refresh them
         if(document.getElementById('userModal').style.display === 'flex') openUserModal();
-        // Check current user permission (in case role changed)
         if(state.currentUser) {
             const me = state.users.find(u => u.username === state.currentUser.name);
             if(me) { state.currentUser.role = me.role; updateUIForRole(); }
         }
+    }, (error) => {
+        console.error("Error fetching users:", error);
     });
 
-    /* --- Auth --- */
+    /* --- Auth Logic --- */
     function switchMode(mode) {
         state.authMode = mode;
         document.getElementById('btnModeGeneral').className = mode === 'general' ? 'mode-btn active' : 'mode-btn';
@@ -399,56 +439,43 @@
         const btn = document.getElementById('btnAuthAction');
 
         if(!u || !p) return alert('請輸入帳號密碼');
-        
-        btn.disabled = true; btn.innerText = '處理中...';
-
-        // Set a timeout to reset the button if network fails
-        const timer = setTimeout(() => { 
-            btn.disabled = false; btn.innerText = title.includes('註冊') ? '註冊' : '登入';
-            alert('連線逾時，請檢查網路狀態');
-        }, 8000);
+        btn.disabled = true;
 
         try {
             // ADMIN LOGIN
             if (state.authMode === 'admin') {
                 if (u === 'Admin' && p === 'Abcd1234') {
-                    // Check if Admin exists in DB, if not create it
                     const q = await db.collection('users').where('username', '==', 'Admin').get();
                     if(q.empty) {
                         await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
                     }
-                    clearTimeout(timer);
                     loginSuccess('Admin', 'senior');
                 } else {
                     const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    clearTimeout(timer);
                     if (!q.empty) {
                         const user = q.docs[0].data();
                         if (user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
                             loginSuccess(user.username, user.role);
                         } else {
-                            alert('權限不足或帳密錯誤');
+                            alert('權限不足或帳密錯誤 (僅管理者可從此處登入)');
                         }
                     } else {
                         alert('權限不足或帳密錯誤');
                     }
                 }
-            }
-            // GENERAL LOGIN/REGISTER
+            } 
+            // GENERAL LOGIN / REGISTER
             else {
                 if (title.includes('註冊')) {
                     if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
-                    
                     const q = await db.collection('users').where('username', '==', u).get();
                     if (!q.empty) throw new Error('帳號已存在');
                     
                     await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
-                    clearTimeout(timer);
                     alert('註冊成功！待管理員核准後方可登入。');
                     toggleAuthMode();
                 } else {
                     const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    clearTimeout(timer);
                     if (q.empty) {
                         alert('帳號或密碼錯誤');
                     } else {
@@ -462,11 +489,10 @@
                 }
             }
         } catch (e) {
-            clearTimeout(timer);
-            alert(e.message);
+            alert(e.message || '發生錯誤');
+            console.error(e);
         } finally {
             btn.disabled = false;
-            btn.innerText = title.includes('註冊') ? '註冊' : '登入';
         }
     }
 
@@ -510,7 +536,7 @@
             const li = document.createElement('li'); li.className = 'search-item';
             const rawTitle = t.title.replace(/<[^>]*>/g, '');
             li.innerHTML = `<span>${rawTitle}</span><span class="search-date">${t.date}</span>`;
-            li.onclick = () => changeDate(t.date);
+            li.onclick = () => { changeDate(t.date); if(window.innerWidth<=768) toggleSidebar(); };
             resultsContainer.appendChild(li);
         });
         if(matched.length === 0) resultsContainer.innerHTML = '<li class="search-item" style="color:#999; cursor:default;">無相符結果</li>';
@@ -679,7 +705,6 @@
             container.appendChild(group);
         });
 
-        // Completed
         const completed = dayTasks.filter(t => t.completed && !t.isDeleted);
         if (completed.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group completed-section';
@@ -688,7 +713,6 @@
             completed.forEach(t => group.appendChild(createTaskElement(t)));
             container.appendChild(group);
         }
-        // Deleted
         const deleted = dayTasks.filter(t => t.isDeleted);
         if (deleted.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group deleted-section';
@@ -771,11 +795,11 @@
         const ul = document.getElementById('historyList'); ul.innerHTML = '';
         state.history.forEach(d => {
             const li = document.createElement('li'); li.className = `history-item ${d === state.currentDate?'active':''}`;
-            li.innerText = d; li.onclick = () => changeDate(d, false); ul.appendChild(li);
+            li.innerText = d; li.onclick = () => { changeDate(d, false); if(window.innerWidth<=768) toggleSidebar(); };
+            ul.appendChild(li);
         });
     }
     
-    // Check if user is logged in
     const storedUser = localStorage.getItem('tt_current_user');
     if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
     
