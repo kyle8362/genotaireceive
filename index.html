@@ -3,333 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>案件進度追蹤系統 (Debug v14)</title>
+    <title>案件進度追蹤系統 (Final v16)</title>
 
     <style>
-        :root {
-            --primary: #0f766e; --primary-light: #ccfbf1; --bg: #f3f4f6;
-            --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
-            --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
-        }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
-
-        /* DEBUG CONSOLE */
-        #debug-console {
-            position: fixed; bottom: 10px; right: 10px; width: 300px; height: 150px;
-            background: rgba(0,0,0,0.85); color: #0f0; font-family: monospace; font-size: 12px;
-            padding: 10px; border-radius: 8px; z-index: 9999; overflow-y: auto;
-            pointer-events: none; /* Let clicks pass through */
-        }
-        .log-err { color: #ff4444; }
-        .log-warn { color: #ffbb33; }
-
-        /* Auth Screen */
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .mode-switch-container { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; }
-        .mode-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
-        .mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .auth-box { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 320px; text-align: center; border: 1px solid var(--border); position: relative; }
-        .auth-tag { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--warning); color: white; padding: 2px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; display: none; }
-        .auth-box.admin-view .auth-tag { display: block; }
-        .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
-        .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
-        .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
-        .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
-
-        /* Layout */
-        #app-screen { display: flex; width: 100%; height: 100%; }
-        aside { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1.5rem; box-sizing: border-box; }
-        .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-        .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; }
-        .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
-        .admin-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: none; font-size: 0.9rem; }
-        .btn-perm { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-        .btn-stats { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
+        :root { --primary: #0f766e; --bg: #f3f4f6; --text: #111827; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; margin: 0; }
         
-        .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
-        input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; }
+        /* Debug Console */
+        #debug-console { position: fixed; bottom: 10px; right: 10px; width: 350px; height: 200px; background: rgba(0,0,0,0.9); color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 8px; z-index: 9999; overflow-y: auto; pointer-events: none; border: 1px solid #333; }
+        .log-err { color: #ff4444; font-weight:bold; } .log-succ { color: #00ff00; } .log-warn { color: #ffbb33; }
+
+        /* Simplified Auth UI for Debugging */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.98); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .auth-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 300px; text-align: center; border: 1px solid #ddd; }
+        .auth-box input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .auth-btn { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+        .auth-btn:disabled { background: #999; }
         
-        .search-box input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
-        .search-results { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
-        .search-item { padding: 8px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .search-item:hover { background: #f9fafb; color: var(--primary); }
-        .search-date { font-size: 0.75rem; color: #9ca3af; }
-
-        .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
-        .history-item { padding: 10px; cursor: pointer; border-radius: 6px; color: var(--text-main); margin-bottom: 4px; display: flex; justify-content: space-between; }
-        .history-item:hover { background: #f8fafc; }
-        .history-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
-
-        main { flex-grow: 1; padding: 2rem; overflow-y: auto; position: relative; }
-        header { margin-bottom: 2rem; }
-        header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
-        .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
-        
-        .overall-progress-container { margin-top: 15px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; }
-        .progress-label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: #4b5563; }
-        .progress-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--success); transition: width 0.5s ease; }
-
-        .task-container { max-width: 900px; padding-bottom: 100px; }
-        .category-group { margin-bottom: 2.5rem; }
-        .category-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
-        .cat-title { color: var(--primary); font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; }
-        .badge-count { background: #e5e7eb; color: #374151; font-size: 0.8rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
-        .cat-progress-track { width: 100%; height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; margin-bottom: 1rem; }
-        .cat-progress-fill { height: 100%; background: var(--primary); transition: width 0.5s ease; }
-
-        .category-group.overdue-section .cat-title { color: #dc2626; } 
-        .category-group.completed-section .cat-title { color: var(--text-light); }
-        .category-group.deleted-section .cat-title { color: var(--danger); }
-        .category-group.completed-section .task-item { background-color: #f9fafb; opacity: 0.9; }
-        .category-group.deleted-section .task-item { background-color: #fff1f2; opacity: 0.8; }
-
-        .task-item { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: flex-start; transition: all 0.2s; border-left: 4px solid transparent; position: relative; }
-        .task-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
+        /* App Layout */
+        #app-screen { display: none; width: 100%; height: 100%; }
+        aside { width: 260px; background: white; border-right: 1px solid #ddd; padding: 20px; display: flex; flex-direction: column; }
+        main { flex: 1; padding: 20px; overflow-y: auto; }
+        .task-item { background: white; padding: 10px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid #ccc; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .task-item[data-cat="定序收件"] { border-left-color: #3b82f6; }
         .task-item[data-cat="引子送件"] { border-left-color: #8b5cf6; }
         .task-item[data-cat="產前收件"] { border-left-color: #ec4899; }
         .task-item[data-cat="業務交辦事項"] { border-left-color: #f59e0b; }
-        .task-item.completed-item { border-left-color: #9ca3af; }
-        .task-item.deleted-item { border-left-color: #ef4444; }
-
-        @keyframes blink-alert {
-            0% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); border-left-color: #ef4444; }
-            50% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); border-left-color: #b91c1c; background-color: #fef2f2; }
-            100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); border-left-color: #ef4444; }
-        }
-        .task-item.overdue-item { animation: blink-alert 2s infinite ease-in-out; border-left-width: 6px; }
-        .overdue-item .task-title { font-weight: 800; color: #b91c1c; }
-
-        .task-checkbox { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 5px; margin-right: 15px; cursor: pointer; flex-shrink: 0; display: grid; place-items: center; transition: 0.2s; margin-top: 3px; }
-        .task-checkbox:hover { border-color: var(--primary); }
-        .task-content { flex-grow: 1; display: flex; flex-direction: column; padding-right: 30px; }
-        .task-title { font-size: 1rem; line-height: 1.5; word-break: break-all; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
-        .task-title:hover { background: #f3f4f6; color: var(--primary); } 
-        .task-meta { font-size: 0.8rem; color: var(--text-light); margin-top: 6px; line-height: 1.4; }
-        .completed-info { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: 500; }
-        .task-overdue-date { display: inline-block; background-color: #ef4444; color: white; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; margin-top: 5px; font-weight: 500; }
-        .task-item.completed-item .task-checkbox { background: var(--text-light); border-color: var(--text-light); }
-        .task-item.completed-item .task-checkbox::after { content: '✓'; color: white; font-size: 14px; }
-        .task-item.completed-item .task-title { color: #9ca3af; text-decoration: line-through; cursor: default; font-weight: normal; }
-
-        .action-area { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .btn-icon { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 2px 8px; color: #9ca3af; border-radius: 4px; }
-        .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); }
-        .btn-delete:hover { color: var(--danger); }
-        .btn-restore { color: var(--success); font-size: 1rem; }
-        .history-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #9ca3af; font-weight: bold; font-size: 18px; }
-        .history-dot:hover { background: #e5e7eb; color: var(--primary); }
-
-        .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; }
-        .fab:hover { transform: scale(1.05); background: #0d9488; }
-
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
-        .modal-card { background: white; padding: 2rem; border-radius: 12px; width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; }
-        
-        .editor-toolbar { display: flex; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-bottom: none; border-radius: 6px 6px 0 0; align-items: center; }
-        .tool-btn { padding: 4px 8px; border: 1px solid #cbd5e1; background: white; border-radius: 4px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; }
-        .color-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid #ddd; }
-        .separator { width: 1px; height: 20px; background: #cbd5e1; margin: 0 4px; }
-        select.tool-select { padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; }
-        
-        #inputTitle { width: 100%; min-height: 100px; padding: 15px; border: 1px solid #d1d5db; border-radius: 0 0 6px 6px; box-sizing: border-box; font-size: 1rem; background: white; outline: none; overflow-y: auto; }
-        #inputTitle:focus { border-color: var(--primary); }
-        .input-group { margin-bottom: 1.2rem; }
-        .input-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; }
-        .input-group select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
-
-        .modal-btns { display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem; }
-        .btn { padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; }
-        .btn-cancel { background: #f3f4f6; color: #4b5563; }
-        .btn-save { background: var(--primary); color: white; }
-
-        .user-list { list-style: none; padding: 0; margin: 0; }
-        .user-item { display: flex; flex-direction: column; padding: 15px; border-bottom: 1px solid #eee; background: #fafafa; border-radius: 6px; margin-bottom: 10px; }
-        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .user-name { font-weight: 600; font-size: 1rem; }
-        .user-role-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 5px; border: 1px solid #ddd;}
-        .role-senior { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
-        .role-admin { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
-        .role-user { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
-        .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
-        .user-edit-row input { flex-grow: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
-        .user-edit-row select { padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem; }
-        .readonly-text { color: #666; font-style: italic; padding: 6px 0; }
-        .btn-approve { background: #10b981; color: white; padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; }
-        .btn-reject { background: #ef4444; color: white; padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; margin-left: 5px;}
-        .btn-icon-eye { background:none; border:none; cursor:pointer; padding:5px; font-size:1rem; }
-
-        .stats-filter-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .stats-filter-row input, .stats-filter-row select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
-        .stats-result-area { max-height: 400px; overflow-y: auto; }
-        .stat-card { background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
-        .stat-header { font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .stat-bar-container { margin-bottom: 8px; }
-        .stat-label { font-size: 0.8rem; color: #666; display: flex; justify-content: space-between; margin-bottom: 3px; }
-        .stat-track { height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
-        .stat-fill { height: 100%; background: var(--primary); }
-
-        .log-list { list-style: none; padding: 0; margin: 0; }
-        .log-item { padding: 10px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 10px; font-size: 0.9rem; }
-        .log-time { color: var(--text-light); min-width: 120px; font-size: 0.8rem; }
-        .log-content { color: var(--text-main); }
-        .log-user { font-weight: 600; color: var(--primary); }
-        @media (max-width: 768px) { aside { display: none; } #app-screen { flex-direction: column; } .modal-card { width: 90%; } }
+        .btn-icon { cursor: pointer; border: none; background: none; color: #888; font-size: 1.2em; float: right; }
     </style>
+
+    <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js" onerror="scriptLoadError('firebase-app')"></script>
+    <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js" onerror="scriptLoadError('firebase-firestore')"></script>
+
 </head>
 <body>
 
-<div id="debug-console">等待初始化...</div>
+<div id="debug-console">系統啟動中...<br>正在嘗試連線 CDN...</div>
 
 <div id="auth-screen">
-    <div class="mode-switch-container">
-        <button class="mode-btn active" id="btnModeGeneral" onclick="switchMode('general')">一般模式</button>
-        <button class="mode-btn" id="btnModeAdmin" onclick="switchMode('admin')">管理模式</button>
-    </div>
-    <div class="auth-box" id="authBox">
-        <div class="auth-tag">ADMIN MODE</div>
-        <h2 id="auth-title" style="color:#0f766e">系統登入</h2>
-        <input type="text" id="username" placeholder="帳號" autofocus>
-        <input type="password" id="password" placeholder="密碼">
-        <button class="auth-btn" id="btnAuthAction" onclick="handleAuth()">登入</button>
-        <div class="switch-auth" id="switchAuthLink" onclick="toggleAuthMode()">沒有帳號？註冊新帳號</div>
+    <h2 style="color:#0f766e">系統狀態檢查</h2>
+    <div class="auth-box">
+        <div id="status-text" style="margin-bottom:15px; font-weight:bold; color:#666;">等待 Firebase 載入...</div>
+        <input type="text" id="username" placeholder="帳號 (Admin)" disabled>
+        <input type="password" id="password" placeholder="密碼 (Abcd1234)" disabled>
+        <button class="auth-btn" id="loginBtn" onclick="tryLogin()" disabled>登入</button>
+        <div style="margin-top:15px; font-size:0.8rem; color:#888;">
+            <a href="#" onclick="toggleMode()">切換 註冊/登入</a>
+        </div>
     </div>
 </div>
 
-<div id="app-screen" style="display:none;">
+<div id="app-screen">
     <aside>
-        <div class="user-profile">
-            <div class="avatar" id="userAvatar">U</div>
-            <div>
-                <div style="font-weight: 600;" id="displayUsername">User</div>
-                <div class="logout-link" onclick="logout()">登出帳號</div>
-            </div>
-        </div>
-        <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
-        <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="openStatsModal()">📊 任務完成統整</div>
-        <div class="sidebar-section">
-            <h3>🔍 搜尋任務</h3>
-            <div class="search-box">
-                <input type="text" id="searchTaskInput" placeholder="輸入關鍵字..." oninput="handleSearch()">
-                <ul class="search-results" id="searchResults"></ul>
-            </div>
-        </div>
-        <div class="sidebar-section">
-            <h3>📅 日期選擇</h3>
-            <input type="date" id="dateSearch" onchange="changeDate(this.value)">
-        </div>
-        <div class="sidebar-section" style="flex-grow: 1; display:flex; flex-direction:column; margin-top:20px;">
-            <h3>🕒 最近檢視紀錄</h3>
-            <ul class="history-list" id="historyList"></ul>
-        </div>
+        <h3>功能選單</h3>
+        <button class="auth-btn" onclick="logout()">登出</button>
+        <div id="userInfo" style="margin-top:20px; font-weight:bold;"></div>
+        <hr>
+        <div style="font-size:0.8rem; color:#666;">若看到此畫面，代表資料庫已成功連線！</div>
     </aside>
-    <main>
-        <header>
-            <div class="date-header" id="headerDateDisplay"></div>
-            <h1>案件進度管理</h1>
-            <div class="overall-progress-container">
-                <div class="progress-label">
-                    <span>當日總完成度</span>
-                    <span id="overallProgressText">0%</span>
-                </div>
-                <div class="progress-track">
-                    <div class="progress-fill" id="overallProgressBar" style="width: 0%"></div>
-                </div>
-            </div>
-        </header>
-        <div class="task-container" id="taskListContainer"></div>
-        <button class="fab" onclick="openModal()">+</button>
+    <main id="taskListContainer">
+        <h2>任務列表 (資料庫連線測試)</h2>
+        <div id="loadingTasks">載入任務中...</div>
     </main>
 </div>
 
-<div class="modal-overlay" id="taskModal">
-    <div class="modal-card">
-        <h2 style="margin-top:0; color:#111827;" id="modalTitle">新增案件/任務</h2>
-        <div class="input-group">
-            <label>任務內容 (選取文字可編輯樣式)</label>
-            <div class="editor-toolbar">
-                <button class="tool-btn" onclick="formatDoc('bold')" title="粗體"><b>B</b></button>
-                <div class="separator"></div>
-                <button class="tool-btn" onclick="formatDoc('foreColor', '#ef4444')" title="紅字"><span class="color-dot" style="background:#ef4444"></span></button>
-                <button class="tool-btn" onclick="formatDoc('foreColor', '#2563eb')" title="藍字"><span class="color-dot" style="background:#2563eb"></span></button>
-                <button class="tool-btn" onclick="formatDoc('foreColor', '#10b981')" title="綠字"><span class="color-dot" style="background:#10b981"></span></button>
-                <button class="tool-btn" onclick="formatDoc('foreColor', '#000000')" title="黑字"><span class="color-dot" style="background:#000000"></span></button>
-                <div class="separator"></div>
-                <button class="tool-btn" onclick="formatDoc('hiliteColor', '#fecaca')" title="紅底" style="background:#fecaca">A</button>
-                <button class="tool-btn" onclick="formatDoc('hiliteColor', '#bfdbfe')" title="藍底" style="background:#bfdbfe">A</button>
-                <button class="tool-btn" onclick="formatDoc('hiliteColor', '#bbf7d0')" title="綠底" style="background:#bbf7d0">A</button>
-                <button class="tool-btn" onclick="formatDoc('hiliteColor', '#ffffff')" title="無底" style="background:#fff">✕</button>
-                <div class="separator"></div>
-                <select class="tool-select" onchange="formatDoc('fontSize', this.value); this.value='';" title="字體大小">
-                    <option value="">字體大小</option>
-                    <option value="2">小</option>
-                    <option value="3">中</option>
-                    <option value="5">大</option>
-                    <option value="7">特大</option>
-                </select>
-            </div>
-            <div id="inputTitle" contenteditable="true" placeholder="輸入內容..."></div>
-        </div>
-        <div class="input-group">
-            <label>歸屬項目</label>
-            <select id="inputCategory">
-                <option value="定序收件">📂 定序收件</option>
-                <option value="引子送件">🚀 引子送件</option>
-                <option value="產前收件">📦 產前收件</option>
-                <option value="業務交辦事項">📋 業務交辦事項</option>
-            </select>
-        </div>
-        <div class="modal-btns">
-            <button class="btn btn-cancel" onclick="closeModal()">取消</button>
-            <button class="btn btn-save" id="btnSaveTask" onclick="saveTask()">確認</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="historyModal">
-    <div class="modal-card" style="width: 400px;">
-        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📋 編輯/操作紀錄</h3>
-        <ul class="log-list" id="logList"></ul>
-        <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('historyModal').style.display='none'">關閉</button></div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="userModal">
-    <div class="modal-card" style="width: 650px;">
-        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👥 成員權限管理</h3>
-        <p style="font-size:0.85rem; color:#666; margin-bottom:10px;">高級管理者可編輯所有資料及查看密碼；管理者僅能核准新帳號。</p>
-        <ul class="user-list" id="userListDisplay"></ul>
-        <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('userModal').style.display='none'">關閉</button></div>
-    </div>
-</div>
-
-<div class="modal-overlay" id="statsModal">
-    <div class="modal-card" style="width: 700px;">
-        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📊 任務完成統整</h3>
-        <div class="stats-filter-row">
-            <div><label style="font-size:0.8rem;">開始日期</label><input type="date" id="statsDateStart"></div>
-            <div><label style="font-size:0.8rem;">結束日期</label><input type="date" id="statsDateEnd"></div>
-            <div><label style="font-size:0.8rem;">檢索帳號</label><select id="statsUserSelect"><option value="all">-- 所有帳號 (總覽) --</option></select></div>
-            <div style="display:flex; align-items:flex-end;"><button class="btn btn-save" onclick="updateStats()">查詢</button></div>
-        </div>
-        <div class="stats-result-area" id="statsResultDisplay"></div>
-        <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('statsModal').style.display='none'">關閉</button></div>
-    </div>
-</div>
-
 <script>
-    // --- 1. Debugger Utility ---
-    function logToScreen(msg, type='info') {
-        const consoleEl = document.getElementById('debug-console');
-        const now = new Date().toLocaleTimeString();
-        const colorClass = type === 'error' ? 'log-err' : (type === 'warn' ? 'log-warn' : '');
-        consoleEl.innerHTML += `<div class="${colorClass}">[${now}] ${msg}</div>`;
-        consoleEl.scrollTop = consoleEl.scrollHeight;
-        console.log(msg); // Also log to real console
+    // --- 0. 錯誤捕捉工具 ---
+    function log(msg, type='') {
+        const el = document.getElementById('debug-console');
+        const c = type==='err'?'log-err':(type==='succ'?'log-succ':'');
+        el.innerHTML += `<div class="${c}">> ${msg}</div>`;
+        el.scrollTop = el.scrollHeight;
+    }
+    
+    function scriptLoadError(name) {
+        log(`嚴重錯誤: ${name}.js 無法載入！`, 'err');
+        log(`可能原因: 公司防火牆擋住了 unpkg.com`, 'warn');
+        document.getElementById('status-text').innerText = "🔥 網路封鎖：無法載入程式庫";
+        document.getElementById('status-text').style.color = "red";
+        alert(`無法連線到程式庫主機 (${name})。\n請嘗試使用手機熱點分享網路，或聯絡 IT 開放 unpkg.com`);
     }
 
-    // --- 2. Firebase Init ---
+    // --- 1. FIREBASE 設定 (請確認這裡是否正確) ---
     const firebaseConfig = {
       apiKey: "AIzaSyBPcmgaT4f3nfyJrJOXnAeYCwH19SwZvCA",
       authDomain: "tasktrack-app-206f8.firebaseapp.com",
@@ -341,498 +96,146 @@
     };
 
     let db;
-    try {
-        logToScreen("正在初始化 Firebase...");
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        logToScreen("Firebase 初始化成功！", 'success');
-        
-        // Test connection
-        db.collection('test').get().then(() => {
-            logToScreen("資料庫連線測試：成功", 'success');
-        }).catch(err => {
-            logToScreen("資料庫連線失敗: " + err.message, 'error');
-        });
+    let isRegisterMode = false;
 
-    } catch (e) {
-        logToScreen("Firebase 載入失敗: " + e.message, 'error');
-    }
-
-    // --- 3. App State ---
-    const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項"];
-    let state = {
-        currentUser: null, authMode: 'general', currentDate: getTodayStr(),
-        tasks: [], users: [], history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
-    };
-
-    function getTodayStr() { return new Date().toISOString().split('T')[0]; }
-    function formatDoc(cmd, value) { document.execCommand(cmd, false, value); document.getElementById('inputTitle').focus(); }
-
-    /* --- REAL-TIME LISTENERS --- */
-    if (db) {
-        db.collection('tasks').onSnapshot(snapshot => {
-            state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            renderTasks();
-        }, err => logToScreen("同步任務失敗: " + err.message, 'error'));
-
-        db.collection('users').onSnapshot(snapshot => {
-            state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-            if(document.getElementById('userModal').style.display === 'flex') openUserModal();
-            if(state.currentUser) {
-                const me = state.users.find(u => u.username === state.currentUser.name);
-                if(me) { state.currentUser.role = me.role; updateUIForRole(); }
-            }
-        }, err => logToScreen("同步使用者失敗: " + err.message, 'error'));
-    }
-
-    /* --- Auth Logic --- */
-    function switchMode(mode) {
-        state.authMode = mode;
-        document.getElementById('btnModeGeneral').className = mode === 'general' ? 'mode-btn active' : 'mode-btn';
-        document.getElementById('btnModeAdmin').className = mode === 'admin' ? 'mode-btn active' : 'mode-btn';
-        const box = document.getElementById('authBox');
-        const link = document.getElementById('switchAuthLink');
-        const title = document.getElementById('auth-title');
-        const btn = document.getElementById('btnAuthAction');
-
-        if (mode === 'admin') {
-            box.classList.add('admin-view'); link.style.display = 'none';
-            title.innerText = '管理員登入'; btn.innerText = '登入';
-        } else {
-            box.classList.remove('admin-view'); link.style.display = 'block';
-            title.innerText = '系統登入'; btn.innerText = '登入';
+    // --- 2. 初始化 ---
+    window.onload = function() {
+        if (typeof firebase === 'undefined') {
+            log("Firebase 物件不存在 (Script Load Failed)", 'err');
+            return;
         }
-    }
-
-    function toggleAuthMode() {
-        if(state.authMode === 'admin') return;
-        const title = document.getElementById('auth-title');
-        const btn = document.getElementById('btnAuthAction');
-        if (title.innerText.includes('登入')) {
-            title.innerText = '註冊新帳號'; btn.innerText = '註冊';
-        } else {
-            title.innerText = '系統登入'; btn.innerText = '登入';
-        }
-    }
-
-    // FIXED & DIAGNOSTIC HANDLE AUTH
-    async function handleAuth() {
-        const u = document.getElementById('username').value.trim();
-        const p = document.getElementById('password').value.trim();
-        const title = document.getElementById('auth-title').innerText;
-        const btn = document.getElementById('btnAuthAction');
-
-        if(!u || !p) return alert('請輸入帳號密碼');
-        if(!db) return alert('資料庫尚未連線，請檢查右下角狀態');
-
-        btn.disabled = true;
-        btn.innerText = '處理中...';
-        logToScreen(`正在處理 ${u} 的請求...`);
-
-        // Force Timeout to prevent button sticking
-        const timeoutId = setTimeout(() => {
-            if(btn.disabled) {
-                btn.disabled = false;
-                btn.innerText = '登入';
-                logToScreen("操作超時 (5秒)，請檢查網路或重試", 'warn');
-                alert("連線超時，請檢查網路連線");
-            }
-        }, 8000); // 8 seconds timeout
 
         try {
-            // ADMIN LOGIN
-            if (state.authMode === 'admin') {
-                if (u === 'Admin' && p === 'Abcd1234') {
-                    // Check if Admin exists
-                    logToScreen("檢查 Admin 帳號...");
-                    const q = await db.collection('users').where('username', '==', 'Admin').get();
-                    if(q.empty) {
-                        logToScreen("Admin 不存在，建立中...");
-                        await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
-                    }
-                    clearTimeout(timeoutId);
-                    loginSuccess('Admin', 'senior');
-                } else {
-                    const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    clearTimeout(timeoutId);
-                    if (!q.empty) {
-                        const user = q.docs[0].data();
-                        if (user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
-                            loginSuccess(user.username, user.role);
-                        } else {
-                            alert('權限不足或帳密錯誤');
-                        }
-                    } else {
-                        alert('權限不足或帳密錯誤');
-                    }
-                }
-            } 
-            // GENERAL LOGIN / REGISTER
-            else {
-                if (title.includes('註冊')) {
-                    if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
-                    const q = await db.collection('users').where('username', '==', u).get();
-                    if (!q.empty) throw new Error('帳號已存在');
-                    
-                    await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
-                    clearTimeout(timeoutId);
-                    alert('註冊成功！待管理員核准後方可登入。');
-                    toggleAuthMode();
-                } else {
-                    const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    clearTimeout(timeoutId);
-                    if (q.empty) {
-                        alert('帳號或密碼錯誤');
-                    } else {
-                        const user = q.docs[0].data();
-                        if (!user.isApproved) {
-                            alert('⚠️ 您的帳號尚未通過審核。');
-                        } else {
-                            loginSuccess(user.username, user.role || 'user');
-                        }
-                    }
-                }
+            log("正在初始化 Firebase App...");
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            log("Firebase 初始化成功！", 'succ');
+            
+            // 開啟輸入框
+            document.getElementById('username').disabled = false;
+            document.getElementById('password').disabled = false;
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('status-text').innerText = "✅ 系統就緒，請登入";
+            document.getElementById('status-text').style.color = "green";
+
+            // 檢查是否已登入
+            const cached = localStorage.getItem('tt_user');
+            if(cached) {
+                log("發現舊登入紀錄，自動登入中...");
+                const u = JSON.parse(cached);
+                showApp(u);
             }
+
         } catch (e) {
-            clearTimeout(timeoutId);
-            alert(e.message || '發生錯誤');
-            logToScreen("錯誤: " + e.message, 'error');
+            log("初始化失敗: " + e.message, 'err');
+            document.getElementById('status-text').innerText = "❌ 設定錯誤: " + e.message;
+        }
+    };
+
+    // --- 3. 登入/註冊 邏輯 ---
+    function toggleMode() {
+        isRegisterMode = !isRegisterMode;
+        document.getElementById('loginBtn').innerText = isRegisterMode ? "註冊並登入" : "登入";
+        document.getElementById('status-text').innerText = isRegisterMode ? "📝 註冊新帳號" : "🔑 用戶登入";
+    }
+
+    async function tryLogin() {
+        const u = document.getElementById('username').value.trim();
+        const p = document.getElementById('password').value.trim();
+        if(!u || !p) return alert("請輸入帳號密碼");
+
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true;
+        log(`${isRegisterMode?'註冊':'登入'}請求: ${u}...`);
+
+        try {
+            // ADMIN 特殊通道 (強制建立)
+            if (u === 'Admin' && p === 'Abcd1234' && !isRegisterMode) {
+                log("偵測到 Admin 登入，檢查資料庫...");
+                const q = await db.collection('users').where('username', '==', 'Admin').get();
+                if(q.empty) {
+                    log("Admin 不存在，正在初始化...");
+                    await db.collection('users').add({
+                        username: 'Admin', password: p, role: 'senior', isApproved: true, remarks: 'System Owner'
+                    });
+                    log("Admin 帳號建立完成", 'succ');
+                }
+                const adminUser = { username: 'Admin', role: 'senior' };
+                localStorage.setItem('tt_user', JSON.stringify(adminUser));
+                showApp(adminUser);
+                return;
+            }
+
+            // 一般邏輯
+            if (isRegisterMode) {
+                // 註冊
+                const q = await db.collection('users').where('username', '==', u).get();
+                if (!q.empty) throw new Error("帳號已存在");
+                
+                await db.collection('users').add({
+                    username: u, password: p, role: 'user', isApproved: false, remarks: 'New User'
+                });
+                alert("註冊成功！請等待管理員核准後再登入。");
+                toggleMode(); // 切回登入
+            } else {
+                // 登入
+                const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                if (q.empty) throw new Error("帳號或密碼錯誤");
+                
+                const userData = q.docs[0].data();
+                if (!userData.isApproved) throw new Error("此帳號尚未被核准");
+                
+                localStorage.setItem('tt_user', JSON.stringify(userData));
+                showApp(userData);
+            }
+
+        } catch (e) {
+            log("操作失敗: " + e.message, 'err');
+            alert(e.message);
         } finally {
             btn.disabled = false;
-            btn.innerText = title.includes('註冊') ? '註冊' : '登入';
         }
     }
 
-    function loginSuccess(username, role) {
-        state.currentUser = { name: username, role: role };
-        localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser));
-        logToScreen("登入成功！進入系統...");
-        initApp();
-    }
-    function logout() { localStorage.removeItem('tt_current_user'); location.reload(); }
-    
-    function initApp() {
+    // --- 4. 顯示主程式 (讀取資料) ---
+    function showApp(user) {
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('app-screen').style.display = 'flex';
-        updateUIForRole();
-        changeDate(state.currentDate, false);
-    }
+        document.getElementById('userInfo').innerText = `Hello, ${user.username} (${user.role || 'user'})`;
+        log("進入主程式，開始監聽資料庫...", 'succ');
 
-    function updateUIForRole() {
-        if(!state.currentUser) return;
-        let roleName = '';
-        if(state.currentUser.role === 'senior') roleName = ' (高級管理者)';
-        else if(state.currentUser.role === 'admin') roleName = ' (管理者)';
-        
-        document.getElementById('displayUsername').innerText = state.currentUser.name + roleName;
-        document.getElementById('userAvatar').innerText = state.currentUser.name[0].toUpperCase();
-        
-        const canManage = state.currentUser.role === 'senior' || state.currentUser.role === 'admin';
-        document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
-        document.getElementById('statsPanelBtn').style.display = state.currentUser.role === 'senior' ? 'block' : 'none';
-    }
-
-    /* --- SEARCH --- */
-    function handleSearch() {
-        const keyword = document.getElementById('searchTaskInput').value.trim().toLowerCase();
-        const resultsContainer = document.getElementById('searchResults');
-        resultsContainer.innerHTML = '';
-        if (!keyword) return;
-
-        const matched = state.tasks.filter(t => t.title.replace(/<[^>]*>/g, '').toLowerCase().includes(keyword));
-        matched.slice(0, 20).forEach(t => {
-            const li = document.createElement('li'); li.className = 'search-item';
-            const rawTitle = t.title.replace(/<[^>]*>/g, '');
-            li.innerHTML = `<span>${rawTitle}</span><span class="search-date">${t.date}</span>`;
-            li.onclick = () => changeDate(t.date);
-            resultsContainer.appendChild(li);
-        });
-        if(matched.length === 0) resultsContainer.innerHTML = '<li class="search-item" style="color:#999; cursor:default;">無相符結果</li>';
-    }
-
-    /* --- STATS --- */
-    function openStatsModal() {
-        const modal = document.getElementById('statsModal');
-        const userSelect = document.getElementById('statsUserSelect');
-        const startInput = document.getElementById('statsDateStart');
-        const endInput = document.getElementById('statsDateEnd');
-
-        userSelect.innerHTML = '<option value="all">-- 所有帳號 (總覽) --</option>';
-        const uniqueUsers = [...new Set(state.tasks.filter(t=>t.completed && t.completedBy).map(t=>t.completedBy))];
-        uniqueUsers.sort().forEach(u => { const opt = document.createElement('option'); opt.value = u; opt.innerText = u; userSelect.appendChild(opt); });
-
-        const year = new Date().getFullYear();
-        startInput.value = `${year}-01-01`; endInput.value = `${year}-12-31`;
-        updateStats(); modal.style.display = 'flex';
-    }
-
-    function updateStats() {
-        const start = document.getElementById('statsDateStart').value;
-        const end = document.getElementById('statsDateEnd').value;
-        const selectedUser = document.getElementById('statsUserSelect').value;
-        const display = document.getElementById('statsResultDisplay');
-        display.innerHTML = '';
-        if(!start || !end) return;
-
-        const validTasks = state.tasks.filter(t => {
-            if(!t.completed || t.isDeleted || !t.completedBy) return false;
-            return t.date >= start && t.date <= end;
-        });
-
-        if (selectedUser === 'all') {
-            const userCounts = {}; let total = 0;
-            validTasks.forEach(t => { if(!userCounts[t.completedBy]) userCounts[t.completedBy]=0; userCounts[t.completedBy]++; total++; });
-            if(total === 0) { display.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">此區間無完成資料</div>'; return; }
-            Object.entries(userCounts).sort((a,b)=>b[1]-a[1]).forEach(([user, count]) => {
-                const pct = Math.round((count/total)*100);
-                const card = document.createElement('div'); card.className = 'stat-card';
-                card.innerHTML = `<div class="stat-header"><span>${user}</span> <span>${count} 件</span></div><div class="stat-bar-container"><div class="stat-label"><span>佔比</span><span>${pct}%</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
-                display.appendChild(card);
-            });
-        } else {
-            const userTasks = validTasks.filter(t => t.completedBy === selectedUser);
-            const total = userTasks.length;
-            if(total === 0) { display.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">帳號 ${selectedUser} 在此區間無完成資料</div>`; return; }
-            const catCounts = {}; ORDERED_CATEGORIES.forEach(c => catCounts[c]=0);
-            userTasks.forEach(t => { if(catCounts[t.category]!==undefined) catCounts[t.category]++; });
-            
-            const card = document.createElement('div'); card.className = 'stat-card';
-            card.innerHTML = `<div class="stat-header" style="border-bottom:1px solid #eee; padding-bottom:5px;">${selectedUser} - 總計 ${total} 件</div>`;
-            ORDERED_CATEGORIES.forEach(cat => {
-                const count = catCounts[cat]; const pct = total===0?0:Math.round((count/total)*100);
-                card.innerHTML += `<div style="margin-top:10px;"><div class="stat-label"><span>${cat}</span><span>${count} (${pct}%)</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
-            });
-            display.appendChild(card);
-        }
-    }
-
-    /* --- USER MANAGEMENT --- */
-    function openUserModal() {
-        const list = document.getElementById('userListDisplay');
-        const role = state.currentUser.role;
-        list.innerHTML = '';
-        if (state.users.length === 0) list.innerHTML = '<li style="padding:10px; color:#666;">目前無一般使用者帳號。</li>';
-
-        state.users.forEach(user => {
-            const li = document.createElement('li'); li.className = 'user-item';
-            const isApproved = user.isApproved;
-            let badgeClass = 'role-user'; let badgeText = '一般者';
-            if(user.role === 'senior') { badgeClass = 'role-senior'; badgeText = '高級管理者'; }
-            else if(user.role === 'admin') { badgeClass = 'role-admin'; badgeText = '管理者'; }
-            if(!isApproved) { badgeClass = ''; badgeText = '待審核'; }
-
-            let controlsHtml = '';
-            if (role === 'senior') {
-                const selUser = user.role === 'user' ? 'selected' : '';
-                const selAdmin = user.role === 'admin' ? 'selected' : '';
-                const selSenior = user.role === 'senior' ? 'selected' : '';
-                const pwdId = `pwd_${user.docId}`;
-                
-                controlsHtml = `
-                    <div class="user-edit-row">
-                        <select id="role_${user.docId}">
-                            <option value="user" ${selUser}>一般者</option>
-                            <option value="admin" ${selAdmin}>管理者</option>
-                            <option value="senior" ${selSenior}>高級管理者</option>
-                        </select>
-                        <input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}">
-                    </div>
-                    <div class="user-edit-row">
-                        <span class="readonly-text" style="min-width:60px;">密碼:</span>
-                        <input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;">
-                        <button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button>
-                    </div>
-                    <div style="text-align:right;">
-                        <button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>
-                        <button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>
-                    </div>
-                `;
-            } else if (role === 'admin') {
-                let actionBtn = !isApproved ? `<button class="btn-approve" onclick="approveUserSimple('${user.docId}')">核准申請</button>` : `<span style="color:#10b981; font-size:0.85rem;">已核准</span>`;
-                controlsHtml = `<div class="user-edit-row"><span class="readonly-text">角色: ${badgeText}</span><span class="readonly-text" style="margin-left:15px;">備註: ${user.remarks || '(無)'}</span></div><div style="text-align:right;">${actionBtn}</div>`;
+        // 監聽任務
+        db.collection('tasks').onSnapshot(snapshot => {
+            const list = document.getElementById('taskListContainer');
+            list.innerHTML = `<h2>任務列表 (${snapshot.size} 筆)</h2>`;
+            if(snapshot.empty) {
+                list.innerHTML += "<p>目前資料庫是空的，請先切換到「管理員」或在完整版新增任務。</p>";
+                return;
             }
-            li.innerHTML = `<div class="user-header"><div><span class="user-name">${user.username}</span><span class="user-role-badge ${badgeClass}">${badgeText}</span></div></div>${controlsHtml}`;
-            list.appendChild(li);
-        });
-        document.getElementById('userModal').style.display = 'flex';
-    }
-
-    function togglePasswordVisibility(id) {
-        const input = document.getElementById(id);
-        if (input.type === "password") { input.type = "text"; } else { input.type = "password"; }
-    }
-
-    function updateUser(docId) {
-        const role = document.getElementById(`role_${docId}`).value;
-        const note = document.getElementById(`note_${docId}`).value;
-        db.collection('users').doc(docId).update({ role: role, remarks: note, isApproved: true })
-            .then(() => alert('資料已更新'));
-    }
-    function deleteUser(docId) {
-        if (!confirm('高級管理員操作：確定要刪除此帳號嗎？')) return;
-        db.collection('users').doc(docId).delete().then(() => openUserModal());
-    }
-    function approveUserSimple(docId) {
-        db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准帳號'));
-    }
-
-    /* --- TASKS CRUD --- */
-    function renderTasks() {
-        const container = document.getElementById('taskListContainer');
-        container.innerHTML = '';
-        
-        // Overdue
-        const overdueTasks = state.tasks.filter(t => t.date < state.currentDate && !t.completed && !t.isDeleted);
-        if (overdueTasks.length > 0) {
-            const group = document.createElement('div'); group.className = 'category-group overdue-section';
-            group.innerHTML = `<div class="category-header-row"><div class="cat-title">🚨 先前未完成 <span class="badge-count" style="background:#fee2e2; color:#b91c1c;">${overdueTasks.length}</span></div></div>`;
-            overdueTasks.sort((a,b)=>new Date(a.date)-new Date(b.date));
-            overdueTasks.forEach(t => group.appendChild(createTaskElement(t, true)));
-            container.appendChild(group);
-        }
-
-        const dayTasks = state.tasks.filter(t => t.date === state.currentDate);
-        const totalActive = dayTasks.filter(t => !t.isDeleted).length;
-        const totalDone = dayTasks.filter(t => !t.isDeleted && t.completed).length;
-        const totalPct = totalActive===0?0:Math.round((totalDone/totalActive)*100);
-        document.getElementById('overallProgressText').innerText = `${totalDone}/${totalActive} (${totalPct}%)`;
-        document.getElementById('overallProgressBar').style.width = `${totalPct}%`;
-
-        if (dayTasks.length === 0 && overdueTasks.length === 0) {
-            container.innerHTML += `<div style="text-align:center; color:#9ca3b8; margin-top:60px;">本日無任何案件或任務</div>`; return;
-        }
-
-        ORDERED_CATEGORIES.forEach(cat => {
-            const all = dayTasks.filter(t => t.category === cat && !t.isDeleted);
-            const active = all.filter(t => !t.completed);
-            const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
-            const group = document.createElement('div'); group.className = 'category-group';
-            group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
-            if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t)));
-            else group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
-            container.appendChild(group);
-        });
-
-        const completed = dayTasks.filter(t => t.completed && !t.isDeleted);
-        if (completed.length > 0) {
-            const group = document.createElement('div'); group.className = 'category-group completed-section';
-            group.innerHTML = `<div class="category-header-row"><div class="cat-title">✅ 已完成 <span class="badge-count">${completed.length}</span></div></div>`;
-            completed.sort((a,b)=>new Date(a.completedAt)-new Date(b.completedAt));
-            completed.forEach(t => group.appendChild(createTaskElement(t)));
-            container.appendChild(group);
-        }
-        const deleted = dayTasks.filter(t => t.isDeleted);
-        if (deleted.length > 0) {
-            const group = document.createElement('div'); group.className = 'category-group deleted-section';
-            group.innerHTML = `<div class="category-header-row"><div class="cat-title">🗑️ 被刪除項目 <span class="badge-count">${deleted.length}</span></div></div>`;
-            deleted.forEach(t => group.appendChild(createTaskElement(t)));
-            container.appendChild(group);
-        }
-    }
-
-    function createTaskElement(task, isOverdue = false) {
-        const div = document.createElement('div');
-        const overdueClass = isOverdue ? 'overdue-item' : '';
-        div.className = `task-item ${overdueClass} ${task.completed ? 'completed-item' : ''} ${task.isDeleted ? 'deleted-item' : ''}`;
-        div.setAttribute('data-cat', task.category);
-        
-        let checkboxHtml = task.isDeleted ? '' : `<div class="task-checkbox" onclick="toggleTask('${task.id}')"></div>`;
-        let metaHtml = '';
-        if (task.completed && !task.isDeleted) {
-            const d = new Date(task.completedAt);
-            metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${task.completedBy} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`;
-        } else if (isOverdue) {
-            metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`;
-        }
-        
-        let actionBtn = task.isDeleted 
-            ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>`
-            : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
-            
-        const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
-        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${metaHtml}</div><div class="action-area"><div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
-        return div;
-    }
-
-    function toggleTask(id) {
-        const task = state.tasks.find(t => t.id === id);
-        if(task) {
-            const newVal = !task.completed;
-            const updateData = { completed: newVal, completedBy: newVal ? state.currentUser.name : null, completedAt: newVal ? new Date().toISOString() : null };
-            updateTaskDb(id, updateData, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態');
-        }
-    }
-    function saveTask() {
-        const htmlContent = document.getElementById('inputTitle').innerHTML.trim();
-        const category = document.getElementById('inputCategory').value;
-        if(document.getElementById('inputTitle').innerText.trim() === '' && !htmlContent.includes('<img')) return alert('請輸入內容');
-
-        if(state.editingTaskId) {
-            updateTaskDb(state.editingTaskId, { title: htmlContent, category: category }, '修改', '編輯任務內容/分類');
-        } else {
-            const newTask = { title: htmlContent, category: category, date: state.currentDate, completed: false, isDeleted: false, logs: [], createdAt: new Date().toISOString() };
-            newTask.logs.push({ type: '建立', desc: `建立任務於 [${category}]`, user: state.currentUser.name, time: new Date().toISOString() });
-            db.collection('tasks').add(newTask);
-        }
-        closeModal();
-    }
-    function deleteTask(id) { if(confirm('移至被刪除項目？')) updateTaskDb(id, { isDeleted: true }, '刪除', '移至被刪除項目'); }
-    function restoreTask(id) { updateTaskDb(id, { isDeleted: false }, '還原', '從刪除項目中還原'); }
-    
-    function updateTaskDb(id, data, logType, logDesc) {
-        const task = state.tasks.find(t => t.id === id);
-        const newLogs = task.logs || [];
-        newLogs.unshift({ type: logType, desc: logDesc, user: state.currentUser.name, time: new Date().toISOString() });
-        db.collection('tasks').doc(id).update({ ...data, logs: newLogs });
-    }
-
-    function changeDate(d, addHistory = true) {
-        state.currentDate = d; document.getElementById('dateSearch').value = d;
-        const dateObj = new Date(d);
-        document.getElementById('headerDateDisplay').innerText = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-        if(addHistory) {
-            let hist = state.history.filter(x => x !== d); hist.unshift(d);
-            if(hist.length > 10) hist.pop();
-            state.history = hist; localStorage.setItem('tt_history', JSON.stringify(hist));
-            renderHistory();
-        }
-        renderTasks();
-    }
-    function renderHistory() {
-        const ul = document.getElementById('historyList'); ul.innerHTML = '';
-        state.history.forEach(d => {
-            const li = document.createElement('li'); li.className = `history-item ${d === state.currentDate?'active':''}`;
-            li.innerText = d; li.onclick = () => changeDate(d, false); ul.appendChild(li);
+            snapshot.forEach(doc => {
+                const t = doc.data();
+                const div = document.createElement('div');
+                div.className = 'task-item';
+                div.setAttribute('data-cat', t.category);
+                div.innerHTML = `
+                    <strong>${t.title}</strong> 
+                    <span style="font-size:0.8rem; color:#666">(${t.date})</span>
+                    <br><small>分類: ${t.category} | 狀態: ${t.completed?'完成':'未完成'}</small>
+                `;
+                list.appendChild(div);
+            });
+            log("資料庫同步成功！", 'succ');
+        }, err => {
+            log("資料庫讀取失敗: " + err.message, 'err');
+            alert("讀取失敗，可能是權限不足或網路中斷");
         });
     }
-    
-    const storedUser = localStorage.getItem('tt_current_user');
-    if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
-    
-    function openModal(taskId=null) {
-        const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle');
-        document.getElementById('taskModal').style.display='flex'; editor.focus();
-        if(taskId) {
-            state.editingTaskId=taskId; const t=state.tasks.find(x=>x.id===taskId);
-            document.getElementById('modalTitle').innerText='編輯任務內容'; editor.innerHTML=t.title; document.getElementById('inputCategory').value=t.category;
-            document.getElementById('btnSaveTask').innerText='保存修改';
-        } else {
-            state.editingTaskId=null; document.getElementById('modalTitle').innerText='新增案件/任務'; editor.innerHTML='';
-            document.getElementById('btnSaveTask').innerText='確認新增';
-        }
+
+    function logout() {
+        localStorage.removeItem('tt_user');
+        location.reload();
     }
-    function closeModal() { document.getElementById('taskModal').style.display='none'; state.editingTaskId=null; }
-    function showHistory(id) {
-        const t = state.tasks.find(x=>x.id===id); if(!t) return;
-        const list = document.getElementById('logList'); list.innerHTML='';
-        (t.logs||[]).forEach(l => {
-            const d=new Date(l.time);
-            const timeStr=`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes()}`;
-            list.innerHTML+=`<li class="log-item"><div class="log-time">${timeStr}</div><div class="log-content"><span class="log-user">${l.user}</span> ${l.desc}</div></li>`;
-        });
-        document.getElementById('historyModal').style.display='flex';
-    }
-    document.getElementById('taskModal').addEventListener('click', e => { if(e.target.id==='taskModal') closeModal(); });
+
 </script>
 </body>
 </html>
