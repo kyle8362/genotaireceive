@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (LINE Fix v26)</title>
+    <title>案件進度追蹤系統 (Mobile LINE v28)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -109,12 +109,13 @@
 
         .ngs-badge { display: inline-block; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #fdfdfd; margin-right: 5px; margin-top: 3px; color: #555; }
 
-        .action-area { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .btn-icon { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 2px 8px; color: #9ca3af; border-radius: 4px; }
-        .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); }
+        .action-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .btn-icon { background: none; border: 1px solid transparent; cursor: pointer; font-size: 1.2rem; padding: 2px 6px; color: #9ca3af; border-radius: 4px; }
+        .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); border-color: #ddd; }
         .btn-delete:hover { color: var(--danger); }
         .btn-restore { color: var(--success); font-size: 1rem; }
         .btn-line:hover { color: var(--line-green); }
+        .btn-copy:hover { color: var(--primary); }
         
         .history-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #9ca3af; font-weight: bold; font-size: 18px; }
         .history-dot:hover { background: #e5e7eb; color: var(--primary); }
@@ -1038,9 +1039,10 @@
             ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>`
             : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
             
-        // LINE BUTTON (Only for Admin+)
+        // LINE & COPY BUTTONS (Only for Admin+)
         let lineBtnHtml = '';
         const canNotify = ['creator', 'senior', 'admin'].includes(state.currentUser.role);
+        
         if (canNotify && !task.isDeleted) {
             let lineText = '';
             if (task.category === 'NGS收件' && task.details) {
@@ -1049,22 +1051,33 @@
                 const plainTitle = task.title.replace(/<[^>]*>/g, '');
                 lineText = `【任務通知】\n${plainTitle}`;
             }
-            const encodedText = encodeURIComponent(lineText);
             
             // Detect Mobile
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Desktop: force protocol, Mobile: universal link
-            const lineUrl = isMobile 
-                ? `https://line.me/R/share?text=${encodedText}` 
-                : `line://msg/text/${encodedText}`;
+            // COPY BUTTON (Always show, great for desktop)
+            lineBtnHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
 
-            lineBtnHtml = `<a href="${lineUrl}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`;
+            // LINE BUTTON (Only show on Mobile)
+            if (isMobile) {
+                const encodedText = encodeURIComponent(lineText);
+                lineBtnHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`;
+            }
         }
 
         const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
         div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area">${lineBtnHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
         return div;
+    }
+
+    // COPY FUNCTION
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert("已複製通知內容！\n請直接到 LINE 貼上即可。");
+        }).catch(err => {
+            console.error('Copy failed', err);
+            prompt("請手動複製:", text);
+        });
     }
 
     /* --- DB OPERATIONS --- */
