@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>案件進度追蹤系統 (Master v11)</title>
+    <title>案件進度追蹤系統 (Stable v12)</title>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -26,6 +26,7 @@
         .auth-box.admin-view .auth-tag { display: block; }
         .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
         .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; }
+        .auth-btn:disabled { background: #ccc; cursor: not-allowed; }
         .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
         /* Layout */
@@ -41,7 +42,6 @@
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; }
         
-        /* Search */
         .search-box input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
         .search-item { padding: 8px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
@@ -58,13 +58,11 @@
         header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
         .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
         
-        /* Progress */
         .overall-progress-container { margin-top: 15px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; }
         .progress-label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: #4b5563; }
         .progress-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--success); transition: width 0.5s ease; }
 
-        /* Tasks */
         .task-container { max-width: 900px; padding-bottom: 100px; }
         .category-group { margin-bottom: 2.5rem; }
         .category-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -119,7 +117,6 @@
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
-        /* Modals */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
         .modal-card { background: white; padding: 2rem; border-radius: 12px; width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; }
         
@@ -156,7 +153,6 @@
         .btn-reject { background: #ef4444; color: white; padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.85rem; margin-left: 5px;}
         .btn-icon-eye { background:none; border:none; cursor:pointer; padding:5px; font-size:1rem; }
 
-        /* Stats */
         .stats-filter-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .stats-filter-row input, .stats-filter-row select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
         .stats-result-area { max-height: 400px; overflow-y: auto; }
@@ -203,7 +199,6 @@
         </div>
         <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
         <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="openStatsModal()">📊 任務完成統整</div>
-        
         <div class="sidebar-section">
             <h3>🔍 搜尋任務</h3>
             <div class="search-box">
@@ -211,7 +206,6 @@
                 <ul class="search-results" id="searchResults"></ul>
             </div>
         </div>
-
         <div class="sidebar-section">
             <h3>📅 日期選擇</h3>
             <input type="date" id="dateSearch" onchange="changeDate(this.value)">
@@ -221,7 +215,6 @@
             <ul class="history-list" id="historyList"></ul>
         </div>
     </aside>
-
     <main>
         <header>
             <div class="date-header" id="headerDateDisplay"></div>
@@ -317,7 +310,7 @@
 </div>
 
 <script>
-    // --- FIREBASE CONFIGURATION ---
+    // --- FIREBASE CONFIGURATION (Must be correct) ---
     const firebaseConfig = {
       apiKey: "AIzaSyBPcmgaT4f3nfyJrJOXnAeYCwH19SwZvCA",
       authDomain: "tasktrack-app-206f8.firebaseapp.com",
@@ -353,9 +346,11 @@
             const me = state.users.find(u => u.username === state.currentUser.name);
             if(me) { state.currentUser.role = me.role; updateUIForRole(); }
         }
+    }, (error) => {
+        console.error("Error fetching users:", error);
     });
 
-    /* --- Auth --- */
+    /* --- Auth Logic (Fixed for Async) --- */
     function switchMode(mode) {
         state.authMode = mode;
         document.getElementById('btnModeGeneral').className = mode === 'general' ? 'mode-btn active' : 'mode-btn';
@@ -385,45 +380,73 @@
         }
     }
 
-    function handleAuth() {
+    // NEW HANDLE AUTH (Direct DB Query)
+    async function handleAuth() {
         const u = document.getElementById('username').value.trim();
         const p = document.getElementById('password').value.trim();
         const title = document.getElementById('auth-title').innerText;
-        if(!u || !p) return alert('請輸入帳號密碼');
+        const btn = document.getElementById('btnAuthAction');
 
-        // ADMIN LOGIN
-        if (state.authMode === 'admin') {
-            if (u === 'Admin' && p === 'Abcd1234') {
-                const adminInDb = state.users.find(user => user.username === 'Admin');
-                if(!adminInDb) db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
-                loginSuccess('Admin', 'senior');
-            } else {
-                const user = state.users.find(x => x.username === u && x.password === p);
-                if (user && user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
-                    loginSuccess(u, user.role);
+        if(!u || !p) return alert('請輸入帳號密碼');
+        btn.disabled = true; // Disable button to prevent double clicks
+
+        try {
+            // ADMIN LOGIN
+            if (state.authMode === 'admin') {
+                if (u === 'Admin' && p === 'Abcd1234') {
+                    // Check if Admin exists, if not create
+                    const snapshot = await db.collection('users').where('username', '==', 'Admin').get();
+                    if(snapshot.empty) {
+                        await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'senior', remarks: 'System Admin' });
+                    }
+                    loginSuccess('Admin', 'senior');
                 } else {
-                    alert('權限不足或帳密錯誤');
+                    // Regular Admin/Senior logging in via Admin panel
+                    const snapshot = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                    if (!snapshot.empty) {
+                        const user = snapshot.docs[0].data();
+                        if (user.isApproved && (user.role === 'admin' || user.role === 'senior')) {
+                            loginSuccess(user.username, user.role);
+                        } else {
+                            alert('權限不足或帳密錯誤 (僅管理者可從此處登入)');
+                        }
+                    } else {
+                        alert('權限不足或帳密錯誤');
+                    }
+                }
+            } 
+            // GENERAL LOGIN / REGISTER
+            else {
+                if (title.includes('註冊')) {
+                    if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
+                    
+                    const snapshot = await db.collection('users').where('username', '==', u).get();
+                    if (!snapshot.empty) throw new Error('帳號已存在');
+                    
+                    await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
+                    alert('註冊成功！待管理員核准後方可登入。');
+                    toggleAuthMode();
+                } else {
+                    // Login: Query DB directly instead of checking local array
+                    const snapshot = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                    
+                    if (snapshot.empty) {
+                        alert('帳號或密碼錯誤');
+                    } else {
+                        const user = snapshot.docs[0].data();
+                        if (!user.isApproved) {
+                            alert('⚠️ 您的帳號尚未通過審核。');
+                        } else {
+                            loginSuccess(user.username, user.role || 'user');
+                        }
+                    }
                 }
             }
-            return;
-        }
-
-        // GENERAL LOGIN/REGISTER
-        if (title.includes('註冊')) {
-            if (u.toLowerCase() === 'admin') return alert('不可使用 Admin 作為帳號');
-            const exist = state.users.find(x => x.username === u);
-            if (exist) return alert('帳號已存在');
-            
-            db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' })
-            .then(() => {
-                alert('註冊成功！待管理員核准後方可登入。');
-                toggleAuthMode();
-            });
-        } else {
-            const user = state.users.find(x => x.username === u && x.password === p);
-            if (!user) return alert('帳號或密碼錯誤');
-            if (!user.isApproved) return alert('⚠️ 您的帳號尚未通過審核。');
-            loginSuccess(u, user.role || 'user');
+        } catch (error) {
+            alert(error.message);
+            console.error("Auth Error:", error);
+        } finally {
+            btn.disabled = false;
         }
     }
 
@@ -433,7 +456,8 @@
         initApp();
     }
     function logout() { localStorage.removeItem('tt_current_user'); location.reload(); }
-    
+    function checkLogin() { const stored = localStorage.getItem('tt_current_user'); if (stored) { state.currentUser = JSON.parse(stored); initApp(); } }
+
     function initApp() {
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('app-screen').style.display = 'flex';
@@ -549,8 +573,6 @@
                 const selUser = user.role === 'user' ? 'selected' : '';
                 const selAdmin = user.role === 'admin' ? 'selected' : '';
                 const selSenior = user.role === 'senior' ? 'selected' : '';
-                
-                // Password Reveal Logic
                 const pwdId = `pwd_${user.docId}`;
                 
                 controlsHtml = `
@@ -734,6 +756,7 @@
         });
     }
     
+    // Check if user is logged in
     const storedUser = localStorage.getItem('tt_current_user');
     if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
     
