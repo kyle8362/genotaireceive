@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (Fix API v33)</title>
+    <title>案件進度追蹤系統 (Final v35)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -116,19 +116,21 @@
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
-        /* Client Search */
+        /* --- Client Location Search Styles --- */
         .cust-header { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .cust-search-bar { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
         .btn-google-form { background: #4285F4; color: white; padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border:none; cursor:pointer;}
+        .btn-google-form:hover { background: #357ae8; }
+        
         .cust-list-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
-        .cust-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid var(--blue); transition: transform 0.2s; }
+        .cust-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid var(--blue); transition: transform 0.2s; display: flex; flex-direction: column; gap: 6px; }
         .cust-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .cust-unit { color: var(--blue); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .cust-name { font-size: 1.2rem; font-weight: 800; color: #111827; margin-bottom: 8px; }
-        .cust-loc { font-size: 1rem; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
-        .cust-contact { background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 0.9rem; color: #4b5563; margin-bottom: 8px; }
-        .cust-note { font-size: 0.85rem; color: #6b7280; font-style: italic; margin-bottom: 8px; border-left: 2px solid #ddd; padding-left: 8px; }
-        .cust-update { font-size: 0.75rem; color: #9ca3af; text-align: right; margin-top: 10px; }
+        
+        .cust-title-row { font-size: 1.1rem; font-weight: 800; color: #111827; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 4px; }
+        .cust-row { font-size: 0.95rem; color: #374151; display: flex; align-items: flex-start; gap: 6px; line-height: 1.5; }
+        .cust-row.note { color: #6b7280; font-style: italic; font-size: 0.85rem; background: #f9fafb; padding: 5px; border-radius: 4px; }
+        .cust-update { font-size: 0.75rem; color: #9ca3af; text-align: right; margin-top: auto; }
+        
         .loading-spinner { text-align: center; padding: 20px; font-size: 1.2rem; color: var(--primary); }
 
         /* Modals & Others */
@@ -241,7 +243,7 @@
         <div id="customerView" class="view-section">
             <header>
                 <h1>客戶位置查詢</h1>
-                <div class="date-header">即時查詢 Google 試算表資料</div>
+                <div class="date-header">位置即時查詢系統</div>
             </header>
             <div class="cust-header">
                 <input type="text" id="custSearchInput" class="cust-search-bar" placeholder="輸入客戶名稱、樓層或關鍵字..." oninput="handleCustomerSearch()">
@@ -251,7 +253,8 @@
                 ⏳ 資料讀取中...
             </div>
             <div class="cust-list-container" id="customerList">
-                </div>
+                <div style="grid-column: 1/-1; text-align:center; color:#9ca3af; margin-top:50px;">請輸入關鍵字開始查詢</div>
+            </div>
         </div>
     </main>
 </div>
@@ -348,7 +351,6 @@
             const res = await fetch(GAS_API_URL);
             const data = await res.json();
             state.customers = data;
-            renderCustomers(data);
         } catch (e) {
             console.error("API Error:", e);
             alert("資料讀取失敗，請確認 API 網址與權限設定 (Anyone)。\n按 F12 看詳細錯誤。");
@@ -358,16 +360,37 @@
     }
     function renderCustomers(data) {
         const container = document.getElementById('customerList'); container.innerHTML = '';
-        if(data.length === 0) { container.innerHTML = '<div style="color:#666;">查無資料</div>'; return; }
+        if(data.length === 0) { container.innerHTML = '<div style="color:#666; text-align:center;">查無資料</div>'; return; }
+        
         data.forEach(cust => {
             const div = document.createElement('div'); div.className = 'cust-card';
-            div.innerHTML = `<div class="cust-unit">${cust.unit||cust.單位||'未分類'}</div><div class="cust-name">${cust.name||cust.客戶名稱||'無名稱'}</div>${(cust.location||cust.樓層)?`<div class="cust-loc">📍 ${cust.location||cust.樓層}</div>`:''}${(cust.contact||cust.聯絡人)?`<div class="cust-contact">📞 ${cust.contact||cust.聯絡人}</div>`:''}<div class="cust-note">${cust.note||cust.備註||'無備註'}</div><div class="cust-update">更新: ${cust.update||cust.最後更新||''}</div>`;
+            const unit = cust.unit||cust.單位||'未分類';
+            const name = cust.name||cust.客戶名稱||'無名稱';
+            const loc = cust.location||cust.樓層||cust.地點||'';
+            const contact = cust.contact||cust.聯絡人||'';
+            const phone = cust.phone||cust.電話||'';
+            const note = cust.note||cust.備註||'';
+            const update = cust.update||cust.最後更新||'';
+
+            let content = `
+                <div class="cust-title-row">${unit} - ${name}</div>
+                <div class="cust-row">🏢 ${loc}</div>
+                ${contact ? `<div class="cust-row">👤 ${contact}</div>` : ''}
+                ${phone ? `<div class="cust-row">📞 ${phone}</div>` : ''}
+                ${note ? `<div class="cust-row note">📝 ${note}</div>` : ''}
+                ${update ? `<div class="cust-update">最後更新: ${update}</div>` : ''}
+            `;
+            div.innerHTML = content;
             container.appendChild(div);
         });
     }
     function handleCustomerSearch() {
         const key = document.getElementById('custSearchInput').value.trim().toLowerCase();
-        if(!key) { renderCustomers(state.customers); return; }
+        const container = document.getElementById('customerList');
+        if(!key) { 
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#9ca3af; margin-top:50px;">請輸入關鍵字開始查詢</div>'; 
+            return; 
+        }
         const filtered = state.customers.filter(c => JSON.stringify(c).toLowerCase().includes(key));
         renderCustomers(filtered);
     }
@@ -560,7 +583,7 @@
     function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => openUserModal()); }
     function approveUserSimple(docId) { db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准')); }
 
-    /* --- TASKS RENDER (MODIFIED) --- */
+    /* --- TASKS RENDER --- */
     function renderTasks() {
         const container = document.getElementById('taskListContainer'); container.innerHTML = '';
         
@@ -586,6 +609,7 @@
             const all = dayTasks.filter(t => t.category === cat && !t.isDeleted);
             const active = all.filter(t => !t.completed);
             const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
+            
             const group = document.createElement('div'); group.className = 'category-group';
             group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
             if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t)));
@@ -676,7 +700,7 @@
             
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Desktop: Show Copy (Always, or if specifically not mobile)
+            // Desktop: Show Copy (Always)
             if (!isMobile) {
                  lineBtnHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
             }
@@ -736,4 +760,3 @@
 </script>
 </body>
 </html>
-
