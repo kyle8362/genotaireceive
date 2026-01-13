@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (Client Search v32)</title>
+    <title>案件進度追蹤系統 (Fix API v33)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -40,16 +40,14 @@
         /* Sidebar Buttons */
         .sidebar-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: block; font-size: 0.9rem; border: 1px solid transparent; width: 100%; }
         .sidebar-btn:hover { opacity: 0.9; }
-        
         .btn-nav-active { background: var(--primary); color: white; border-color: var(--primary); }
         .btn-nav-inactive { background: white; color: var(--text-light); border: 1px solid var(--border); }
         
+        .admin-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: none; font-size: 0.9rem; }
         .btn-perm { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
         .btn-stats { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
         .btn-settings { background: #f0fdfa; color: #0f766e; border: 1px solid #ccfbf1; } 
         .btn-import { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-        
-        /* Client Search specific button */
         .btn-client-search { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
@@ -58,13 +56,16 @@
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
         .search-item { padding: 8px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .search-item:hover { background: #f9fafb; color: var(--primary); }
-        
-        /* Main Layout Switcher */
+        .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        .history-item { padding: 10px; cursor: pointer; border-radius: 6px; color: var(--text-main); margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .history-item:hover { background: #f8fafc; }
+        .history-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
         main { flex-grow: 1; padding: 2rem; overflow-y: auto; position: relative; }
         .view-section { display: none; height: 100%; flex-direction: column; }
         .view-section.active { display: flex; }
 
-        /* --- Task View Styles --- */
+        /* Task View */
         header { margin-bottom: 2rem; }
         header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
         .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
@@ -86,6 +87,7 @@
         details summary:hover { background: #f3f4f6; color: var(--primary); }
         .details-content { padding: 10px; background: #fff; }
         .category-group.overdue-section .cat-title { color: #dc2626; } 
+        
         .task-item { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: flex-start; transition: all 0.2s; border-left: 4px solid transparent; position: relative; }
         .task-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .task-item[data-cat="定序收件"] { border-left-color: #3b82f6; }
@@ -107,15 +109,17 @@
         .action-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .btn-icon { background: none; border: 1px solid transparent; cursor: pointer; font-size: 1.2rem; padding: 2px 6px; color: #9ca3af; border-radius: 4px; }
         .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); border-color: #ddd; }
+        .btn-delete:hover { color: var(--danger); }
+        .btn-restore { color: var(--success); font-size: 1rem; }
+        .btn-line:hover { color: var(--line-green); }
+        .btn-copy:hover { color: var(--primary); }
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
-        /* --- Customer Location View Styles --- */
+        /* Client Search */
         .cust-header { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .cust-search-bar { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
         .btn-google-form { background: #4285F4; color: white; padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border:none; cursor:pointer;}
-        .btn-google-form:hover { background: #357ae8; }
-        
         .cust-list-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
         .cust-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid var(--blue); transition: transform 0.2s; }
         .cust-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
@@ -141,7 +145,6 @@
         .input-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; }
         .input-group select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
         .input-group input[type="text"] { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
-        /* NGS Form, Import Area etc. from v30 styles */
         #ngs-form-container { background: #f0fdfa; padding: 15px; border: 1px solid #ccfbf1; border-radius: 8px; margin-bottom: 15px; display: none; }
         .ngs-row { margin-bottom: 10px; }
         .ngs-row label { font-size: 0.85rem; color: #0f766e; font-weight: 600; margin-bottom: 4px; display: block; }
@@ -215,6 +218,10 @@
             <h3>📅 日期選擇</h3>
             <input type="date" id="dateSearch" onchange="changeDate(this.value)">
         </div>
+        <div class="sidebar-section" style="flex-grow: 1; display:flex; flex-direction:column; margin-top:20px;">
+            <h3>🕒 最近檢視紀錄</h3>
+            <ul class="history-list" id="historyList"></ul>
+        </div>
     </aside>
 
     <main>
@@ -279,7 +286,7 @@
     const db = firebase.firestore();
 
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxq3nzO5zqbiZnD8pcptQ1Gnm-_2JB4DTS13sts3pWF5NyC7Ok6tt317w9alAOJBVNyYw/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxgS-o3wya22LzINo56w5TIFstx7Nge3X_ttfJH2Oi1UjiEhQ_YIG41VNaaAPgXSKZtIw/exec";
 
     let state = {
         currentUser: null, currentDate: getTodayStr(), activeTab: 'tasks',
@@ -309,9 +316,8 @@
             document.getElementById('customerView').classList.add('active');
             document.getElementById('taskSearchSection').style.display = 'none';
             document.getElementById('taskDateSection').style.display = 'none';
-            if(state.customers.length === 0) fetchCustomers(); // Fetch on first view
+            if(state.customers.length === 0) fetchCustomers();
         }
-        
         if(window.innerWidth <= 768) toggleSidebar();
     }
 
@@ -335,7 +341,7 @@
         if(document.getElementById('salesSettingsModal').style.display === 'flex') openSalesSettings();
     });
 
-    /* --- CUSTOMER SEARCH (FETCH & RENDER) --- */
+    /* --- CUSTOMER SEARCH --- */
     async function fetchCustomers() {
         document.getElementById('custLoading').style.display = 'block';
         try {
@@ -344,49 +350,25 @@
             state.customers = data;
             renderCustomers(data);
         } catch (e) {
-            alert("資料讀取失敗，請檢查網路或 API");
-            console.error(e);
+            console.error("API Error:", e);
+            alert("資料讀取失敗，請確認 API 網址與權限設定 (Anyone)。\n按 F12 看詳細錯誤。");
         } finally {
             document.getElementById('custLoading').style.display = 'none';
         }
     }
-
     function renderCustomers(data) {
-        const container = document.getElementById('customerList');
-        container.innerHTML = '';
+        const container = document.getElementById('customerList'); container.innerHTML = '';
         if(data.length === 0) { container.innerHTML = '<div style="color:#666;">查無資料</div>'; return; }
-        
         data.forEach(cust => {
-            const div = document.createElement('div');
-            div.className = 'cust-card';
-            // Mapping: Assuming API returns keys like 'name', 'location', 'note', etc. 
-            // Adapt if your API keys differ.
-            const unit = cust.unit || cust.單位 || '未分類';
-            const name = cust.name || cust.客戶名稱 || '無名稱';
-            const loc = cust.location || cust.樓層 || cust.地點 || '';
-            const contact = cust.contact || cust.聯絡人 || '';
-            const note = cust.note || cust.備註 || '無備註';
-            const update = cust.update || cust.最後更新 || '';
-
-            div.innerHTML = `
-                <div class="cust-unit">${unit}</div>
-                <div class="cust-name">${name}</div>
-                ${loc ? `<div class="cust-loc">📍 ${loc}</div>` : ''}
-                ${contact ? `<div class="cust-contact">📞 ${contact}</div>` : ''}
-                <div class="cust-note">${note}</div>
-                ${update ? `<div class="cust-update">更新: ${update}</div>` : ''}
-            `;
+            const div = document.createElement('div'); div.className = 'cust-card';
+            div.innerHTML = `<div class="cust-unit">${cust.unit||cust.單位||'未分類'}</div><div class="cust-name">${cust.name||cust.客戶名稱||'無名稱'}</div>${(cust.location||cust.樓層)?`<div class="cust-loc">📍 ${cust.location||cust.樓層}</div>`:''}${(cust.contact||cust.聯絡人)?`<div class="cust-contact">📞 ${cust.contact||cust.聯絡人}</div>`:''}<div class="cust-note">${cust.note||cust.備註||'無備註'}</div><div class="cust-update">更新: ${cust.update||cust.最後更新||''}</div>`;
             container.appendChild(div);
         });
     }
-
     function handleCustomerSearch() {
         const key = document.getElementById('custSearchInput').value.trim().toLowerCase();
         if(!key) { renderCustomers(state.customers); return; }
-        const filtered = state.customers.filter(c => {
-            const str = JSON.stringify(c).toLowerCase();
-            return str.includes(key);
-        });
+        const filtered = state.customers.filter(c => JSON.stringify(c).toLowerCase().includes(key));
         renderCustomers(filtered);
     }
 
@@ -421,7 +403,6 @@
     }
     function loginSuccess(username, role) { state.currentUser = { name: username, role: role }; localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser)); initApp(); }
     function logout() { localStorage.removeItem('tt_current_user'); location.reload(); }
-    
     function initApp() {
         document.getElementById('auth-screen').style.display = 'none'; document.getElementById('app-screen').style.display = 'flex';
         updateUIForRole(); changeDate(state.currentDate, false);
@@ -579,7 +560,7 @@
     function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => openUserModal()); }
     function approveUserSimple(docId) { db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准')); }
 
-    /* --- TASKS RENDER --- */
+    /* --- TASKS RENDER (MODIFIED) --- */
     function renderTasks() {
         const container = document.getElementById('taskListContainer'); container.innerHTML = '';
         
@@ -605,7 +586,6 @@
             const all = dayTasks.filter(t => t.category === cat && !t.isDeleted);
             const active = all.filter(t => !t.completed);
             const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
-            
             const group = document.createElement('div'); group.className = 'category-group';
             group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
             if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t)));
@@ -613,6 +593,7 @@
             container.appendChild(group);
         });
 
+        // Completed (Grouped & Collapsible)
         const completedTasks = dayTasks.filter(t => t.completed && !t.isDeleted);
         if (completedTasks.length > 0) {
             const compSection = document.createElement('div'); compSection.className = 'category-group completed-section';
@@ -631,6 +612,7 @@
             container.appendChild(compSection);
         }
 
+        // Deleted (Grouped & Collapsible)
         const deletedTasks = dayTasks.filter(t => t.isDeleted);
         if (deletedTasks.length > 0) {
             const delSection = document.createElement('div'); delSection.className = 'category-group deleted-section';
@@ -694,7 +676,7 @@
             
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Desktop: Show Copy (Always)
+            // Desktop: Show Copy (Always, or if specifically not mobile)
             if (!isMobile) {
                  lineBtnHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
             }
@@ -716,7 +698,6 @@
     }
     
     // ... (Keep existing Helper Functions: toggleTask, getDropdownOrInput, saveTask, deleteTask, restoreTask, updateTaskDb, changeDate, renderHistory, openModal, closeModal, showHistory) ...
-    // Note: Re-paste full blocks for helper functions here if needed, but for brevity assuming they are carried over from v30/v31 logic exactly as is.
     function toggleTask(id) { const task = state.tasks.find(t => t.id === id); if(task) { const newVal = !task.completed; updateTaskDb(id, { completed: newVal, completedBy: newVal ? state.currentUser.name : null, completedAt: newVal ? new Date().toISOString() : null }, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態'); } }
     function getDropdownOrInput(selectId, inputId) { const sel = document.getElementById(selectId).value; return (sel === '其他') ? document.getElementById(inputId).value.trim() : sel; }
     function saveTask() { 
