@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (Client v37)</title>
+    <title>案件進度追蹤系統 (Card Layout v37)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -37,6 +37,7 @@
         .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; flex-shrink: 0; }
         .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
         
+        /* Sidebar Buttons */
         .sidebar-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: block; font-size: 0.9rem; border: 1px solid transparent; width: 100%; }
         .sidebar-btn:hover { opacity: 0.9; }
         .btn-nav-active { background: var(--primary); color: white; border-color: var(--primary); }
@@ -288,7 +289,7 @@
     const db = firebase.firestore();
 
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
-    // ⚠️ 您的 API 網址
+    // ⚠️ 您的 API 網址 (請確認後端已更新為讀取 building/floor 分開的版本)
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyBb7G3UGTEoz5TBpwn2__pUhtqH9eIZTOghFqbivqHxoGXNNeIbswqGOie55_Jtj6w7Q/exec";
 
     let state = {
@@ -351,7 +352,6 @@
             const res = await fetch(GAS_API_URL);
             const data = await res.json();
             state.customers = data;
-            // No render here (wait for search)
         } catch (e) {
             console.error("API Error:", e);
             alert("資料讀取失敗，請確認 API 網址與權限設定 (Anyone)。\n按 F12 看詳細錯誤。");
@@ -365,20 +365,25 @@
         
         data.forEach(cust => {
             const div = document.createElement('div'); div.className = 'cust-card';
-            // Mapping from GAS (v36 structure)
+            // Mapping from GAS (v36 updated structure)
+            const unit = cust.unit||'未分類';
             const name = cust.name||'無名稱';
-            const loc = cust.location?`${cust.building||''} ${cust.floor||''}`.trim() : (cust.building ? `${cust.building} | ${cust.floor}` : '');
-            // For v36 format which combines building and floor in GAS:
-            const combinedLoc = cust.building ? `${cust.building} | ${cust.floor}` : (cust.location || '');
-            
+            const building = cust.building||'';
+            const floor = cust.floor||'';
             const contact = cust.contact||'';
             const phone = cust.phone||'';
             const note = cust.note||'';
             const update = cust.update||'';
 
+            // Format: Building - Floor or just one if the other missing
+            let locStr = '';
+            if(building && floor) locStr = `${building} - ${floor}`;
+            else if(building) locStr = building;
+            else if(floor) locStr = floor;
+
             let content = `
-                <div class="cust-title-row">${name}</div>
-                <div class="cust-row">📍 ${combinedLoc}</div>
+                <div class="cust-title-row">${unit} - ${name}</div>
+                ${locStr ? `<div class="cust-row">📍 ${locStr}</div>` : ''}
                 ${contact ? `<div class="cust-row">👤 ${contact}</div>` : ''}
                 ${phone ? `<div class="cust-row">📞 ${phone}</div>` : ''}
                 ${note ? `<div class="cust-row note">📝 ${note}</div>` : ''}
