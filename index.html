@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (Import Simple v30)</title>
+    <title>案件進度追蹤系統 (Final v31)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -70,6 +70,15 @@
         .badge-count { background: #e5e7eb; color: #374151; font-size: 0.8rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
         .cat-progress-track { width: 100%; height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; margin-bottom: 1rem; }
         .cat-progress-fill { height: 100%; background: var(--primary); transition: width 0.5s ease; }
+
+        /* Collapsible Sections */
+        details { margin-bottom: 10px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: white; }
+        details summary { padding: 12px; cursor: pointer; font-weight: 600; background: #f9fafb; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        details summary:hover { background: #f3f4f6; color: var(--primary); }
+        details[open] summary { border-bottom: 1px solid #e5e7eb; }
+        details summary::after { content: '+'; font-size: 1.2rem; font-weight: bold; }
+        details[open] summary::after { content: '-'; }
+        .details-content { padding: 10px; background: #fff; }
 
         .category-group.overdue-section .cat-title { color: #dc2626; } 
         .category-group.completed-section .cat-title { color: var(--text-light); }
@@ -580,6 +589,12 @@
     function getTodayStr() { return new Date().toISOString().split('T')[0]; }
     function formatDoc(cmd, value) { document.execCommand(cmd, false, value); document.getElementById('inputTitle').focus(); }
 
+    /* --- HELPER: GET USER NICKNAME --- */
+    function getUserDisplayName(username) {
+        const u = state.users.find(x => x.username === username);
+        return (u && u.nickname) ? u.nickname : username;
+    }
+
     /* --- MOBILE MENU --- */
     function toggleSidebar() {
         document.querySelector('aside').classList.toggle('open');
@@ -614,14 +629,13 @@
         if(doc.exists) {
             state.salesOptions = doc.data().list || ['Jeff', '廖軒逵'];
         } else {
-            // Init default if not exists
             state.salesOptions = ['Jeff', '廖軒逵'];
             db.collection('settings').doc('ngs_sales').set({ list: state.salesOptions });
         }
         if(document.getElementById('salesSettingsModal').style.display === 'flex') openSalesSettings();
     });
 
-    /* --- Auth Logic (Unified) --- */
+    /* --- Auth Logic --- */
     function toggleAuthMode() {
         const title = document.getElementById('auth-title');
         const btn = document.getElementById('btnAuthAction');
@@ -649,18 +663,17 @@
                 const q = await db.collection('users').where('username', '==', u).get();
                 if (!q.empty) throw new Error('帳號已存在');
                 
-                await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '' });
+                await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '', nickname: '' });
                 alert('註冊成功！待管理員核准後方可登入。');
                 toggleAuthMode();
             } else {
                 // Login
                 if (u === 'Admin' && p === 'Abcd1234') {
-                    // Admin Backdoor / Auto-heal
+                    // Admin Backdoor
                     const q = await db.collection('users').where('username', '==', 'Admin').get();
                     if(q.empty) {
-                        await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'creator', remarks: '創世神' });
+                        await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'creator', remarks: '創世神', nickname: '系統管理員' });
                     } else {
-                        // Ensure role is creator
                         const docId = q.docs[0].id;
                         if(q.docs[0].data().role !== 'creator') await db.collection('users').doc(docId).update({ role: 'creator' });
                     }
@@ -709,8 +722,9 @@
         else if(state.currentUser.role === 'senior') roleName = ' (高級管理者)';
         else if(state.currentUser.role === 'admin') roleName = ' (管理者)';
         
-        document.getElementById('displayUsername').innerText = state.currentUser.name + roleName;
-        document.getElementById('userAvatar').innerText = state.currentUser.name[0].toUpperCase();
+        const dispName = getUserDisplayName(state.currentUser.name);
+        document.getElementById('displayUsername').innerText = dispName + roleName;
+        document.getElementById('userAvatar').innerText = dispName[0].toUpperCase();
         
         const canManage = ['creator','senior','admin'].includes(state.currentUser.role);
         const canConfig = ['creator','senior'].includes(state.currentUser.role);
@@ -721,56 +735,6 @@
         document.getElementById('importBtn').style.display = canManage ? 'block' : 'none';
     }
 
-    /* --- IMPORT LOGIC --- */
-    function openImportModal() {
-        // Populate Dropdown (exclude NGS)
-        const select = document.getElementById('importCategorySelect');
-        select.innerHTML = '';
-        ORDERED_CATEGORIES.forEach(cat => {
-            if (cat !== 'NGS收件') {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.innerText = cat;
-                select.appendChild(opt);
-            }
-        });
-        document.getElementById('importModal').style.display = 'flex';
-        document.getElementById('importTextarea').value = '';
-    }
-
-    async function processImport() {
-        const raw = document.getElementById('importTextarea').value.trim();
-        const cat = document.getElementById('importCategorySelect').value;
-        if(!raw) return alert("請輸入內容");
-        
-        const lines = raw.split('\n');
-        let successCount = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            const title = lines[i].trim();
-            if(!title) continue;
-
-            try {
-                await db.collection('tasks').add({
-                    category: cat,
-                    title: title,
-                    details: null,
-                    date: state.currentDate,
-                    completed: false,
-                    isDeleted: false,
-                    logs: [{ type: '匯入', desc: '批量匯入', user: state.currentUser.name, time: new Date().toISOString() }],
-                    createdAt: new Date().toISOString()
-                });
-                successCount++;
-            } catch(e) {
-                console.error(e);
-            }
-        }
-        
-        alert(`匯入完成！成功: ${successCount}`);
-        document.getElementById('importModal').style.display = 'none';
-    }
-
     /* --- SALES SETTINGS --- */
     function openSalesSettings() {
         const list = document.getElementById('salesOptionList');
@@ -778,53 +742,45 @@
         state.salesOptions.forEach((opt, index) => {
             const li = document.createElement('li');
             li.className = 'setting-item';
-            li.innerHTML = `
-                <span>${opt}</span>
-                <div>
-                    <button class="btn-icon" onclick="editSalesOption(${index})">✏️</button>
-                    <button class="btn-icon" style="color:red;" onclick="deleteSalesOption(${index})">🗑️</button>
-                </div>
-            `;
+            li.innerHTML = `<span>${opt}</span><div><button class="btn-icon" onclick="editSalesOption(${index})">✏️</button><button class="btn-icon" style="color:red;" onclick="deleteSalesOption(${index})">🗑️</button></div>`;
             list.appendChild(li);
         });
         document.getElementById('salesSettingsModal').style.display = 'flex';
     }
-
-    function saveSalesSettings() {
-        db.collection('settings').doc('ngs_sales').update({ list: state.salesOptions });
-    }
-
-    function addSalesOption() {
-        const input = document.getElementById('newSalesName');
-        const val = input.value.trim();
-        if(val) {
-            state.salesOptions.push(val);
-            saveSalesSettings();
-            input.value = '';
-        }
-    }
-
-    function deleteSalesOption(index) {
-        if(confirm('確定刪除此業務選項？')) {
-            state.salesOptions.splice(index, 1);
-            saveSalesSettings();
-        }
-    }
-
-    function editSalesOption(index) {
-        const newVal = prompt("修改業務姓名:", state.salesOptions[index]);
-        if(newVal && newVal.trim() !== "") {
-            state.salesOptions[index] = newVal.trim();
-            saveSalesSettings();
-        }
-    }
-
+    function saveSalesSettings() { db.collection('settings').doc('ngs_sales').update({ list: state.salesOptions }); }
+    function addSalesOption() { const val = document.getElementById('newSalesName').value.trim(); if(val) { state.salesOptions.push(val); saveSalesSettings(); document.getElementById('newSalesName').value = ''; } }
+    function deleteSalesOption(index) { if(confirm('確定刪除？')) { state.salesOptions.splice(index, 1); saveSalesSettings(); } }
+    function editSalesOption(index) { const newVal = prompt("修改:", state.salesOptions[index]); if(newVal && newVal.trim()) { state.salesOptions[index] = newVal.trim(); saveSalesSettings(); } }
     function populateSalesDropdowns() {
         const optsHtml = state.salesOptions.map(s => `<option value="${s}">${s}</option>`).join('');
-        const s1 = document.getElementById('ngsSales');
-        const s2 = document.getElementById('ngsQcSales');
-        if(s1) s1.innerHTML = optsHtml;
-        if(s2) s2.innerHTML = optsHtml;
+        const s1 = document.getElementById('ngsSales'); const s2 = document.getElementById('ngsQcSales');
+        if(s1) s1.innerHTML = optsHtml; if(s2) s2.innerHTML = optsHtml;
+    }
+
+    /* --- IMPORT LOGIC --- */
+    function openImportModal() {
+        const select = document.getElementById('importCategorySelect'); select.innerHTML = '';
+        ORDERED_CATEGORIES.forEach(cat => {
+            if (cat !== 'NGS收件') { const opt = document.createElement('option'); opt.value = cat; opt.innerText = cat; select.appendChild(opt); }
+        });
+        document.getElementById('importModal').style.display = 'flex'; document.getElementById('importTextarea').value = '';
+    }
+    async function processImport() {
+        const raw = document.getElementById('importTextarea').value.trim(); const cat = document.getElementById('importCategorySelect').value;
+        if(!raw) return alert("請輸入內容");
+        const lines = raw.split('\n'); let successCount = 0;
+        for (let i = 0; i < lines.length; i++) {
+            const title = lines[i].trim();
+            if(!title) continue;
+            try {
+                await db.collection('tasks').add({
+                    category: cat, title: title, details: null, date: state.currentDate, completed: false, isDeleted: false,
+                    logs: [{ type: '匯入', desc: '批量匯入', user: state.currentUser.name, time: new Date().toISOString() }], createdAt: new Date().toISOString()
+                });
+                successCount++;
+            } catch(e) { console.error(e); }
+        }
+        alert(`匯入完成！成功: ${successCount}`); document.getElementById('importModal').style.display = 'none';
     }
 
     /* --- SEARCH --- */
@@ -833,12 +789,10 @@
         const resultsContainer = document.getElementById('searchResults');
         resultsContainer.innerHTML = '';
         if (!keyword) return;
-
         const matched = state.tasks.filter(t => t.title.replace(/<[^>]*>/g, '').toLowerCase().includes(keyword));
         matched.slice(0, 20).forEach(t => {
             const li = document.createElement('li'); li.className = 'search-item';
-            const rawTitle = t.title.replace(/<[^>]*>/g, '');
-            li.innerHTML = `<span>${rawTitle}</span><span class="search-date">${t.date}</span>`;
+            li.innerHTML = `<span>${t.title.replace(/<[^>]*>/g, '')}</span><span class="search-date">${t.date}</span>`;
             li.onclick = () => { changeDate(t.date); if(window.innerWidth<=768) toggleSidebar(); };
             resultsContainer.appendChild(li);
         });
@@ -848,38 +802,23 @@
     /* --- NGS FORM LOGIC --- */
     function handleCategoryChange() {
         const cat = document.getElementById('inputCategory').value;
-        const ngsForm = document.getElementById('ngs-form-container');
-        if (cat === 'NGS收件') {
-            ngsForm.style.display = 'block';
-        } else {
-            ngsForm.style.display = 'none';
-        }
+        document.getElementById('ngs-form-container').style.display = (cat === 'NGS收件') ? 'block' : 'none';
     }
-
     function handleNgsNeedsChange() {
         const needs = document.getElementById('ngsNeeds').value;
-        const exFields = document.getElementById('ngs-extraction-fields');
-        const qcFields = document.getElementById('ngs-qc-fields');
-        
-        exFields.style.display = (needs === '萃取') ? 'block' : 'none';
-        qcFields.style.display = (needs === 'QC') ? 'block' : 'none';
+        document.getElementById('ngs-extraction-fields').style.display = (needs === '萃取') ? 'block' : 'none';
+        document.getElementById('ngs-qc-fields').style.display = (needs === 'QC') ? 'block' : 'none';
     }
-
     function handleDropdownChange(selectId, inputId) {
-        const val = document.getElementById(selectId).value;
-        document.getElementById(inputId).style.display = (val === '其他') ? 'block' : 'none';
+        document.getElementById(inputId).style.display = (document.getElementById(selectId).value === '其他') ? 'block' : 'none';
     }
-
     function generateNgsTitle() {
         const cat = document.getElementById('inputCategory').value;
         if (cat !== 'NGS收件') return;
-
         const unit = document.getElementById('ngsUnit').value.trim();
         const pi = document.getElementById('ngsPI').value.trim();
         const needs = document.getElementById('ngsNeeds').value;
-        
         let subType = '';
-        
         if (needs === '萃取') {
             const sel = document.getElementById('ngsExpTypeSelect').value;
             subType = (sel === '其他') ? document.getElementById('ngsExpTypeInput').value.trim() : sel;
@@ -887,41 +826,25 @@
             const sel = document.getElementById('ngsNucleicTypeSelect').value;
             subType = (sel === '其他') ? document.getElementById('ngsNucleicTypeInput').value.trim() : sel;
         }
-
-        if (unit && pi && subType) {
-            document.getElementById('inputTitle').innerText = `${unit}-${pi}-${subType} 收件`;
-        }
+        if (unit && pi && subType) document.getElementById('inputTitle').innerText = `${unit}-${pi}-${subType} 收件`;
     }
 
     /* --- STATS --- */
     function openStatsModal() {
-        const modal = document.getElementById('statsModal');
-        const userSelect = document.getElementById('statsUserSelect');
-        const startInput = document.getElementById('statsDateStart');
-        const endInput = document.getElementById('statsDateEnd');
-
+        const modal = document.getElementById('statsModal'); const userSelect = document.getElementById('statsUserSelect');
+        const startInput = document.getElementById('statsDateStart'); const endInput = document.getElementById('statsDateEnd');
         userSelect.innerHTML = '<option value="all">-- 所有帳號 (總覽) --</option>';
         const uniqueUsers = [...new Set(state.tasks.filter(t=>t.completed && t.completedBy).map(t=>t.completedBy))];
-        uniqueUsers.sort().forEach(u => { const opt = document.createElement('option'); opt.value = u; opt.innerText = u; userSelect.appendChild(opt); });
-
-        const year = new Date().getFullYear();
-        startInput.value = `${year}-01-01`; endInput.value = `${year}-12-31`;
+        uniqueUsers.sort().forEach(u => { const opt = document.createElement('option'); opt.value = u; opt.innerText = getUserDisplayName(u); userSelect.appendChild(opt); });
+        const year = new Date().getFullYear(); startInput.value = `${year}-01-01`; endInput.value = `${year}-12-31`;
         updateStats(); modal.style.display = 'flex';
     }
-
     function updateStats() {
-        const start = document.getElementById('statsDateStart').value;
-        const end = document.getElementById('statsDateEnd').value;
+        const start = document.getElementById('statsDateStart').value; const end = document.getElementById('statsDateEnd').value;
         const selectedUser = document.getElementById('statsUserSelect').value;
-        const display = document.getElementById('statsResultDisplay');
-        display.innerHTML = '';
+        const display = document.getElementById('statsResultDisplay'); display.innerHTML = '';
         if(!start || !end) return;
-
-        const validTasks = state.tasks.filter(t => {
-            if(!t.completed || t.isDeleted || !t.completedBy) return false;
-            return t.date >= start && t.date <= end;
-        });
-
+        const validTasks = state.tasks.filter(t => !t.completed || t.isDeleted || !t.completedBy ? false : (t.date >= start && t.date <= end));
         if (selectedUser === 'all') {
             const userCounts = {}; let total = 0;
             validTasks.forEach(t => { if(!userCounts[t.completedBy]) userCounts[t.completedBy]=0; userCounts[t.completedBy]++; total++; });
@@ -929,18 +852,17 @@
             Object.entries(userCounts).sort((a,b)=>b[1]-a[1]).forEach(([user, count]) => {
                 const pct = Math.round((count/total)*100);
                 const card = document.createElement('div'); card.className = 'stat-card';
-                card.innerHTML = `<div class="stat-header"><span>${user}</span> <span>${count} 件</span></div><div class="stat-bar-container"><div class="stat-label"><span>佔比</span><span>${pct}%</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
+                card.innerHTML = `<div class="stat-header"><span>${getUserDisplayName(user)}</span> <span>${count} 件</span></div><div class="stat-bar-container"><div class="stat-label"><span>佔比</span><span>${pct}%</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
                 display.appendChild(card);
             });
         } else {
             const userTasks = validTasks.filter(t => t.completedBy === selectedUser);
             const total = userTasks.length;
-            if(total === 0) { display.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">帳號 ${selectedUser} 在此區間無完成資料</div>`; return; }
+            if(total === 0) { display.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">帳號 ${getUserDisplayName(selectedUser)} 在此區間無完成資料</div>`; return; }
             const catCounts = {}; ORDERED_CATEGORIES.forEach(c => catCounts[c]=0);
             userTasks.forEach(t => { if(catCounts[t.category]!==undefined) catCounts[t.category]++; });
-            
             const card = document.createElement('div'); card.className = 'stat-card';
-            card.innerHTML = `<div class="stat-header" style="border-bottom:1px solid #eee; padding-bottom:5px;">${selectedUser} - 總計 ${total} 件</div>`;
+            card.innerHTML = `<div class="stat-header" style="border-bottom:1px solid #eee; padding-bottom:5px;">${getUserDisplayName(selectedUser)} - 總計 ${total} 件</div>`;
             ORDERED_CATEGORIES.forEach(cat => {
                 const count = catCounts[cat]; const pct = total===0?0:Math.round((count/total)*100);
                 card.innerHTML += `<div style="margin-top:10px;"><div class="stat-label"><span>${cat}</span><span>${count} (${pct}%)</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
@@ -951,88 +873,62 @@
 
     /* --- USER MANAGEMENT --- */
     function openUserModal() {
-        const list = document.getElementById('userListDisplay');
-        const myRole = state.currentUser.role;
-        list.innerHTML = '';
-        if (state.users.length === 0) list.innerHTML = '<li style="padding:10px; color:#666;">目前無一般使用者帳號。</li>';
-
+        const list = document.getElementById('userListDisplay'); const myRole = state.currentUser.role; list.innerHTML = '';
         state.users.forEach(user => {
             const li = document.createElement('li'); li.className = 'user-item';
-            const isApproved = user.isApproved;
-            
             let badgeClass = 'role-user'; let badgeText = '一般者';
             if(user.role === 'creator') { badgeClass = 'role-creator'; badgeText = '🟣 創世神'; }
             else if(user.role === 'senior') { badgeClass = 'role-senior'; badgeText = '高級管理者'; }
             else if(user.role === 'admin') { badgeClass = 'role-admin'; badgeText = '管理者'; }
-            if(!isApproved) { badgeClass = ''; badgeText = '待審核'; }
-
+            if(!user.isApproved) { badgeClass = ''; badgeText = '待審核'; }
+            
             const isTargetCreator = user.role === 'creator';
+            const canEditNickname = ['creator', 'senior'].includes(myRole);
+
             let controlsHtml = '';
-
-            if (myRole === 'creator') {
-                const selUser = user.role === 'user' ? 'selected' : '';
-                const selAdmin = user.role === 'admin' ? 'selected' : '';
-                const selSenior = user.role === 'senior' ? 'selected' : '';
-                
-                const pwdId = `pwd_${user.docId}`;
-                const roleSelect = isTargetCreator ? `<select disabled><option selected>創世神</option></select>` : 
-                    `<select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select>`;
-
-                controlsHtml = `
-                    <div class="user-edit-row">${roleSelect}<input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}"></div>
-                    <div class="user-edit-row"><span class="readonly-text" style="min-width:60px;">密碼:</span><input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;"><button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button></div>
-                    <div style="text-align:right;"><button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button>${ !isTargetCreator ? `<button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>` : '' }</div>`;
-            } 
-            else if (myRole === 'senior') {
-                if (isTargetCreator) {
-                    controlsHtml = `<div class="user-edit-row"><span style="color:purple; font-weight:bold;">此為最高權限帳號，無法編輯。</span></div>`;
+            if (myRole === 'creator' || myRole === 'senior') {
+                if (myRole === 'senior' && isTargetCreator) {
+                     controlsHtml = `<div class="user-edit-row"><span style="color:purple; font-weight:bold;">此為最高權限帳號，無法編輯。</span></div>`;
                 } else {
                     const selUser = user.role === 'user' ? 'selected' : '';
                     const selAdmin = user.role === 'admin' ? 'selected' : '';
                     const selSenior = user.role === 'senior' ? 'selected' : '';
-                    const pwdId = `pwd_${user.docId}`;
-                    controlsHtml = `<div class="user-edit-row"><select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select><input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}"></div><div class="user-edit-row"><span class="readonly-text" style="min-width:60px;">密碼:</span><input type="password" id="${pwdId}" value="${user.password}" readonly style="background:#eee; color:#555;"><button class="btn-icon-eye" onclick="togglePasswordVisibility('${pwdId}')" title="顯示/隱藏密碼">👁️</button></div><div style="text-align:right;"><button class="btn-approve" onclick="updateUser('${user.docId}')">${isApproved?'更新資料':'核准/更新'}</button><button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button></div>`;
+                    const roleSelect = (myRole==='creator' && isTargetCreator) ? `<select disabled><option>創世神</option></select>` : `<select id="role_${user.docId}"><option value="user" ${selUser}>一般者</option><option value="admin" ${selAdmin}>管理者</option><option value="senior" ${selSenior}>高級管理者</option></select>`;
+                    
+                    controlsHtml = `
+                        <div class="user-edit-row">
+                            ${roleSelect}
+                            <input type="text" id="note_${user.docId}" placeholder="備註" value="${user.remarks || ''}" style="width:50%">
+                            <input type="text" id="nick_${user.docId}" placeholder="稱謂 (選填)" value="${user.nickname || ''}" style="width:30%">
+                        </div>
+                        <div class="user-edit-row"><span class="readonly-text">密碼:</span><input type="password" id="pwd_${user.docId}" value="${user.password}" readonly style="background:#eee;color:#555;"><button class="btn-icon-eye" onclick="togglePasswordVisibility('pwd_${user.docId}')">👁️</button></div>
+                        <div style="text-align:right;"><button class="btn-approve" onclick="updateUser('${user.docId}')">${user.isApproved?'更新資料':'核准/更新'}</button>${!isTargetCreator ? `<button class="btn-reject" onclick="deleteUser('${user.docId}')">刪除</button>` : ''}</div>
+                    `;
                 }
+            } else {
+                let actionBtn = !user.isApproved ? `<button class="btn-approve" onclick="approveUserSimple('${user.docId}')">核准申請</button>` : `<span style="color:#10b981; font-size:0.85rem;">已核准</span>`;
+                controlsHtml = `<div class="user-edit-row"><span class="readonly-text">角色: ${badgeText}</span><span class="readonly-text" style="margin-left:15px;">備註: ${user.remarks || '(無)'}</span></div><div style="text-align:right;">${actionBtn}</div>`;
             }
-            else if (myRole === 'admin') {
-                if (isTargetCreator || user.role === 'senior') {
-                    controlsHtml = `<div class="user-edit-row"><span class="readonly-text">權限高於或等於您，無法檢視詳細資料。</span></div>`;
-                } else {
-                    let actionBtn = !isApproved ? `<button class="btn-approve" onclick="approveUserSimple('${user.docId}')">核准申請</button>` : `<span style="color:#10b981; font-size:0.85rem;">已核准</span>`;
-                    controlsHtml = `<div class="user-edit-row"><span class="readonly-text">角色: ${badgeText}</span><span class="readonly-text" style="margin-left:15px;">備註: ${user.remarks || '(無)'}</span></div><div style="text-align:right;">${actionBtn}</div>`;
-                }
-            }
-
             li.innerHTML = `<div class="user-header"><div><span class="user-name">${user.username}</span><span class="user-role-badge ${badgeClass}">${badgeText}</span></div></div>${controlsHtml}`;
             list.appendChild(li);
         });
         document.getElementById('userModal').style.display = 'flex';
     }
-
-    function togglePasswordVisibility(id) {
-        const input = document.getElementById(id);
-        if (input.type === "password") { input.type = "text"; } else { input.type = "password"; }
-    }
-
+    function togglePasswordVisibility(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
     function updateUser(docId) {
         const role = document.getElementById(`role_${docId}`).value;
         const note = document.getElementById(`note_${docId}`).value;
-        db.collection('users').doc(docId).update({ role: role, remarks: note, isApproved: true }).then(() => alert('資料已更新'));
+        const nick = document.getElementById(`nick_${docId}`).value;
+        db.collection('users').doc(docId).update({ role: role, remarks: note, nickname: nick, isApproved: true }).then(() => alert('資料已更新'));
     }
-    function deleteUser(docId) {
-        if (!confirm('確定要刪除此帳號嗎？')) return;
-        db.collection('users').doc(docId).delete().then(() => openUserModal());
-    }
-    function approveUserSimple(docId) {
-        db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准帳號'));
-    }
+    function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => openUserModal()); }
+    function approveUserSimple(docId) { db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准')); }
 
-    /* --- TASKS CRUD --- */
+    /* --- TASKS RENDER --- */
     function renderTasks() {
-        const container = document.getElementById('taskListContainer');
-        container.innerHTML = '';
+        const container = document.getElementById('taskListContainer'); container.innerHTML = '';
         
-        // Overdue
+        // 1. Overdue
         const overdueTasks = state.tasks.filter(t => t.date < state.currentDate && !t.completed && !t.isDeleted);
         if (overdueTasks.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group overdue-section';
@@ -1042,6 +938,7 @@
             container.appendChild(group);
         }
 
+        // 2. Active Tasks (Current Date)
         const dayTasks = state.tasks.filter(t => t.date === state.currentDate);
         const totalActive = dayTasks.filter(t => !t.isDeleted).length;
         const totalDone = dayTasks.filter(t => !t.isDeleted && t.completed).length;
@@ -1057,6 +954,7 @@
             const all = dayTasks.filter(t => t.category === cat && !t.isDeleted);
             const active = all.filter(t => !t.completed);
             const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
+            
             const group = document.createElement('div'); group.className = 'category-group';
             group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
             if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t)));
@@ -1064,20 +962,45 @@
             container.appendChild(group);
         });
 
-        const completed = dayTasks.filter(t => t.completed && !t.isDeleted);
-        if (completed.length > 0) {
-            const group = document.createElement('div'); group.className = 'category-group completed-section';
-            group.innerHTML = `<div class="category-header-row"><div class="cat-title">✅ 已完成 <span class="badge-count">${completed.length}</span></div></div>`;
-            completed.sort((a,b)=>new Date(a.completedAt)-new Date(b.completedAt));
-            completed.forEach(t => group.appendChild(createTaskElement(t)));
-            container.appendChild(group);
+        // 3. Completed (Grouped & Collapsible)
+        const completedTasks = dayTasks.filter(t => t.completed && !t.isDeleted);
+        if (completedTasks.length > 0) {
+            const compSection = document.createElement('div');
+            compSection.className = 'category-group completed-section';
+            compSection.innerHTML = `<div class="category-header-row"><div class="cat-title">✅ 已完成項目 (總覽) <span class="badge-count">${completedTasks.length}</span></div></div>`;
+            
+            ORDERED_CATEGORIES.forEach(cat => {
+                const subTasks = completedTasks.filter(t => t.category === cat);
+                if (subTasks.length > 0) {
+                    const details = document.createElement('details');
+                    details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
+                    const content = details.querySelector('.details-content');
+                    subTasks.sort((a,b)=>new Date(a.completedAt)-new Date(b.completedAt));
+                    subTasks.forEach(t => content.appendChild(createTaskElement(t)));
+                    compSection.appendChild(details);
+                }
+            });
+            container.appendChild(compSection);
         }
-        const deleted = dayTasks.filter(t => t.isDeleted);
-        if (deleted.length > 0) {
-            const group = document.createElement('div'); group.className = 'category-group deleted-section';
-            group.innerHTML = `<div class="category-header-row"><div class="cat-title">🗑️ 被刪除項目 <span class="badge-count">${deleted.length}</span></div></div>`;
-            deleted.forEach(t => group.appendChild(createTaskElement(t)));
-            container.appendChild(group);
+
+        // 4. Deleted (Grouped & Collapsible)
+        const deletedTasks = dayTasks.filter(t => t.isDeleted);
+        if (deletedTasks.length > 0) {
+            const delSection = document.createElement('div');
+            delSection.className = 'category-group deleted-section';
+            delSection.innerHTML = `<div class="category-header-row"><div class="cat-title">🗑️ 被刪除項目 (總覽) <span class="badge-count">${deletedTasks.length}</span></div></div>`;
+            
+            ORDERED_CATEGORIES.forEach(cat => {
+                const subTasks = deletedTasks.filter(t => t.category === cat);
+                if (subTasks.length > 0) {
+                    const details = document.createElement('details');
+                    details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
+                    const content = details.querySelector('.details-content');
+                    subTasks.forEach(t => content.appendChild(createTaskElement(t)));
+                    delSection.appendChild(details);
+                }
+            });
+            container.appendChild(delSection);
         }
     }
 
@@ -1091,27 +1014,20 @@
         let metaHtml = '';
         if (task.completed && !task.isDeleted) {
             const d = new Date(task.completedAt);
-            metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${task.completedBy} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`;
+            const userDisp = getUserDisplayName(task.completedBy);
+            metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${userDisp} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`;
         } else if (isOverdue) {
             metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`;
         }
 
-        // Show NGS Details if available
         let ngsInfoHtml = '';
         if (task.details) {
-            ngsInfoHtml += `<div style="margin-top:5px; padding:5px; background:#f0fdfa; border-radius:4px; font-size:0.8rem; color:#0f766e;">
-                <div><span class="ngs-badge">單位</span> ${task.details.unit}</div>
-                <div><span class="ngs-badge">主持人</span> ${task.details.pi}</div>
-                <div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
-            
+             // ... (Keep existing NGS display logic) ...
+            ngsInfoHtml += `<div style="margin-top:5px; padding:5px; background:#f0fdfa; border-radius:4px; font-size:0.8rem; color:#0f766e;"><div><span class="ngs-badge">單位</span> ${task.details.unit}</div><div><span class="ngs-badge">主持人</span> ${task.details.pi}</div><div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
             if(task.details.needs === '萃取') {
-                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div>
-                <div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div>
-                <div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
+                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
             } else if (task.details.needs === 'QC') {
-                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div>
-                <div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div>
-                <div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
+                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
             }
             ngsInfoHtml += `</div>`;
         }
@@ -1120,182 +1036,75 @@
             ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>`
             : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
             
-        const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
-        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area"><div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
-        return div;
-    }
-
-    /* --- DB OPERATIONS --- */
-    function toggleTask(id) {
-        const task = state.tasks.find(t => t.id === id);
-        if(task) {
-            const newVal = !task.completed;
-            const updateData = { completed: newVal, completedBy: newVal ? state.currentUser.name : null, completedAt: newVal ? new Date().toISOString() : null };
-            updateTaskDb(id, updateData, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態');
-        }
-    }
-    
-    function getDropdownOrInput(selectId, inputId) {
-        const sel = document.getElementById(selectId).value;
-        return (sel === '其他') ? document.getElementById(inputId).value.trim() : sel;
-    }
-
-    function saveTask() {
-        const htmlContent = document.getElementById('inputTitle').innerHTML.trim();
-        const category = document.getElementById('inputCategory').value;
-        const textContent = document.getElementById('inputTitle').innerText.trim();
+        let lineBtnHtml = '';
+        const canNotify = ['creator', 'senior', 'admin'].includes(state.currentUser.role);
         
-        // VALIDATION
-        if(textContent === '' && !htmlContent.includes('<img')) return alert('請輸入任務內容');
-        
-        // NGS Specific Validation & Data Collection
-        let details = null;
-        if (category === 'NGS收件') {
-            const unit = document.getElementById('ngsUnit').value.trim();
-            const pi = document.getElementById('ngsPI').value.trim();
-            const needs = document.getElementById('ngsNeeds').value;
+        if (canNotify && !task.isDeleted) {
+            let lineText = '';
+            if (task.category === 'NGS收件' && task.details) {
+                lineText = `【NGS案件通知】\n單位: ${task.details.unit}\n主持人: ${task.details.pi}\n項目: ${task.details.needs === '萃取' ? task.details.expType : task.details.nucleicType}\n負責業務: ${task.details.sales}`;
+            } else {
+                const plainTitle = task.title.replace(/<[^>]*>/g, '');
+                lineText = `【任務通知】\n${plainTitle}`;
+            }
             
-            if (!unit || !pi || !needs) return alert('請完整填寫 NGS 詳細資料');
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            details = { unit, pi, needs };
-            
-            // Common fields for Extraction AND QC (based on prompt v22 update)
-            if (needs === '萃取' || needs === 'QC') {
-                const prefix = needs === '萃取' ? 'ngs' : 'ngsQc';
-                
-                // Specific Type field
-                if (needs === '萃取') {
-                    details.sampleType = getDropdownOrInput('ngsSampleTypeSelect', 'ngsSampleTypeInput');
-                    if (!details.sampleType) return alert('請填寫檢體種類');
-                } else {
-                    details.nucleicType = getDropdownOrInput('ngsNucleicTypeSelect', 'ngsNucleicTypeInput');
-                    if (!details.nucleicType) return alert('請填寫核酸種類');
-                }
+            // Desktop: Show Copy (Always, or if specifically not mobile)
+            lineBtnHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字" style="${isMobile?'display:none':''}">📋</button>`;
 
-                // Shared fields (Logic mapped to correct IDs)
-                details.temp = document.getElementById(prefix + 'Temp').value;
-                details.returnBack = document.getElementById(prefix + 'Return').value;
-                details.sampleCount = document.getElementById(prefix + 'Count').value.trim();
-                details.expType = getDropdownOrInput(prefix + 'ExpTypeSelect', prefix + 'ExpTypeInput');
-                details.platform = getDropdownOrInput(prefix + 'PlatformSelect', prefix + 'PlatformInput');
-                details.sales = document.getElementById(prefix + 'Sales').value;
-
-                if (!details.sampleCount || !details.expType || !details.platform) return alert('請完整填寫詳細資料 (數量、實驗、平台)');
+            // Mobile: Show LINE
+            if (isMobile) {
+                const encodedText = encodeURIComponent(lineText);
+                lineBtnHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`;
             }
         }
 
-        if(state.editingTaskId) {
-            updateTaskDb(state.editingTaskId, { title: htmlContent, category: category, details: details }, '修改', '編輯任務內容/分類');
-        } else {
-            const newTask = { title: htmlContent, category: category, date: state.currentDate, completed: false, isDeleted: false, logs: [], createdAt: new Date().toISOString(), details: details };
-            newTask.logs.push({ type: '建立', desc: `建立任務於 [${category}]`, user: state.currentUser.name, time: new Date().toISOString() });
-            db.collection('tasks').add(newTask);
+        const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
+        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area">${lineBtnHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
+        return div;
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => alert("已複製通知內容！")).catch(err => prompt("請手動複製:", text));
+    }
+    
+    // ... (Remaining Helper Functions: toggleTask, getDropdownOrInput, saveTask, deleteTask, restoreTask, updateTaskDb, changeDate, renderHistory, openModal, closeModal, showHistory from v30 - Kept identical for stability) ...
+    function toggleTask(id) { const task = state.tasks.find(t => t.id === id); if(task) { const newVal = !task.completed; updateTaskDb(id, { completed: newVal, completedBy: newVal ? state.currentUser.name : null, completedAt: newVal ? new Date().toISOString() : null }, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態'); } }
+    function getDropdownOrInput(selectId, inputId) { const sel = document.getElementById(selectId).value; return (sel === '其他') ? document.getElementById(inputId).value.trim() : sel; }
+    function saveTask() { 
+        // ... (Logic from v30) ... 
+        const htmlContent = document.getElementById('inputTitle').innerHTML.trim(); const category = document.getElementById('inputCategory').value;
+        const textContent = document.getElementById('inputTitle').innerText.trim();
+        if(textContent === '' && !htmlContent.includes('<img')) return alert('請輸入任務內容');
+        let details = null;
+        if (category === 'NGS收件') {
+            const unit = document.getElementById('ngsUnit').value.trim(); const pi = document.getElementById('ngsPI').value.trim(); const needs = document.getElementById('ngsNeeds').value;
+            if (!unit || !pi || !needs) return alert('請完整填寫 NGS 詳細資料');
+            details = { unit, pi, needs };
+            if (needs === '萃取' || needs === 'QC') {
+                const prefix = needs === '萃取' ? 'ngs' : 'ngsQc';
+                if (needs === '萃取') { details.sampleType = getDropdownOrInput('ngsSampleTypeSelect', 'ngsSampleTypeInput'); if (!details.sampleType) return alert('請填寫檢體種類'); }
+                else { details.nucleicType = getDropdownOrInput('ngsNucleicTypeSelect', 'ngsNucleicTypeInput'); if (!details.nucleicType) return alert('請填寫核酸種類'); }
+                details.temp = document.getElementById(prefix + 'Temp').value; details.returnBack = document.getElementById(prefix + 'Return').value;
+                details.sampleCount = document.getElementById(prefix + 'Count').value.trim(); details.expType = getDropdownOrInput(prefix + 'ExpTypeSelect', prefix + 'ExpTypeInput');
+                details.platform = getDropdownOrInput(prefix + 'PlatformSelect', prefix + 'PlatformInput'); details.sales = document.getElementById(prefix + 'Sales').value;
+                if (!details.sampleCount || !details.expType || !details.platform) return alert('請完整填寫詳細資料');
+            }
         }
+        if(state.editingTaskId) { updateTaskDb(state.editingTaskId, { title: htmlContent, category: category, details: details }, '修改', '編輯任務內容/分類'); } 
+        else { const newTask = { title: htmlContent, category: category, date: state.currentDate, completed: false, isDeleted: false, logs: [], createdAt: new Date().toISOString(), details: details }; newTask.logs.push({ type: '建立', desc: `建立任務於 [${category}]`, user: state.currentUser.name, time: new Date().toISOString() }); db.collection('tasks').add(newTask); }
         closeModal();
     }
     function deleteTask(id) { if(confirm('移至被刪除項目？')) updateTaskDb(id, { isDeleted: true }, '刪除', '移至被刪除項目'); }
     function restoreTask(id) { updateTaskDb(id, { isDeleted: false }, '還原', '從刪除項目中還原'); }
-    
-    function updateTaskDb(id, data, logType, logDesc) {
-        const task = state.tasks.find(t => t.id === id);
-        const newLogs = task.logs || [];
-        newLogs.unshift({ type: logType, desc: logDesc, user: state.currentUser.name, time: new Date().toISOString() });
-        db.collection('tasks').doc(id).update({ ...data, logs: newLogs });
-    }
-
-    function changeDate(d, addHistory = true) {
-        state.currentDate = d; document.getElementById('dateSearch').value = d;
-        const dateObj = new Date(d);
-        document.getElementById('headerDateDisplay').innerText = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-        if(addHistory) {
-            let hist = state.history.filter(x => x !== d); hist.unshift(d);
-            if(hist.length > 10) hist.pop();
-            state.history = hist; localStorage.setItem('tt_history', JSON.stringify(hist));
-            renderHistory();
-        }
-        renderTasks();
-    }
-    function renderHistory() {
-        const ul = document.getElementById('historyList'); ul.innerHTML = '';
-        state.history.forEach(d => {
-            const li = document.createElement('li'); li.className = `history-item ${d === state.currentDate?'active':''}`;
-            li.innerText = d; li.onclick = () => { changeDate(d, false); if(window.innerWidth<=768) toggleSidebar(); };
-            ul.appendChild(li);
-        });
-    }
-    
-    const storedUser = localStorage.getItem('tt_current_user');
-    if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
-    
-    function openModal(taskId=null) {
-        // Prepare Dropdowns first
-        populateSalesDropdowns();
-
-        const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle');
-        document.getElementById('taskModal').style.display='flex'; editor.focus();
-        
-        // Reset Form
-        document.getElementById('ngs-form-container').style.display = 'none';
-        document.getElementById('ngsUnit').value = '';
-        document.getElementById('ngsPI').value = '';
-        document.getElementById('ngsNeeds').value = '';
-        document.getElementById('ngs-extraction-fields').style.display = 'none';
-        document.getElementById('ngs-qc-fields').style.display = 'none';
-        
-        if(taskId) {
-            state.editingTaskId=taskId; const t=state.tasks.find(x=>x.id===taskId);
-            document.getElementById('modalTitle').innerText='編輯任務內容'; editor.innerHTML=t.title; document.getElementById('inputCategory').value=t.category;
-            document.getElementById('btnSaveTask').innerText='保存修改';
-            
-            if (t.category === 'NGS收件' && t.details) {
-                document.getElementById('ngs-form-container').style.display = 'block';
-                document.getElementById('ngsUnit').value = t.details.unit || '';
-                document.getElementById('ngsPI').value = t.details.pi || '';
-                document.getElementById('ngsNeeds').value = t.details.needs || '';
-                
-                const setVal = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val||''; }
-                const setDropdown = (selId, inpId, val, opts) => {
-                    if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; }
-                    else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; }
-                };
-
-                if (t.details.needs === '萃取') {
-                    document.getElementById('ngs-extraction-fields').style.display = 'block';
-                    setVal('ngsTemp', t.details.temp);
-                    setVal('ngsReturn', t.details.returnBack);
-                    setVal('ngsCount', t.details.sampleCount);
-                    setVal('ngsSales', t.details.sales);
-                    setDropdown('ngsSampleTypeSelect', 'ngsSampleTypeInput', t.details.sampleType, ['Cell','Blood','Tissue','Plant']);
-                    setDropdown('ngsExpTypeSelect', 'ngsExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']);
-                    setDropdown('ngsPlatformSelect', 'ngsPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']);
-                } else if (t.details.needs === 'QC') {
-                    document.getElementById('ngs-qc-fields').style.display = 'block';
-                    setVal('ngsQcTemp', t.details.temp);
-                    setVal('ngsQcReturn', t.details.returnBack);
-                    setVal('ngsQcCount', t.details.sampleCount);
-                    setVal('ngsQcSales', t.details.sales);
-                    setDropdown('ngsNucleicTypeSelect', 'ngsNucleicTypeInput', t.details.nucleicType, ['DNA','RNA','Library','miRNA']);
-                    setDropdown('ngsQcExpTypeSelect', 'ngsQcExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']);
-                    setDropdown('ngsQcPlatformSelect', 'ngsQcPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']);
-                }
-            }
-        } else {
-            state.editingTaskId=null; document.getElementById('modalTitle').innerText='新增案件/任務'; editor.innerHTML='';
-            document.getElementById('btnSaveTask').innerText='確認新增';
-            document.getElementById('inputCategory').value = '定序收件'; 
-        }
-    }
+    function updateTaskDb(id, data, logType, logDesc) { const task = state.tasks.find(t => t.id === id); const newLogs = task.logs || []; newLogs.unshift({ type: logType, desc: logDesc, user: state.currentUser.name, time: new Date().toISOString() }); db.collection('tasks').doc(id).update({ ...data, logs: newLogs }); }
+    function changeDate(d, addHistory = true) { state.currentDate = d; document.getElementById('dateSearch').value = d; const dateObj = new Date(d); document.getElementById('headerDateDisplay').innerText = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'}); if(addHistory) { let hist = state.history.filter(x => x !== d); hist.unshift(d); if(hist.length > 10) hist.pop(); state.history = hist; localStorage.setItem('tt_history', JSON.stringify(hist)); renderHistory(); } renderTasks(); }
+    function renderHistory() { const ul = document.getElementById('historyList'); ul.innerHTML = ''; state.history.forEach(d => { const li = document.createElement('li'); li.className = `history-item ${d === state.currentDate?'active':''}`; li.innerText = d; li.onclick = () => { changeDate(d, false); if(window.innerWidth<=768) toggleSidebar(); }; ul.appendChild(li); }); }
+    const storedUser = localStorage.getItem('tt_current_user'); if(storedUser) { state.currentUser = JSON.parse(storedUser); initApp(); }
+    function openModal(taskId=null) { populateSalesDropdowns(); const modal=document.getElementById('taskModal'); const editor=document.getElementById('inputTitle'); document.getElementById('taskModal').style.display='flex'; editor.focus(); document.getElementById('ngs-form-container').style.display = 'none'; document.getElementById('ngsUnit').value = ''; document.getElementById('ngsPI').value = ''; document.getElementById('ngsNeeds').value = ''; document.getElementById('ngs-extraction-fields').style.display = 'none'; document.getElementById('ngs-qc-fields').style.display = 'none'; if(taskId) { state.editingTaskId=taskId; const t=state.tasks.find(x=>x.id===taskId); document.getElementById('modalTitle').innerText='編輯任務內容'; editor.innerHTML=t.title; document.getElementById('inputCategory').value=t.category; document.getElementById('btnSaveTask').innerText='保存修改'; if (t.category === 'NGS收件' && t.details) { document.getElementById('ngs-form-container').style.display = 'block'; document.getElementById('ngsUnit').value = t.details.unit || ''; document.getElementById('ngsPI').value = t.details.pi || ''; document.getElementById('ngsNeeds').value = t.details.needs || ''; const setVal = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val||''; }; const setDropdown = (selId, inpId, val, opts) => { if(opts.includes(val)) { document.getElementById(selId).value=val; document.getElementById(inpId).style.display='none'; } else { document.getElementById(selId).value='其他'; document.getElementById(inpId).style.display='block'; document.getElementById(inpId).value=val; } }; if (t.details.needs === '萃取') { document.getElementById('ngs-extraction-fields').style.display = 'block'; setVal('ngsTemp', t.details.temp); setVal('ngsReturn', t.details.returnBack); setVal('ngsCount', t.details.sampleCount); setVal('ngsSales', t.details.sales); setDropdown('ngsSampleTypeSelect', 'ngsSampleTypeInput', t.details.sampleType, ['Cell','Blood','Tissue','Plant']); setDropdown('ngsExpTypeSelect', 'ngsExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']); setDropdown('ngsPlatformSelect', 'ngsPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']); } else if (t.details.needs === 'QC') { document.getElementById('ngs-qc-fields').style.display = 'block'; setVal('ngsQcTemp', t.details.temp); setVal('ngsQcReturn', t.details.returnBack); setVal('ngsQcCount', t.details.sampleCount); setVal('ngsQcSales', t.details.sales); setDropdown('ngsNucleicTypeSelect', 'ngsNucleicTypeInput', t.details.nucleicType, ['DNA','RNA','Library','miRNA']); setDropdown('ngsQcExpTypeSelect', 'ngsQcExpTypeInput', t.details.expType, ['Seq Only','DGE','Small RNA','WES','WGS','PIPseq','Amplicon Sequence','細菌WGS','metagenome','16s','16sFL','Olink','10x','RADseq']); setDropdown('ngsQcPlatformSelect', 'ngsQcPlatformInput', t.details.platform, ['Novaseq X Plus','Miseq','PacBio','Nanopore','Olink']); } } } else { state.editingTaskId=null; document.getElementById('modalTitle').innerText='新增案件/任務'; editor.innerHTML=''; document.getElementById('btnSaveTask').innerText='確認新增'; document.getElementById('inputCategory').value = '定序收件'; } }
     function closeModal() { document.getElementById('taskModal').style.display='none'; state.editingTaskId=null; }
-    function showHistory(id) {
-        const t = state.tasks.find(x=>x.id===id); if(!t) return;
-        const list = document.getElementById('logList'); list.innerHTML='';
-        (t.logs||[]).forEach(l => {
-            const d=new Date(l.time);
-            const timeStr=`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes()}`;
-            list.innerHTML+=`<li class="log-item"><div class="log-time">${timeStr}</div><div class="log-content"><span class="log-user">${l.user}</span> ${l.desc}</div></li>`;
-        });
-        document.getElementById('historyModal').style.display='flex';
-    }
+    function showHistory(id) { const t = state.tasks.find(x=>x.id===id); if(!t) return; const list = document.getElementById('logList'); list.innerHTML=''; (t.logs||[]).forEach(l => { const d=new Date(l.time); const timeStr=`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes()}`; const userDisp = getUserDisplayName(l.user); list.innerHTML+=`<li class="log-item"><div class="log-time">${timeStr}</div><div class="log-content"><span class="log-user">${userDisp}</span> ${l.desc}</div></li>`; }); document.getElementById('historyModal').style.display='flex'; }
     document.getElementById('taskModal').addEventListener('click', e => { if(e.target.id==='taskModal') closeModal(); });
 </script>
 </body>
