@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v48 Fixed)</title>
+    <title>中區收送件進度追蹤系統 (v50 Search)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -54,10 +54,16 @@
 
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
-        .search-box input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 10px; }
-        .search-results { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
-        .search-item { padding: 8px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .search-item:hover { background: #f9fafb; color: var(--primary); }
+        
+        /* === SEARCH BOX STYLES === */
+        .search-box { position: relative; margin-bottom: 20px; }
+        .search-box input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 0.9rem; }
+        .search-results { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 6px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .search-item { padding: 10px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+        .search-item:hover { background: #f0fdfa; color: var(--primary); }
+        .search-item:last-child { border-bottom: none; }
+        /* ========================= */
+
         .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
         .history-item { padding: 10px; cursor: pointer; border-radius: 6px; color: var(--text-main); margin-bottom: 4px; display: flex; justify-content: space-between; }
         .history-item:hover { background: #f8fafc; }
@@ -109,18 +115,18 @@
         .task-item.completed-item .task-title { color: #9ca3af; text-decoration: line-through; }
         .ngs-badge { display: inline-block; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #fdfdfd; margin-right: 5px; margin-top: 3px; color: #555; }
         
-        /* === ENHANCED ASSIGN BADGE (LARGE & VISIBLE) === */
+        /* === ENHANCED ASSIGN BADGE === */
         .assign-badge { 
             display: inline-block; 
-            font-size: 0.95rem; /* Larger font */
-            background-color: var(--assign-bg); /* Indigo */
-            color: #ffffff; 
+            font-size: 0.95rem; 
+            background-color: var(--assign-bg); 
+            color: white; 
             padding: 4px 10px; 
             border-radius: 6px; 
             margin-left: 10px; 
             vertical-align: middle; 
-            font-weight: 800; /* Bold */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Shadow */
+            font-weight: 800; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             white-space: nowrap;
             letter-spacing: 0.5px;
             border: 1px solid #312e81;
@@ -180,6 +186,7 @@
         /* User List and Settings Styles */
         .user-list, .settings-list, .assign-list { list-style: none; padding: 0; margin: 0; }
         .user-item { display: flex; flex-direction: column; padding: 15px; border: 1px solid #eee; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; }
+        .user-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .user-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
         .user-role-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; margin-left: 8px; border: 1px solid #ddd; font-weight: 500; }
@@ -246,7 +253,7 @@
         <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
 
         <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
-        <div class="admin-btn btn-settings" id="salesSettingsBtn" onclick="openSalesSettings()">⚙️ NGS 業務設定</div>
+        <div class="admin-btn btn-settings" id="salesSettingsBtn" onclick="openSalesSettings()">⚙️ 標籤選單後台設定</div>
         <div class="admin-btn btn-assign-settings" id="assignSettingsBtn" onclick="openAssignSettingsModal()">👤 指派任務帳號設定</div>
         <div class="admin-btn btn-import" id="importBtn" onclick="openImportModal()">📥 批量匯入任務</div>
         <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="openStatsModal()">📊 任務完成統整</div>
@@ -313,7 +320,8 @@
 </div>
 
 <div class="modal-overlay" id="taskModal"><div class="modal-card"><h2 id="modalTitle" style="margin-top:0; color:#111827;">新增案件/任務</h2><div class="input-group"><label>歸屬項目</label><select id="inputCategory" onchange="handleCategoryChange()"><option value="定序收件">📂 定序收件</option><option value="引子送件">🚀 引子送件</option><option value="產前收件">📦 產前收件</option><option value="業務交辦事項">📋 業務交辦事項</option><option value="NGS收件">🧬 NGS 收件 (需填詳細資料)</option></select></div><div id="ngs-form-container"><h4 style="margin-top:0; color:#0f766e;">📝 NGS 詳細資料 (必填)</h4><div class="ngs-row"><label>1. 單位</label><input type="text" id="ngsUnit" placeholder="輸入單位" oninput="generateNgsTitle()"></div><div class="ngs-row"><label>2. 主持人</label><input type="text" id="ngsPI" placeholder="輸入主持人" oninput="generateNgsTitle()"></div><div class="ngs-row"><label>3. 樣本處理需求</label><select id="ngsNeeds" onchange="handleNgsNeedsChange(); generateNgsTitle()"><option value="">請選擇</option><option value="萃取">萃取 (Extraction)</option><option value="QC">QC</option></select></div><div id="ngs-extraction-fields"><div class="ngs-row"><label>4-1.1 檢體種類</label><select id="ngsSampleTypeSelect" onchange="handleDropdownChange('ngsSampleTypeSelect', 'ngsSampleTypeInput')"><option value="Cell">Cell</option><option value="Blood">Blood</option><option value="Tissue">Tissue</option><option value="Plant">Plant</option><option value="其他">其他 (手動輸入)</option></select><input type="text" id="ngsSampleTypeInput" placeholder="請輸入檢體種類" style="display:none; margin-top:5px;"></div><div class="ngs-row"><label>4-1.2 保存溫度</label><select id="ngsTemp"><option value="常溫">常溫</option><option value="4°C">4°C</option><option value="-20°C">-20°C</option><option value="-80°C">-80°C</option></select></div><div class="ngs-row"><label>4-1.3 歸還</label><select id="ngsReturn"><option value="是">是</option><option value="否">否</option></select></div><div class="ngs-row"><label>4-1.4 樣本數量</label><input type="text" id="ngsCount" placeholder="填寫數量"></div><div class="ngs-row"><label>4-1.5 後續實驗種類</label><select id="ngsExpTypeSelect" onchange="handleDropdownChange('ngsExpTypeSelect', 'ngsExpTypeInput'); generateNgsTitle()"><option value="">請選擇</option><option value="Seq Only">Seq Only</option><option value="DGE">DGE</option><option value="Small RNA">Small RNA</option><option value="WES">WES</option><option value="WGS">WGS</option><option value="PIPseq">PIPseq</option><option value="Amplicon Sequence">Amplicon Sequence</option><option value="細菌WGS">細菌WGS</option><option value="metagenome">metagenome</option><option value="16s">16s</option><option value="16sFL">16sFL</option><option value="Olink">Olink</option><option value="10x">10x</option><option value="RADseq">RADseq</option><option value="其他">其他 (手動輸入)</option></select><input type="text" id="ngsExpTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;" oninput="generateNgsTitle()"></div><div class="ngs-row"><label>4-1.6 實驗平台</label><select id="ngsPlatformSelect" onchange="handleDropdownChange('ngsPlatformSelect', 'ngsPlatformInput')"><option value="Novaseq X Plus">Novaseq X Plus</option><option value="Miseq">Miseq</option><option value="PacBio">PacBio</option><option value="Nanopore">Nanopore</option><option value="Olink">Olink</option><option value="其他">其他 (手動輸入)</option></select><input type="text" id="ngsPlatformInput" placeholder="輸入平台" style="display:none; margin-top:5px;"></div><div class="ngs-row"><label>4-1.7 負責業務</label><select id="ngsSales"></select></div></div><div id="ngs-qc-fields"><div class="ngs-row"><label>4-2.1 核酸種類</label><select id="ngsNucleicTypeSelect" onchange="handleDropdownChange('ngsNucleicTypeSelect', 'ngsNucleicTypeInput'); generateNgsTitle()"><option value="">請選擇</option><option value="DNA">DNA</option><option value="RNA">RNA</option><option value="Library">Library</option><option value="miRNA">miRNA</option><option value="其他">其他 (手動輸入)</option></select><input type="text" id="ngsNucleicTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;" oninput="generateNgsTitle()"></div><div class="ngs-row"><label>4-2.2 保存溫度</label><select id="ngsQcTemp"><option value="常溫">常溫</option><option value="4°C">4°C</option><option value="-20°C">-20°C</option><option value="-80°C">-80°C</option></select></div><div class="ngs-row"><label>4-2.3 歸還</label><select id="ngsQcReturn"><option value="是">是</option><option value="否">否</option></select></div><div class="ngs-row"><label>4-2.4 樣本數量</label><input type="text" id="ngsQcCount" placeholder="填寫數量"></div><div class="ngs-row"><label>4-2.5 後續實驗種類</label><select id="ngsQcExpTypeSelect" onchange="handleDropdownChange('ngsQcExpTypeSelect', 'ngsQcExpTypeInput')"><option value="">請選擇</option><option value="Seq Only">Seq Only</option><option value="DGE">DGE</option><option value="Small RNA">Small RNA</option><option value="WES">WES</option><option value="WGS">WGS</option><option value="PIPseq">PIPseq</option><option value="Amplicon Sequence">Amplicon Sequence</option><option value="細菌WGS">細菌WGS</option><option value="metagenome">metagenome</option><option value="16s">16s</option><option value="16sFL">16sFL</option><option value="Olink">Olink</option><option value="10x">10x</option><option value="RADseq">RADseq</option><option value="其他">其他 (手動輸入)</option></select><input type="text" id="ngsQcExpTypeInput" placeholder="輸入種類" style="display:none; margin-top:5px;"></div><div class="ngs-row"><label>4-2.6 實驗平台</label><select id="ngsQcPlatformSelect" onchange="handleDropdownChange('ngsQcPlatformSelect', 'ngsQcPlatformInput')"><option value="Novaseq X Plus">Novaseq X Plus</option><option value="Miseq">Miseq</option><option value="PacBio">PacBio</option><option value="Nanopore">Nanopore</option><option value="Olink">Olink</option><option value="其他">其他 (手動輸入)</option></select><input type="text" id="ngsQcPlatformInput" placeholder="輸入平台" style="display:none; margin-top:5px;"></div><div class="ngs-row"><label>4-2.7 負責業務</label><select id="ngsQcSales"></select></div></div></div><div class="input-group"><label>任務內容 (選取文字可編輯樣式)</label><div class="editor-toolbar"><button class="tool-btn" onclick="formatDoc('bold')" title="粗體"><b>B</b></button><div class="separator"></div><button class="tool-btn" onclick="formatDoc('foreColor', '#ef4444')" title="紅字"><span class="color-dot" style="background:#ef4444"></span></button><button class="tool-btn" onclick="formatDoc('foreColor', '#2563eb')" title="藍字"><span class="color-dot" style="background:#2563eb"></span></button><button class="tool-btn" onclick="formatDoc('foreColor', '#10b981')" title="綠字"><span class="color-dot" style="background:#10b981"></span></button><button class="tool-btn" onclick="formatDoc('foreColor', '#000000')" title="黑字"><span class="color-dot" style="background:#000000"></span></button><div class="separator"></div><button class="tool-btn" onclick="formatDoc('hiliteColor', '#fecaca')" title="紅底" style="background:#fecaca">A</button><button class="tool-btn" onclick="formatDoc('hiliteColor', '#bfdbfe')" title="藍底" style="background:#bfdbfe">A</button><button class="tool-btn" onclick="formatDoc('hiliteColor', '#bbf7d0')" title="綠底" style="background:#bbf7d0">A</button><button class="tool-btn" onclick="formatDoc('hiliteColor', '#ffffff')" title="無底" style="background:#fff">✕</button><div class="separator"></div><select class="tool-select" onchange="formatDoc('fontSize', this.value); this.value='';" title="字體大小"><option value="">字體大小</option><option value="2">小</option><option value="3">中</option><option value="5">大</option><option value="7">特大</option></select></div><div id="inputTitle" contenteditable="true" placeholder="輸入內容..."></div></div><div class="modal-btns"><button class="btn btn-cancel" onclick="closeModal()">取消</button><button class="btn btn-save" id="btnSaveTask" onclick="saveTask()">確認</button></div></div></div>
-<div class="modal-overlay" id="salesSettingsModal"><div class="modal-card" style="width: 450px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">⚙️ NGS 負責業務設定</h3><div style="display:flex; gap:10px; margin-bottom:15px;"><input type="text" id="newSalesName" placeholder="輸入新業務姓名" style="flex-grow:1; padding:8px; border:1px solid #ccc; border-radius:4px;"><button class="btn btn-save" onclick="addSalesOption()">新增</button></div><ul class="settings-list" id="salesOptionList"></ul><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('salesSettingsModal').style.display='none'">關閉</button></div></div></div>
+
+<div class="modal-overlay" id="salesSettingsModal"><div class="modal-card" style="width: 450px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">⚙️ 標籤選單後台設定</h3><div style="display:flex; gap:10px; margin-bottom:15px;"><input type="text" id="newSalesName" placeholder="輸入新業務姓名" style="flex-grow:1; padding:8px; border:1px solid #ccc; border-radius:4px;"><button class="btn btn-save" onclick="addSalesOption()">新增</button></div><ul class="settings-list" id="salesOptionList"></ul><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('salesSettingsModal').style.display='none'">關閉</button></div></div></div>
 <div class="modal-overlay" id="historyModal"><div class="modal-card" style="width: 400px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📋 編輯/操作紀錄</h3><ul class="log-list" id="logList"></ul><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('historyModal').style.display='none'">關閉</button></div></div></div>
 <div class="modal-overlay" id="userModal"><div class="modal-card" style="width: 650px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👥 成員權限管理</h3><div style="margin-bottom:10px; text-align:right;"><select id="userFilterSelect" onchange="renderUserList()" style="padding:5px; border-radius:4px; border:1px solid #ddd; font-size:0.85rem;"><option value="all">顯示全部</option><option value="creator">🟣 創世神</option><option value="senior">高級管理者</option><option value="admin">管理者</option><option value="user">一般者</option><option value="pending">待審核</option></select></div><ul class="user-list" id="userListDisplay"></ul><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('userModal').style.display='none'">關閉</button></div></div></div>
 <div class="modal-overlay" id="statsModal"><div class="modal-card" style="width: 700px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📊 任務完成統整</h3><div class="stats-filter-row"><div><label style="font-size:0.8rem;">開始日期</label><input type="date" id="statsDateStart"></div><div><label style="font-size:0.8rem;">結束日期</label><input type="date" id="statsDateEnd"></div><div><label style="font-size:0.8rem;">檢索帳號</label><select id="statsUserSelect"><option value="all">-- 所有帳號 (總覽) --</option></select></div><div style="display:flex; align-items:flex-end;"><button class="btn btn-save" onclick="updateStats()">查詢</button></div></div><div class="stats-result-area" id="statsResultDisplay"></div><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('statsModal').style.display='none'">關閉</button></div></div></div>
@@ -322,7 +330,7 @@
     <div class="modal-card" style="width: 500px;">
         <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👤 指派任務帳號設定</h3>
         <div id="assignRulesContainer"></div>
-        <div style="text-align:right; margin-top:10px;"><button class="btn btn-save" onclick="saveAssignmentRules()">儲存設定</button></div>
+        <div style="text-align:right; margin-top:15px;"><button class="btn btn-save" onclick="saveAssignmentRules()">儲存設定</button></div>
         <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('assignSettingsModal').style.display='none'">關閉</button></div>
     </div>
 </div>
@@ -372,10 +380,12 @@
         document.getElementById('btnTabCustomers').className = `sidebar-btn ${tab==='customers'?'btn-nav-active':'btn-nav-inactive'}`;
         if (tab === 'tasks') {
             document.getElementById('taskView').classList.add('active');
-            document.getElementById('taskSearchSection').style.display = 'block'; document.getElementById('taskDateSection').style.display = 'block';
+            if(document.getElementById('taskSearchSection')) document.getElementById('taskSearchSection').style.display = 'block'; 
+            document.getElementById('taskDateSection').style.display = 'block';
         } else {
             document.getElementById('customerView').classList.add('active');
-            document.getElementById('taskSearchSection').style.display = 'none'; document.getElementById('taskDateSection').style.display = 'none';
+            if(document.getElementById('taskSearchSection')) document.getElementById('taskSearchSection').style.display = 'none'; 
+            document.getElementById('taskDateSection').style.display = 'none';
             if(state.customers.length === 0) fetchCustomers();
         }
         if(window.innerWidth <= 768) toggleSidebar();
@@ -389,6 +399,7 @@
     db.collection('users').onSnapshot(snapshot => {
         state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
         if(document.getElementById('userModal').style.display === 'flex') renderUserList();
+        if(document.getElementById('assignModal').style.display === 'flex') openAssignModal(assigningTaskId, state.tasks.find(t=>t.id===assigningTaskId)?.category);
         if (state.currentUser) {
             const me = state.users.find(u => u.username === state.currentUser.name);
             if (!me) { alert('您的帳號已被移除，即將強制登出。'); logout(); } 
@@ -430,6 +441,44 @@
         if(!key) { document.getElementById('customerList').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;margin-top:50px;">請輸入關鍵字開始查詢</div>'; return; }
         const filtered = state.customers.filter(c => JSON.stringify(c).toLowerCase().includes(key));
         renderCustomers(filtered);
+    }
+    
+    // --- SEARCH TASKS (v50) ---
+    function handleSearch() {
+        const input = document.getElementById('searchTaskInput');
+        const list = document.getElementById('searchResults');
+        const val = input.value.trim().toLowerCase();
+        list.innerHTML = '';
+        list.style.display = 'none';
+        
+        if (!val) return;
+
+        const matches = state.tasks.filter(t => {
+            const rawTitle = t.title ? t.title.replace(/<[^>]+>/g, '') : '';
+            return rawTitle.toLowerCase().includes(val);
+        });
+
+        if (matches.length > 0) {
+            list.style.display = 'block';
+            list.classList.add('has-results');
+            matches.sort((a,b) => new Date(b.date) - new Date(a.date));
+            matches.slice(0, 20).forEach(t => {
+                const li = document.createElement('li');
+                li.className = 'search-item';
+                const rawTitle = t.title.replace(/<[^>]+>/g, '');
+                li.innerHTML = `<div style="font-weight:bold;">${rawTitle}</div><div style="font-size:0.8rem; color:#666;">📅 ${t.date}</div>`;
+                li.onclick = () => {
+                    changeDate(t.date);
+                    input.value = '';
+                    list.style.display = 'none';
+                    if(window.innerWidth <= 768) toggleSidebar();
+                };
+                list.appendChild(li);
+            });
+        } else {
+            list.style.display = 'block';
+            list.innerHTML = '<li style="padding:10px; color:#999; text-align:center;">無符合結果</li>';
+        }
     }
 
     /* --- Auth Logic --- */
@@ -475,7 +524,7 @@
         document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
         document.getElementById('statsPanelBtn').style.display = canConfig ? 'block' : 'none';
         document.getElementById('salesSettingsBtn').style.display = canConfig ? 'block' : 'none';
-        document.getElementById('assignSettingsBtn').style.display = canConfig ? 'block' : 'none'; // Separate Btn
+        document.getElementById('assignSettingsBtn').style.display = canConfig ? 'block' : 'none'; 
         document.getElementById('importBtn').style.display = canManage ? 'block' : 'none'; 
     }
 
@@ -490,8 +539,8 @@
     function deleteSalesOption(index) { if(confirm('確定刪除？')) { state.salesOptions.splice(index, 1); saveSalesSettings(); } }
     function editSalesOption(index) { const newVal = prompt("修改:", state.salesOptions[index]); if(newVal && newVal.trim()) { state.salesOptions[index] = newVal.trim(); saveSalesSettings(); } }
     function populateSalesDropdowns() { const optsHtml = state.salesOptions.map(s => `<option value="${s}">${s}</option>`).join(''); const s1 = document.getElementById('ngsSales'); const s2 = document.getElementById('ngsQcSales'); if(s1) s1.innerHTML = optsHtml; if(s2) s2.innerHTML = optsHtml; }
-
-    /* --- ASSIGNMENT SETTINGS (Standalone) --- */
+    
+    /* --- ASSIGNMENT SETTINGS (Refined) --- */
     function openAssignSettingsModal() {
         const container = document.getElementById('assignRulesContainer'); container.innerHTML = '';
         const roleOrder = { 'creator': 0, 'senior': 1, 'admin': 2, 'user': 3 };
@@ -500,24 +549,31 @@
         ORDERED_CATEGORIES.forEach(cat => {
             const wrapper = document.createElement('div'); wrapper.className = 'assign-section';
             const currentAllowed = state.assignmentRules[cat] || [];
+            
             let checkboxes = '';
             approvedUsers.forEach(u => {
                 const checked = currentAllowed.includes(u.username) ? 'checked' : '';
                 const dName = u.nickname || u.username;
-                checkboxes += `<label class="assign-check-item"><input type="checkbox" name="rule_${cat}" value="${u.username}" ${checked}> ${dName}</label>`;
+                // Important: Use data attributes for easier selection to avoid character escaping issues
+                checkboxes += `<label class="assign-check-item"><input type="checkbox" class="assign-checkbox" data-cat="${cat}" data-user="${u.username}" ${checked}> ${dName}</label>`;
             });
+
             wrapper.innerHTML = `<div class="assign-sec-title">${cat}</div><div class="assign-checkbox-group">${checkboxes}</div>`;
             container.appendChild(wrapper);
         });
         document.getElementById('assignSettingsModal').style.display = 'flex';
     }
+
     function saveAssignmentRules() {
         const newRules = {};
         ORDERED_CATEGORIES.forEach(cat => {
-            const checks = document.querySelectorAll(`input[name="rule_${cat}"]:checked`);
-            newRules[cat] = Array.from(checks).map(c => c.value);
+            // Select checkboxes for this specific category that are checked
+            const checkedBoxes = Array.from(document.querySelectorAll(`.assign-checkbox[data-cat="${cat}"]:checked`));
+            newRules[cat] = checkedBoxes.map(cb => cb.getAttribute('data-user'));
         });
-        db.collection('settings').doc('assignment_rules').set(newRules).then(() => alert('設定已儲存'));
+        db.collection('settings').doc('assignment_rules').set(newRules)
+          .then(() => { alert('設定已儲存'); document.getElementById('assignSettingsModal').style.display='none'; })
+          .catch(e => { console.error(e); alert('儲存失敗'); });
     }
 
     /* --- ASSIGNMENT ACTION --- */
@@ -525,10 +581,20 @@
     function openAssignModal(taskId, category) {
         assigningTaskId = taskId; const list = document.getElementById('assignUserList'); list.innerHTML = '';
         const allowedUsers = state.assignmentRules[category] || [];
-        let targetUsers = allowedUsers.length > 0 ? state.users.filter(u => allowedUsers.includes(u.username)) : state.users.filter(u => u.isApproved);
+        let targetUsers = [];
+        
+        if (allowedUsers.length > 0) {
+            targetUsers = state.users.filter(u => allowedUsers.includes(u.username));
+        } else {
+            targetUsers = state.users.filter(u => u.isApproved);
+        }
+
         if (targetUsers.length === 0) { list.innerHTML = '<li style="padding:10px; color:#666;">無可用指派對象，請至後台設定。</li>'; }
+        
         targetUsers.forEach(u => {
-            const li = document.createElement('li'); li.className = 'user-item'; li.style.cursor = 'pointer';
+            const li = document.createElement('li'); 
+            li.className = 'user-item'; 
+            li.style.cursor = 'pointer';
             const dName = u.nickname || u.username;
             li.innerHTML = `<div style="font-weight:bold; width:100%; padding:5px;" onclick="confirmAssign('${u.username}')">${dName}</div>`;
             list.appendChild(li);
@@ -558,7 +624,7 @@
         alert(`匯入完成！成功: ${successCount}`); document.getElementById('importModal').style.display = 'none';
     }
 
-    /* --- STATS LOGIC (Fixed) --- */
+    /* --- STATS LOGIC --- */
     function openStatsModal() {
         const modal = document.getElementById('statsModal'); 
         const userSelect = document.getElementById('statsUserSelect'); 
@@ -606,10 +672,15 @@
         }
     }
 
-    /* --- USER MANAGEMENT (Fixed) --- */
+    /* --- USER MANAGEMENT --- */
     function openUserModal() {
+        renderUserList(); // Call render function
+        document.getElementById('userModal').style.display = 'flex';
+    }
+
+    function renderUserList() {
         const list = document.getElementById('userListDisplay'); 
-        const myRole = state.currentUser.role; 
+        if(!list) return; 
         const filterRole = document.getElementById('userFilterSelect') ? document.getElementById('userFilterSelect').value : 'all'; 
         
         list.innerHTML = '';
@@ -617,9 +688,10 @@
         // Sorting Logic: Creator > Senior > Admin > User > Pending
         const roleOrder = { 'creator': 0, 'senior': 1, 'admin': 2, 'user': 3, 'pending': 4 };
         
-        let displayUsers = state.users.sort((a,b) => {
-            const rA = a.isApproved ? (roleOrder[a.role]||3) : 4;
-            const rB = b.isApproved ? (roleOrder[b.role]||3) : 4;
+        let displayUsers = [...state.users];
+        displayUsers.sort((a,b) => {
+            const rA = !a.isApproved ? 4 : (roleOrder[a.role]!==undefined ? roleOrder[a.role] : 3);
+            const rB = !b.isApproved ? 4 : (roleOrder[b.role]!==undefined ? roleOrder[b.role] : 3);
             return rA - rB;
         });
 
@@ -641,6 +713,7 @@
             if(!user.isApproved) { badgeClass = ''; badgeText = '待審核'; }
             
             const isTargetCreator = user.role === 'creator';
+            const myRole = state.currentUser ? state.currentUser.role : 'user';
             let controlsHtml = '';
             
             if (myRole === 'creator' || myRole === 'senior') {
@@ -667,21 +740,19 @@
         });
         document.getElementById('userModal').style.display = 'flex';
     }
-    
-    // Alias function for 'renderUserList' as some HTML might call it
-    const renderUserList = openUserModal;
 
     function togglePasswordVisibility(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
     function updateUser(docId) {
         const role = document.getElementById(`role_${docId}`).value; const note = document.getElementById(`note_${docId}`).value; const nick = document.getElementById(`nick_${docId}`).value;
         db.collection('users').doc(docId).update({ role: role, remarks: note, nickname: nick, isApproved: true }).then(() => alert('資料已更新'));
     }
-    function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => openUserModal()); }
+    function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => renderUserList()); }
     function approveUserSimple(docId) { db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准')); }
 
     /* --- TASKS RENDER --- */
     function renderTasks() {
         const container = document.getElementById('taskListContainer'); container.innerHTML = '';
+        
         const overdueTasks = state.tasks.filter(t => t.date < state.currentDate && !t.completed && !t.isDeleted);
         if (overdueTasks.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group overdue-section';
@@ -690,19 +761,29 @@
             overdueTasks.forEach(t => group.appendChild(createTaskElement(t, true)));
             container.appendChild(group);
         }
+
         const dayTasks = state.tasks.filter(t => t.date === state.currentDate);
-        const totalActive = dayTasks.filter(t => !t.isDeleted).length; const totalDone = dayTasks.filter(t => !t.isDeleted && t.completed).length;
+        const totalActive = dayTasks.filter(t => !t.isDeleted).length;
+        const totalDone = dayTasks.filter(t => !t.isDeleted && t.completed).length;
         const totalPct = totalActive===0?0:Math.round((totalDone/totalActive)*100);
-        document.getElementById('overallProgressText').innerText = `${totalDone}/${totalActive} (${totalPct}%)`; document.getElementById('overallProgressBar').style.width = `${totalPct}%`;
+        document.getElementById('overallProgressText').innerText = `${totalDone}/${totalActive} (${totalPct}%)`;
+        document.getElementById('overallProgressBar').style.width = `${totalPct}%`;
+
         if (dayTasks.length === 0 && overdueTasks.length === 0) { container.innerHTML += `<div style="text-align:center; color:#9ca3b8; margin-top:60px;">本日無任何案件或任務</div>`; return; }
+
         ORDERED_CATEGORIES.forEach(cat => {
-            const all = dayTasks.filter(t => t.category === cat && !t.isDeleted); const active = all.filter(t => !t.completed);
+            const all = dayTasks.filter(t => t.category === cat && !t.isDeleted);
+            const active = all.filter(t => !t.completed);
             const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
+            
             const group = document.createElement('div'); group.className = 'category-group';
             group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
-            if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t))); else group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
+            if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t)));
+            else group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
             container.appendChild(group);
         });
+
+        // Completed
         const completedTasks = dayTasks.filter(t => t.completed && !t.isDeleted);
         if (completedTasks.length > 0) {
             const compSection = document.createElement('div'); compSection.className = 'category-group completed-section';
@@ -710,7 +791,8 @@
             ORDERED_CATEGORIES.forEach(cat => {
                 const subTasks = completedTasks.filter(t => t.category === cat);
                 if (subTasks.length > 0) {
-                    const details = document.createElement('details'); details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
+                    const details = document.createElement('details');
+                    details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
                     const content = details.querySelector('.details-content');
                     subTasks.sort((a,b)=>new Date(a.completedAt)-new Date(b.completedAt));
                     subTasks.forEach(t => content.appendChild(createTaskElement(t)));
@@ -719,6 +801,8 @@
             });
             container.appendChild(compSection);
         }
+
+        // Deleted
         const deletedTasks = dayTasks.filter(t => t.isDeleted);
         if (deletedTasks.length > 0) {
             const delSection = document.createElement('div'); delSection.className = 'category-group deleted-section';
@@ -726,7 +810,8 @@
             ORDERED_CATEGORIES.forEach(cat => {
                 const subTasks = deletedTasks.filter(t => t.category === cat);
                 if (subTasks.length > 0) {
-                    const details = document.createElement('details'); details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
+                    const details = document.createElement('details');
+                    details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
                     const content = details.querySelector('.details-content');
                     subTasks.forEach(t => content.appendChild(createTaskElement(t)));
                     delSection.appendChild(details);
@@ -735,38 +820,79 @@
             container.appendChild(delSection);
         }
     }
+
     function createTaskElement(task, isOverdue = false) {
-        const div = document.createElement('div'); div.className = `task-item ${isOverdue?'overdue-item':''} ${task.completed?'completed-item':''} ${task.isDeleted?'deleted-item':''}`;
+        const div = document.createElement('div');
+        const overdueClass = isOverdue ? 'overdue-item' : '';
+        div.className = `task-item ${overdueClass} ${task.completed ? 'completed-item' : ''} ${task.isDeleted ? 'deleted-item' : ''}`;
         div.setAttribute('data-cat', task.category);
+        
         let checkboxHtml = task.isDeleted ? '' : `<div class="task-checkbox" onclick="toggleTask('${task.id}')"></div>`;
         let metaHtml = '';
-        if (task.completed && !task.isDeleted) { const d = new Date(task.completedAt); metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${getUserDisplayName(task.completedBy)} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`; } 
-        else if (isOverdue) { metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`; }
+        if (task.completed && !task.isDeleted) {
+            const d = new Date(task.completedAt);
+            const userDisp = getUserDisplayName(task.completedBy);
+            metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${userDisp} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`;
+        } else if (isOverdue) {
+            metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`;
+        }
+
         let ngsInfoHtml = '';
         if (task.details) {
             ngsInfoHtml += `<div style="margin-top:5px; padding:5px; background:#f0fdfa; border-radius:4px; font-size:0.8rem; color:#0f766e;"><div><span class="ngs-badge">單位</span> ${task.details.unit}</div><div><span class="ngs-badge">主持人</span> ${task.details.pi}</div><div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
-            if(task.details.needs === '萃取') ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
-            else if (task.details.needs === 'QC') ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
+            if(task.details.needs === '萃取') {
+                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
+            } else if (task.details.needs === 'QC') {
+                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
+            }
             ngsInfoHtml += `</div>`;
         }
-        let actionBtn = task.isDeleted ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>` : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
+        
+        let actionBtn = task.isDeleted 
+            ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>`
+            : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
+            
         let rightButtonsHtml = '';
         const canNotify = ['creator', 'senior', 'admin'].includes(state.currentUser.role);
-        if (!task.isDeleted) rightButtonsHtml += `<button onclick="openAssignModal('${task.id}', '${task.category}')" class="btn-icon btn-assign" title="指派任務">👤</button>`;
-        if (!task.isDeleted) { // Copy Button for everyone
-            let lineText = '';
-            if (task.category === 'NGS收件' && task.details) lineText = `【NGS案件通知】\n單位: ${task.details.unit}\n主持人: ${task.details.pi}\n項目: ${task.details.needs === '萃取' ? task.details.expType : task.details.nucleicType}\n負責業務: ${task.details.sales}`;
-            else { const plainTitle = task.title.replace(/<[^>]*>/g, ''); lineText = `【任務通知】\n${plainTitle}`; }
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if (!isMobile) rightButtonsHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
-            else { const encodedText = encodeURIComponent(lineText); rightButtonsHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`; }
+        
+        if (!task.isDeleted) {
+            rightButtonsHtml += `<button onclick="openAssignModal('${task.id}', '${task.category}')" class="btn-icon btn-assign" title="指派任務">👤</button>`;
         }
-        let assignedBadge = task.assignedTo ? `<span class="assign-badge">${getUserDisplayName(task.assignedTo)}</span>` : '';
+
+        if (canNotify && !task.isDeleted) {
+            let lineText = '';
+            if (task.category === 'NGS收件' && task.details) {
+                lineText = `【NGS案件通知】\n單位: ${task.details.unit}\n主持人: ${task.details.pi}\n項目: ${task.details.needs === '萃取' ? task.details.expType : task.details.nucleicType}\n負責業務: ${task.details.sales}`;
+            } else {
+                const plainTitle = task.title.replace(/<[^>]*>/g, '');
+                lineText = `【任務通知】\n${plainTitle}`;
+            }
+            
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (!isMobile) {
+                 rightButtonsHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
+            } else {
+                const encodedText = encodeURIComponent(lineText);
+                rightButtonsHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`;
+            }
+        }
+        
+        let assignedBadge = '';
+        if (task.assignedTo) {
+            assignedBadge = `<span class="assign-badge">${getUserDisplayName(task.assignedTo)}</span>`;
+        }
+
         const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
         div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title} ${assignedBadge}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area">${rightButtonsHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
         return div;
     }
-    function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => alert("已複製通知內容！")).catch(err => prompt("請手動複製:", text)); }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => alert("已複製通知內容！")).catch(err => prompt("請手動複製:", text));
+    }
+    
+    // ... (Keep existing Helper Functions: toggleTask, getDropdownOrInput, saveTask, deleteTask, restoreTask, updateTaskDb, changeDate, renderHistory, openModal, closeModal, showHistory) ...
     function toggleTask(id) { const task = state.tasks.find(t => t.id === id); if(task) { const newVal = !task.completed; updateTaskDb(id, { completed: newVal, completedBy: newVal ? state.currentUser.name : null, completedAt: newVal ? new Date().toISOString() : null }, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態'); } }
     function getDropdownOrInput(selectId, inputId) { const sel = document.getElementById(selectId).value; return (sel === '其他') ? document.getElementById(inputId).value.trim() : sel; }
     function saveTask() { 
