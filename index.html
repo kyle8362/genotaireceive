@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>案件進度追蹤系統 (Updated v38)</title>
+    <title>中區收送件進度追蹤系統 (v47 Stable)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -15,6 +15,7 @@
             --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
             --genesis: #7e22ce; --line-green: #06c755; --blue: #2563eb;
+            --assign-bg: #4338ca; /* Deep Indigo */
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
@@ -49,6 +50,7 @@
         .btn-settings { background: #f0fdfa; color: #0f766e; border: 1px solid #ccfbf1; } 
         .btn-import { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
         .btn-client-search { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+        .btn-assign-settings { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
 
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
@@ -101,11 +103,29 @@
         .task-checkbox { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 5px; margin-right: 15px; cursor: pointer; flex-shrink: 0; display: grid; place-items: center; margin-top: 3px; }
         .task-checkbox:hover { border-color: var(--primary); }
         .task-content { flex-grow: 1; display: flex; flex-direction: column; padding-right: 10px; }
-        .task-title { font-size: 1rem; line-height: 1.5; word-break: break-all; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
+        .task-title { font-size: 1rem; line-height: 1.5; word-break: break-all; padding: 2px 4px; border-radius: 4px; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; }
         .task-meta { font-size: 0.8rem; color: var(--text-light); margin-top: 6px; line-height: 1.4; }
         .completed-info { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: 500; }
         .task-item.completed-item .task-title { color: #9ca3af; text-decoration: line-through; }
         .ngs-badge { display: inline-block; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #fdfdfd; margin-right: 5px; margin-top: 3px; color: #555; }
+        
+        /* NEW: Assignment Badge - Large and Visible */
+        .assign-badge { 
+            display: inline-block; 
+            font-size: 0.95rem; 
+            background-color: var(--assign-bg); 
+            color: white; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            margin-left: 10px; 
+            vertical-align: middle; 
+            font-weight: 800; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            border: 1px solid #312e81;
+        }
+
         .action-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .btn-icon { background: none; border: 1px solid transparent; cursor: pointer; font-size: 1.2rem; padding: 2px 6px; color: #9ca3af; border-radius: 4px; }
         .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); border-color: #ddd; }
@@ -113,24 +133,22 @@
         .btn-restore { color: var(--success); font-size: 1rem; }
         .btn-line:hover { color: var(--line-green); }
         .btn-copy:hover { color: var(--primary); }
+        .btn-assign:hover { color: var(--assign-bg); background: #e0e7ff; }
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
-        /* --- Client Location Search Styles --- */
+        /* Client Search */
         .cust-header { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .cust-search-bar { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
         .btn-google-form { background: #4285F4; color: white; padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border:none; cursor:pointer;}
         .btn-google-form:hover { background: #357ae8; }
-        
         .cust-list-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
         .cust-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-top: 4px solid var(--blue); transition: transform 0.2s; display: flex; flex-direction: column; gap: 6px; }
         .cust-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        
         .cust-title-row { font-size: 1.2rem; font-weight: 800; color: #111827; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 4px; }
         .cust-row { font-size: 1rem; color: #374151; display: flex; align-items: flex-start; gap: 6px; line-height: 1.5; }
         .cust-row.note { color: #6b7280; font-style: italic; font-size: 0.9rem; background: #f9fafb; padding: 8px; border-radius: 4px; margin-top: 5px; }
         .cust-update { font-size: 0.75rem; color: #9ca3af; text-align: right; margin-top: auto; padding-top: 10px; border-top: 1px dashed #eee; }
-        
         .loading-spinner { text-align: center; padding: 20px; font-size: 1.2rem; color: var(--primary); }
 
         /* Modals & Others */
@@ -158,6 +176,30 @@
         .btn { padding: 9px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; }
         .btn-cancel { background: #f3f4f6; color: #4b5563; }
         .btn-save { background: var(--primary); color: white; }
+
+        /* User List and Settings Styles */
+        .user-list, .settings-list, .assign-list { list-style: none; padding: 0; margin: 0; }
+        .user-item { display: flex; flex-direction: column; padding: 15px; border: 1px solid #eee; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; }
+        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .user-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
+        .user-role-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; margin-left: 8px; border: 1px solid #ddd; font-weight: 500; }
+        .role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+        .role-senior { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
+        .role-admin { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+        .role-user { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+        .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+        .user-edit-row input, .user-edit-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; }
+        
+        .settings-container { margin-top: 15px; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        
+        /* Assignment Settings */
+        .assign-section { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
+        .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
+        .assign-checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        .assign-check-item { display: flex; align-items: center; font-size: 0.9rem; background: white; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+        .assign-check-item:hover { border-color: var(--primary); }
+        .assign-check-item input { margin-right: 6px; }
 
         @media (max-width: 768px) {
             #mobile-menu-btn { display: block; }
@@ -205,6 +247,7 @@
 
         <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
         <div class="admin-btn btn-settings" id="salesSettingsBtn" onclick="openSalesSettings()">⚙️ NGS 業務設定</div>
+        <div class="admin-btn btn-assign-settings" id="assignSettingsBtn" onclick="openAssignSettingsModal()">👤 指派任務帳號設定</div>
         <div class="admin-btn btn-import" id="importBtn" onclick="openImportModal()">📥 批量匯入任務</div>
         <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="openStatsModal()">📊 任務完成統整</div>
         
@@ -230,7 +273,7 @@
         <div id="taskView" class="view-section active">
             <header>
                 <div class="date-header" id="headerDateDisplay"></div>
-                <h1>案件進度管理</h1>
+                <h1>中區收送件即時進度</h1>
                 <div class="overall-progress-container">
                     <div class="progress-label"><span>當日總完成度</span><span id="overallProgressText">0%</span></div>
                     <div class="progress-track"><div class="progress-fill" id="overallProgressBar" style="width: 0%"></div></div>
@@ -274,6 +317,23 @@
 <div class="modal-overlay" id="userModal"><div class="modal-card" style="width: 650px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👥 成員權限管理</h3><p style="font-size:0.85rem; color:#666; margin-bottom:10px;"><span style="color:#7e22ce; font-weight:bold;">🟣 創世神</span>：最高權限，不可被修改。<br>高級管理者可編輯資料；管理者僅能核准。</p><ul class="user-list" id="userListDisplay"></ul><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('userModal').style.display='none'">關閉</button></div></div></div>
 <div class="modal-overlay" id="statsModal"><div class="modal-card" style="width: 700px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📊 任務完成統整</h3><div class="stats-filter-row"><div><label style="font-size:0.8rem;">開始日期</label><input type="date" id="statsDateStart"></div><div><label style="font-size:0.8rem;">結束日期</label><input type="date" id="statsDateEnd"></div><div><label style="font-size:0.8rem;">檢索帳號</label><select id="statsUserSelect"><option value="all">-- 所有帳號 (總覽) --</option></select></div><div style="display:flex; align-items:flex-end;"><button class="btn btn-save" onclick="updateStats()">查詢</button></div></div><div class="stats-result-area" id="statsResultDisplay"></div><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('statsModal').style.display='none'">關閉</button></div></div></div>
 
+<div class="modal-overlay" id="assignSettingsModal">
+    <div class="modal-card" style="width: 500px;">
+        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👤 指派任務帳號設定</h3>
+        <div id="assignRulesContainer"></div>
+        <div style="text-align:right; margin-top:10px;"><button class="btn btn-save" onclick="saveAssignmentRules()">儲存設定</button></div>
+        <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('assignSettingsModal').style.display='none'">關閉</button></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="assignModal">
+    <div class="modal-card" style="width: 350px;">
+        <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👤 指派任務給...</h3>
+        <ul class="assign-list" id="assignUserList"></ul>
+        <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('assignModal').style.display='none'">取消</button></div>
+    </div>
+</div>
+
 <script>
     // --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
@@ -294,7 +354,7 @@
 
     let state = {
         currentUser: null, currentDate: getTodayStr(), activeTab: 'tasks',
-        tasks: [], users: [], salesOptions: [], customers: [], 
+        tasks: [], users: [], salesOptions: [], customers: [], assignmentRules: {},
         history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
     };
 
@@ -306,20 +366,15 @@
     /* --- TAB SWITCHING --- */
     function switchTab(tab) {
         state.activeTab = tab;
-        document.getElementById('taskView').classList.remove('active');
-        document.getElementById('customerView').classList.remove('active');
-        
+        document.getElementById('taskView').classList.remove('active'); document.getElementById('customerView').classList.remove('active');
         document.getElementById('btnTabTasks').className = `sidebar-btn ${tab==='tasks'?'btn-nav-active':'btn-nav-inactive'}`;
         document.getElementById('btnTabCustomers').className = `sidebar-btn ${tab==='customers'?'btn-nav-active':'btn-nav-inactive'}`;
-        
         if (tab === 'tasks') {
             document.getElementById('taskView').classList.add('active');
-            document.getElementById('taskSearchSection').style.display = 'block';
-            document.getElementById('taskDateSection').style.display = 'block';
+            document.getElementById('taskSearchSection').style.display = 'block'; document.getElementById('taskDateSection').style.display = 'block';
         } else {
             document.getElementById('customerView').classList.add('active');
-            document.getElementById('taskSearchSection').style.display = 'none';
-            document.getElementById('taskDateSection').style.display = 'none';
+            document.getElementById('taskSearchSection').style.display = 'none'; document.getElementById('taskDateSection').style.display = 'none';
             if(state.customers.length === 0) fetchCustomers();
         }
         if(window.innerWidth <= 768) toggleSidebar();
@@ -339,67 +394,39 @@
             else if (state.currentUser.role !== me.role) { state.currentUser.role = me.role; localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser)); updateUIForRole(); }
         }
     });
+    // Listen for Settings
     db.collection('settings').doc('ngs_sales').onSnapshot(doc => {
         if(doc.exists) state.salesOptions = doc.data().list || ['Jeff', '廖軒逵'];
         else { state.salesOptions = ['Jeff', '廖軒逵']; db.collection('settings').doc('ngs_sales').set({ list: state.salesOptions }); }
         if(document.getElementById('salesSettingsModal').style.display === 'flex') openSalesSettings();
     });
+    db.collection('settings').doc('assignment_rules').onSnapshot(doc => {
+        state.assignmentRules = doc.exists ? doc.data() : {};
+    });
 
     /* --- CUSTOMER SEARCH --- */
     async function fetchCustomers() {
         document.getElementById('custLoading').style.display = 'block';
-        try {
-            const res = await fetch(GAS_API_URL);
-            const data = await res.json();
-            state.customers = data;
-        } catch (e) {
-            console.error("API Error:", e);
-            alert("資料讀取失敗，請確認 API 網址與權限設定 (Anyone)。\n按 F12 看詳細錯誤。");
-        } finally {
-            document.getElementById('custLoading').style.display = 'none';
-        }
+        try { const res = await fetch(GAS_API_URL); const data = await res.json(); state.customers = data; } 
+        catch (e) { console.error("API Error:", e); alert("資料讀取失敗"); } 
+        finally { document.getElementById('custLoading').style.display = 'none'; }
     }
     function renderCustomers(data) {
         const container = document.getElementById('customerList'); container.innerHTML = '';
         if(data.length === 0) { container.innerHTML = '<div style="color:#666; text-align:center;">查無資料</div>'; return; }
-        
         data.forEach(cust => {
             const div = document.createElement('div'); div.className = 'cust-card';
-            // Mapping from GAS (v36 updated structure)
-            const unit = cust.unit||'未分類';
-            const name = cust.name||'無名稱';
-            const building = cust.building||'';
-            const floor = cust.floor||'';
-            const contact = cust.contact||'';
-            const phone = cust.phone||'';
-            const note = cust.note||'';
-            const update = cust.update||'';
-
-            // Format: Building - Floor or just one if the other missing
-            let locStr = '';
-            if(building && floor) locStr = `${building} - ${floor}`;
-            else if(building) locStr = building;
-            else if(floor) locStr = floor;
-
-            let content = `
-                <div class="cust-title-row">${unit} - ${name}</div>
-                ${locStr ? `<div class="cust-row">📍 ${locStr}</div>` : ''}
-                ${contact ? `<div class="cust-row">👤 ${contact}</div>` : ''}
-                ${phone ? `<div class="cust-row">📞 ${phone}</div>` : ''}
-                ${note ? `<div class="cust-row note">📝 ${note}</div>` : ''}
-                ${update ? `<div class="cust-update">最後更新: ${update}</div>` : ''}
-            `;
-            div.innerHTML = content;
+            const name = cust.name||'無名稱'; const unit = cust.unit||'未分類';
+            const building = cust.building||''; const floor = cust.floor||'';
+            let locStr = ''; if(building && floor) locStr = `${building} - ${floor}`; else if(building) locStr = building; else if(floor) locStr = floor;
+            const contact = cust.contact||''; const phone = cust.phone||''; const note = cust.note||''; const update = cust.update||'';
+            div.innerHTML = `<div class="cust-title-row">${unit} - ${name}</div>${locStr?`<div class="cust-row">📍 ${locStr}</div>`:''}${contact?`<div class="cust-row">👤 ${contact}</div>`:''}${phone?`<div class="cust-row">📞 ${phone}</div>`:''}${note?`<div class="cust-row note">📝 ${note}</div>`:''}${update?`<div class="cust-update">最後更新: ${update}</div>`:''}`;
             container.appendChild(div);
         });
     }
     function handleCustomerSearch() {
         const key = document.getElementById('custSearchInput').value.trim().toLowerCase();
-        const container = document.getElementById('customerList');
-        if(!key) { 
-            container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#9ca3af; margin-top:50px;">請輸入關鍵字開始查詢</div>'; 
-            return; 
-        }
+        if(!key) { document.getElementById('customerList').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;margin-top:50px;">請輸入關鍵字開始查詢</div>'; return; }
         const filtered = state.customers.filter(c => JSON.stringify(c).toLowerCase().includes(key));
         renderCustomers(filtered);
     }
@@ -435,10 +462,7 @@
     }
     function loginSuccess(username, role) { state.currentUser = { name: username, role: role }; localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser)); initApp(); }
     function logout() { localStorage.removeItem('tt_current_user'); location.reload(); }
-    function initApp() {
-        document.getElementById('auth-screen').style.display = 'none'; document.getElementById('app-screen').style.display = 'flex';
-        updateUIForRole(); changeDate(state.currentDate, false);
-    }
+    function initApp() { document.getElementById('auth-screen').style.display = 'none'; document.getElementById('app-screen').style.display = 'flex'; updateUIForRole(); changeDate(state.currentDate, false); }
     function updateUIForRole() {
         if(!state.currentUser) return;
         let roleName = '';
@@ -450,10 +474,73 @@
         document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
         document.getElementById('statsPanelBtn').style.display = canConfig ? 'block' : 'none';
         document.getElementById('salesSettingsBtn').style.display = canConfig ? 'block' : 'none';
-        document.getElementById('importBtn').style.display = canManage ? 'block' : 'none';
+        document.getElementById('assignSettingsBtn').style.display = canConfig ? 'block' : 'none'; // Separate Btn
+        document.getElementById('importBtn').style.display = canManage ? 'block' : 'none'; 
     }
 
-    /* --- IMPORT & SETTINGS --- */
+    /* --- SALES SETTINGS --- */
+    function openSalesSettings() {
+        const list = document.getElementById('salesOptionList'); list.innerHTML = '';
+        state.salesOptions.forEach((opt, index) => { const li = document.createElement('li'); li.className = 'setting-item'; li.innerHTML = `<span>${opt}</span><div><button class="btn-icon" onclick="editSalesOption(${index})">✏️</button><button class="btn-icon" style="color:red;" onclick="deleteSalesOption(${index})">🗑️</button></div>`; list.appendChild(li); });
+        document.getElementById('salesSettingsModal').style.display = 'flex';
+    }
+    function saveSalesSettings() { db.collection('settings').doc('ngs_sales').update({ list: state.salesOptions }); }
+    function addSalesOption() { const val = document.getElementById('newSalesName').value.trim(); if(val) { state.salesOptions.push(val); saveSalesSettings(); document.getElementById('newSalesName').value = ''; } }
+    function deleteSalesOption(index) { if(confirm('確定刪除？')) { state.salesOptions.splice(index, 1); saveSalesSettings(); } }
+    function editSalesOption(index) { const newVal = prompt("修改:", state.salesOptions[index]); if(newVal && newVal.trim()) { state.salesOptions[index] = newVal.trim(); saveSalesSettings(); } }
+    function populateSalesDropdowns() { const optsHtml = state.salesOptions.map(s => `<option value="${s}">${s}</option>`).join(''); const s1 = document.getElementById('ngsSales'); const s2 = document.getElementById('ngsQcSales'); if(s1) s1.innerHTML = optsHtml; if(s2) s2.innerHTML = optsHtml; }
+
+    /* --- ASSIGNMENT SETTINGS (Standalone) --- */
+    function openAssignSettingsModal() {
+        const container = document.getElementById('assignRulesContainer'); container.innerHTML = '';
+        const roleOrder = { 'creator': 0, 'senior': 1, 'admin': 2, 'user': 3 };
+        const approvedUsers = state.users.filter(u => u.isApproved).sort((a,b) => (roleOrder[a.role]||4) - (roleOrder[b.role]||4));
+        
+        ORDERED_CATEGORIES.forEach(cat => {
+            const wrapper = document.createElement('div'); wrapper.className = 'assign-section';
+            const currentAllowed = state.assignmentRules[cat] || [];
+            let checkboxes = '';
+            approvedUsers.forEach(u => {
+                const checked = currentAllowed.includes(u.username) ? 'checked' : '';
+                const dName = u.nickname || u.username;
+                checkboxes += `<label class="assign-check-item"><input type="checkbox" name="rule_${cat}" value="${u.username}" ${checked}> ${dName}</label>`;
+            });
+            wrapper.innerHTML = `<div class="assign-sec-title">${cat}</div><div class="assign-checkbox-group">${checkboxes}</div>`;
+            container.appendChild(wrapper);
+        });
+        document.getElementById('assignSettingsModal').style.display = 'flex';
+    }
+    function saveAssignmentRules() {
+        const newRules = {};
+        ORDERED_CATEGORIES.forEach(cat => {
+            const checks = document.querySelectorAll(`input[name="rule_${cat}"]:checked`);
+            newRules[cat] = Array.from(checks).map(c => c.value);
+        });
+        db.collection('settings').doc('assignment_rules').set(newRules).then(() => alert('設定已儲存'));
+    }
+
+    /* --- ASSIGNMENT ACTION --- */
+    let assigningTaskId = null;
+    function openAssignModal(taskId, category) {
+        assigningTaskId = taskId; const list = document.getElementById('assignUserList'); list.innerHTML = '';
+        const allowedUsers = state.assignmentRules[category] || [];
+        let targetUsers = allowedUsers.length > 0 ? state.users.filter(u => allowedUsers.includes(u.username)) : state.users.filter(u => u.isApproved);
+        if (targetUsers.length === 0) { list.innerHTML = '<li style="padding:10px; color:#666;">無可用指派對象，請至後台設定。</li>'; }
+        targetUsers.forEach(u => {
+            const li = document.createElement('li'); li.className = 'user-item'; li.style.cursor = 'pointer';
+            const dName = u.nickname || u.username;
+            li.innerHTML = `<div style="font-weight:bold; width:100%; padding:5px;" onclick="confirmAssign('${u.username}')">${dName}</div>`;
+            list.appendChild(li);
+        });
+        document.getElementById('assignModal').style.display = 'flex';
+    }
+    function confirmAssign(username) {
+        if(!assigningTaskId) return;
+        updateTaskDb(assigningTaskId, { assignedTo: username }, '指派', `指派給 ${getUserDisplayName(username)}`);
+        document.getElementById('assignModal').style.display = 'none'; assigningTaskId = null;
+    }
+
+    /* --- IMPORT LOGIC --- */
     function openImportModal() {
         const select = document.getElementById('importCategorySelect'); select.innerHTML = '';
         ORDERED_CATEGORIES.forEach(cat => { if (cat !== 'NGS收件') { const opt = document.createElement('option'); opt.value = cat; opt.innerText = cat; select.appendChild(opt); } });
@@ -469,53 +556,24 @@
         }
         alert(`匯入完成！成功: ${successCount}`); document.getElementById('importModal').style.display = 'none';
     }
-    function openSalesSettings() {
-        const list = document.getElementById('salesOptionList'); list.innerHTML = '';
-        state.salesOptions.forEach((opt, index) => { const li = document.createElement('li'); li.className = 'setting-item'; li.innerHTML = `<span>${opt}</span><div><button class="btn-icon" onclick="editSalesOption(${index})">✏️</button><button class="btn-icon" style="color:red;" onclick="deleteSalesOption(${index})">🗑️</button></div>`; list.appendChild(li); });
-        document.getElementById('salesSettingsModal').style.display = 'flex';
-    }
-    function saveSalesSettings() { db.collection('settings').doc('ngs_sales').update({ list: state.salesOptions }); }
-    function addSalesOption() { const val = document.getElementById('newSalesName').value.trim(); if(val) { state.salesOptions.push(val); saveSalesSettings(); document.getElementById('newSalesName').value = ''; } }
-    function deleteSalesOption(index) { if(confirm('確定刪除？')) { state.salesOptions.splice(index, 1); saveSalesSettings(); } }
-    function editSalesOption(index) { const newVal = prompt("修改:", state.salesOptions[index]); if(newVal && newVal.trim()) { state.salesOptions[index] = newVal.trim(); saveSalesSettings(); } }
-    function populateSalesDropdowns() { const optsHtml = state.salesOptions.map(s => `<option value="${s}">${s}</option>`).join(''); const s1 = document.getElementById('ngsSales'); const s2 = document.getElementById('ngsQcSales'); if(s1) s1.innerHTML = optsHtml; if(s2) s2.innerHTML = optsHtml; }
 
-    /* --- TASKS LOGIC --- */
-    function handleSearch() {
-        const keyword = document.getElementById('searchTaskInput').value.trim().toLowerCase();
-        const resultsContainer = document.getElementById('searchResults'); resultsContainer.innerHTML = '';
-        if (!keyword) return;
-        const matched = state.tasks.filter(t => t.title.replace(/<[^>]*>/g, '').toLowerCase().includes(keyword));
-        matched.slice(0, 20).forEach(t => {
-            const li = document.createElement('li'); li.className = 'search-item';
-            li.innerHTML = `<span>${t.title.replace(/<[^>]*>/g, '')}</span><span class="search-date">${t.date}</span>`;
-            li.onclick = () => { changeDate(t.date); if(window.innerWidth<=768) toggleSidebar(); };
-            resultsContainer.appendChild(li);
-        });
-        if(matched.length === 0) resultsContainer.innerHTML = '<li class="search-item" style="color:#999; cursor:default;">無相符結果</li>';
-    }
-
-    /* --- NGS LOGIC --- */
-    function handleCategoryChange() { const cat = document.getElementById('inputCategory').value; document.getElementById('ngs-form-container').style.display = (cat === 'NGS收件') ? 'block' : 'none'; }
-    function handleNgsNeedsChange() { const needs = document.getElementById('ngsNeeds').value; document.getElementById('ngs-extraction-fields').style.display = (needs === '萃取') ? 'block' : 'none'; document.getElementById('ngs-qc-fields').style.display = (needs === 'QC') ? 'block' : 'none'; }
-    function handleDropdownChange(selectId, inputId) { document.getElementById(inputId).style.display = (document.getElementById(selectId).value === '其他') ? 'block' : 'none'; }
-    function generateNgsTitle() {
-        const cat = document.getElementById('inputCategory').value; if (cat !== 'NGS收件') return;
-        const unit = document.getElementById('ngsUnit').value.trim(); const pi = document.getElementById('ngsPI').value.trim(); const needs = document.getElementById('ngsNeeds').value;
-        let subType = '';
-        if (needs === '萃取') { const sel = document.getElementById('ngsExpTypeSelect').value; subType = (sel === '其他') ? document.getElementById('ngsExpTypeInput').value.trim() : sel; }
-        else if (needs === 'QC') { const sel = document.getElementById('ngsNucleicTypeSelect').value; subType = (sel === '其他') ? document.getElementById('ngsNucleicTypeInput').value.trim() : sel; }
-        if (unit && pi && subType) document.getElementById('inputTitle').innerText = `${unit}-${pi}-${subType} 收件`;
-    }
-
-    /* --- STATS --- */
+    /* --- STATS LOGIC (Fixed) --- */
     function openStatsModal() {
-        const modal = document.getElementById('statsModal'); const userSelect = document.getElementById('statsUserSelect'); const startInput = document.getElementById('statsDateStart'); const endInput = document.getElementById('statsDateEnd');
+        const modal = document.getElementById('statsModal'); 
+        const userSelect = document.getElementById('statsUserSelect'); 
+        const startInput = document.getElementById('statsDateStart'); 
+        const endInput = document.getElementById('statsDateEnd');
+        
         userSelect.innerHTML = '<option value="all">-- 所有帳號 (總覽) --</option>';
         const uniqueUsers = [...new Set(state.tasks.filter(t=>t.completed && t.completedBy).map(t=>t.completedBy))];
         uniqueUsers.sort().forEach(u => { const opt = document.createElement('option'); opt.value = u; opt.innerText = getUserDisplayName(u); userSelect.appendChild(opt); });
-        const year = new Date().getFullYear(); startInput.value = `${year}-01-01`; endInput.value = `${year}-12-31`;
-        updateStats(); modal.style.display = 'flex';
+        
+        const year = new Date().getFullYear(); 
+        startInput.value = `${year}-01-01`; 
+        endInput.value = `${year}-12-31`;
+        
+        updateStats(); 
+        modal.style.display = 'flex';
     }
     function updateStats() {
         const start = document.getElementById('statsDateStart').value; const end = document.getElementById('statsDateEnd').value;
@@ -547,10 +605,33 @@
         }
     }
 
-    /* --- USER MANAGEMENT --- */
+    /* --- USER MANAGEMENT (Fixed) --- */
     function openUserModal() {
-        const list = document.getElementById('userListDisplay'); const myRole = state.currentUser.role; list.innerHTML = '';
-        state.users.forEach(user => {
+        const list = document.getElementById('userListDisplay'); 
+        const myRole = state.currentUser.role; 
+        const filterRole = document.getElementById('userFilterSelect') ? document.getElementById('userFilterSelect').value : 'all'; // Default to all if element missing
+        
+        list.innerHTML = '';
+        
+        // Sorting Logic: Creator > Senior > Admin > User > Pending
+        const roleOrder = { 'creator': 0, 'senior': 1, 'admin': 2, 'user': 3, 'pending': 4 };
+        
+        let displayUsers = state.users.sort((a,b) => {
+            const rA = a.isApproved ? (roleOrder[a.role]||3) : 4;
+            const rB = b.isApproved ? (roleOrder[b.role]||3) : 4;
+            return rA - rB;
+        });
+
+        // Filtering Logic
+        if (filterRole !== 'all') {
+            if (filterRole === 'pending') {
+                displayUsers = displayUsers.filter(u => !u.isApproved);
+            } else {
+                displayUsers = displayUsers.filter(u => u.isApproved && u.role === filterRole);
+            }
+        }
+
+        displayUsers.forEach(user => {
             const li = document.createElement('li'); li.className = 'user-item';
             let badgeClass = 'role-user'; let badgeText = '一般者';
             if(user.role === 'creator') { badgeClass = 'role-creator'; badgeText = '🟣 創世神'; }
@@ -560,6 +641,7 @@
             
             const isTargetCreator = user.role === 'creator';
             let controlsHtml = '';
+            
             if (myRole === 'creator' || myRole === 'senior') {
                 if (myRole === 'senior' && isTargetCreator) {
                      controlsHtml = `<div class="user-edit-row"><span style="color:purple; font-weight:bold;">此為最高權限帳號，無法編輯。</span></div>`;
@@ -595,7 +677,6 @@
     /* --- TASKS RENDER --- */
     function renderTasks() {
         const container = document.getElementById('taskListContainer'); container.innerHTML = '';
-        
         const overdueTasks = state.tasks.filter(t => t.date < state.currentDate && !t.completed && !t.isDeleted);
         if (overdueTasks.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group overdue-section';
@@ -604,29 +685,19 @@
             overdueTasks.forEach(t => group.appendChild(createTaskElement(t, true)));
             container.appendChild(group);
         }
-
         const dayTasks = state.tasks.filter(t => t.date === state.currentDate);
-        const totalActive = dayTasks.filter(t => !t.isDeleted).length;
-        const totalDone = dayTasks.filter(t => !t.isDeleted && t.completed).length;
+        const totalActive = dayTasks.filter(t => !t.isDeleted).length; const totalDone = dayTasks.filter(t => !t.isDeleted && t.completed).length;
         const totalPct = totalActive===0?0:Math.round((totalDone/totalActive)*100);
-        document.getElementById('overallProgressText').innerText = `${totalDone}/${totalActive} (${totalPct}%)`;
-        document.getElementById('overallProgressBar').style.width = `${totalPct}%`;
-
+        document.getElementById('overallProgressText').innerText = `${totalDone}/${totalActive} (${totalPct}%)`; document.getElementById('overallProgressBar').style.width = `${totalPct}%`;
         if (dayTasks.length === 0 && overdueTasks.length === 0) { container.innerHTML += `<div style="text-align:center; color:#9ca3b8; margin-top:60px;">本日無任何案件或任務</div>`; return; }
-
         ORDERED_CATEGORIES.forEach(cat => {
-            const all = dayTasks.filter(t => t.category === cat && !t.isDeleted);
-            const active = all.filter(t => !t.completed);
+            const all = dayTasks.filter(t => t.category === cat && !t.isDeleted); const active = all.filter(t => !t.completed);
             const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
-            
             const group = document.createElement('div'); group.className = 'category-group';
             group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
-            if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t)));
-            else group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
+            if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t))); else group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
             container.appendChild(group);
         });
-
-        // Completed (Grouped & Collapsible)
         const completedTasks = dayTasks.filter(t => t.completed && !t.isDeleted);
         if (completedTasks.length > 0) {
             const compSection = document.createElement('div'); compSection.className = 'category-group completed-section';
@@ -634,8 +705,7 @@
             ORDERED_CATEGORIES.forEach(cat => {
                 const subTasks = completedTasks.filter(t => t.category === cat);
                 if (subTasks.length > 0) {
-                    const details = document.createElement('details');
-                    details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
+                    const details = document.createElement('details'); details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
                     const content = details.querySelector('.details-content');
                     subTasks.sort((a,b)=>new Date(a.completedAt)-new Date(b.completedAt));
                     subTasks.forEach(t => content.appendChild(createTaskElement(t)));
@@ -644,8 +714,6 @@
             });
             container.appendChild(compSection);
         }
-
-        // Deleted (Grouped & Collapsible)
         const deletedTasks = dayTasks.filter(t => t.isDeleted);
         if (deletedTasks.length > 0) {
             const delSection = document.createElement('div'); delSection.className = 'category-group deleted-section';
@@ -653,8 +721,7 @@
             ORDERED_CATEGORIES.forEach(cat => {
                 const subTasks = deletedTasks.filter(t => t.category === cat);
                 if (subTasks.length > 0) {
-                    const details = document.createElement('details');
-                    details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
+                    const details = document.createElement('details'); details.innerHTML = `<summary>${cat} (${subTasks.length})</summary><div class="details-content"></div>`;
                     const content = details.querySelector('.details-content');
                     subTasks.forEach(t => content.appendChild(createTaskElement(t)));
                     delSection.appendChild(details);
@@ -663,74 +730,38 @@
             container.appendChild(delSection);
         }
     }
-
     function createTaskElement(task, isOverdue = false) {
-        const div = document.createElement('div');
-        const overdueClass = isOverdue ? 'overdue-item' : '';
-        div.className = `task-item ${overdueClass} ${task.completed ? 'completed-item' : ''} ${task.isDeleted ? 'deleted-item' : ''}`;
+        const div = document.createElement('div'); div.className = `task-item ${isOverdue?'overdue-item':''} ${task.completed?'completed-item':''} ${task.isDeleted?'deleted-item':''}`;
         div.setAttribute('data-cat', task.category);
-        
         let checkboxHtml = task.isDeleted ? '' : `<div class="task-checkbox" onclick="toggleTask('${task.id}')"></div>`;
         let metaHtml = '';
-        if (task.completed && !task.isDeleted) {
-            const d = new Date(task.completedAt);
-            const userDisp = getUserDisplayName(task.completedBy);
-            metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${userDisp} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`;
-        } else if (isOverdue) {
-            metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`;
-        }
-
+        if (task.completed && !task.isDeleted) { const d = new Date(task.completedAt); metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${getUserDisplayName(task.completedBy)} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`; } 
+        else if (isOverdue) { metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`; }
         let ngsInfoHtml = '';
         if (task.details) {
             ngsInfoHtml += `<div style="margin-top:5px; padding:5px; background:#f0fdfa; border-radius:4px; font-size:0.8rem; color:#0f766e;"><div><span class="ngs-badge">單位</span> ${task.details.unit}</div><div><span class="ngs-badge">主持人</span> ${task.details.pi}</div><div><span class="ngs-badge">需求</span> ${task.details.needs}</div>`;
-            if(task.details.needs === '萃取') {
-                ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
-            } else if (task.details.needs === 'QC') {
-                ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
-            }
+            if(task.details.needs === '萃取') ngsInfoHtml += `<div><span class="ngs-badge">種類</span> ${task.details.sampleType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
+            else if (task.details.needs === 'QC') ngsInfoHtml += `<div><span class="ngs-badge">核酸</span> ${task.details.nucleicType} | 數量:${task.details.sampleCount}</div><div><span class="ngs-badge">後續</span> ${task.details.expType} | 平台:${task.details.platform}</div><div><span class="ngs-badge">業務</span> ${task.details.sales} | 歸還:${task.details.returnBack} | ${task.details.temp}</div>`;
             ngsInfoHtml += `</div>`;
         }
-        
-        let actionBtn = task.isDeleted 
-            ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>`
-            : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
-            
-        let lineBtnHtml = '';
+        let actionBtn = task.isDeleted ? `<button class="btn-icon btn-restore" onclick="restoreTask('${task.id}')">↩ 還原</button>` : `<button class="btn-icon btn-delete" onclick="deleteTask('${task.id}')">×</button>`;
+        let rightButtonsHtml = '';
         const canNotify = ['creator', 'senior', 'admin'].includes(state.currentUser.role);
-        
+        if (!task.isDeleted) rightButtonsHtml += `<button onclick="openAssignModal('${task.id}', '${task.category}')" class="btn-icon btn-assign" title="指派任務">👤</button>`;
         if (canNotify && !task.isDeleted) {
             let lineText = '';
-            if (task.category === 'NGS收件' && task.details) {
-                lineText = `【NGS案件通知】\n單位: ${task.details.unit}\n主持人: ${task.details.pi}\n項目: ${task.details.needs === '萃取' ? task.details.expType : task.details.nucleicType}\n負責業務: ${task.details.sales}`;
-            } else {
-                const plainTitle = task.title.replace(/<[^>]*>/g, '');
-                lineText = `【任務通知】\n${plainTitle}`;
-            }
-            
+            if (task.category === 'NGS收件' && task.details) lineText = `【NGS案件通知】\n單位: ${task.details.unit}\n主持人: ${task.details.pi}\n項目: ${task.details.needs === '萃取' ? task.details.expType : task.details.nucleicType}\n負責業務: ${task.details.sales}`;
+            else { const plainTitle = task.title.replace(/<[^>]*>/g, ''); lineText = `【任務通知】\n${plainTitle}`; }
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            // Desktop: Show Copy (Always)
-            if (!isMobile) {
-                 lineBtnHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
-            }
-
-            // Mobile: Show LINE
-            if (isMobile) {
-                const encodedText = encodeURIComponent(lineText);
-                lineBtnHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`;
-            }
+            if (!isMobile) rightButtonsHtml += `<button onclick="copyToClipboard(\`${lineText.replace(/`/g, '\\`')}\`)" class="btn-icon btn-copy" title="複製通知文字">📋</button>`;
+            else { const encodedText = encodeURIComponent(lineText); rightButtonsHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`; }
         }
-
+        let assignedBadge = task.assignedTo ? `<span class="assign-badge">${getUserDisplayName(task.assignedTo)}</span>` : '';
         const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
-        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area">${lineBtnHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
+        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title} ${assignedBadge}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area">${rightButtonsHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
         return div;
     }
-
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => alert("已複製通知內容！")).catch(err => prompt("請手動複製:", text));
-    }
-    
-    // ... (Keep existing Helper Functions: toggleTask, getDropdownOrInput, saveTask, deleteTask, restoreTask, updateTaskDb, changeDate, renderHistory, openModal, closeModal, showHistory) ...
+    function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => alert("已複製通知內容！")).catch(err => prompt("請手動複製:", text)); }
     function toggleTask(id) { const task = state.tasks.find(t => t.id === id); if(task) { const newVal = !task.completed; updateTaskDb(id, { completed: newVal, completedBy: newVal ? state.currentUser.name : null, completedAt: newVal ? new Date().toISOString() : null }, newVal ? '完成' : '重啟', newVal ? '標記為完成' : '取消完成狀態'); } }
     function getDropdownOrInput(selectId, inputId) { const sel = document.getElementById(selectId).value; return (sel === '其他') ? document.getElementById(inputId).value.trim() : sel; }
     function saveTask() { 
