@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v52 Scroll Fix)</title>
+    <title>中區收送件進度追蹤系統 (v53 NGS Fixed)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -33,35 +33,12 @@
         #mobile-menu-btn { display: none; position: absolute; top: 15px; left: 15px; z-index: 1100; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: var(--primary); }
         #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 900; backdrop-filter: blur(2px); }
         
-        /* === SIDEBAR MODIFIED FOR SCROLLING === */
-        aside { 
-            width: 280px; 
-            background: var(--sidebar-bg); 
-            border-right: 1px solid var(--border); 
-            display: flex; 
-            flex-direction: column; 
-            box-sizing: border-box; 
-            transition: transform 0.3s ease; 
-            padding: 0; /* Clear padding for children to handle */
-        }
-        
-        .sidebar-fixed {
-            padding: 1.5rem 1.5rem 0.5rem 1.5rem;
-            flex-shrink: 0;
-            background: var(--sidebar-bg);
-            z-index: 10;
-        }
-
-        .sidebar-scroll {
-            padding: 0.5rem 1.5rem 1.5rem 1.5rem;
-            flex-grow: 1;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #cbd5e1 transparent;
-        }
+        /* === SIDEBAR SCROLL FIX === */
+        aside { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s ease; padding: 0; }
+        .sidebar-fixed { padding: 1.5rem 1.5rem 0.5rem 1.5rem; flex-shrink: 0; background: var(--sidebar-bg); z-index: 10; }
+        .sidebar-scroll { padding: 0.5rem 1.5rem 1.5rem 1.5rem; flex-grow: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
         .sidebar-scroll::-webkit-scrollbar { width: 5px; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-        /* ======================================= */
         
         .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
         .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; flex-shrink: 0; }
@@ -83,7 +60,7 @@
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
         
-        /* SEARCH BOX STYLES */
+        /* SEARCH BOX */
         .search-box { position: relative; margin-bottom: 20px; }
         .search-box input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 0.9rem; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 6px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -91,7 +68,7 @@
         .search-item:hover { background: #f0fdfa; color: var(--primary); }
         .search-item:last-child { border-bottom: none; }
 
-        .history-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
+        .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
         .history-item { padding: 10px; cursor: pointer; border-radius: 6px; color: var(--text-main); margin-bottom: 4px; display: flex; justify-content: space-between; }
         .history-item:hover { background: #f8fafc; }
         .history-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
@@ -213,7 +190,6 @@
         /* User List and Settings Styles */
         .user-list, .settings-list, .assign-list { list-style: none; padding: 0; margin: 0; }
         .user-item { display: flex; flex-direction: column; padding: 15px; border: 1px solid #eee; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; }
-        .user-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .user-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
         .user-role-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; margin-left: 8px; border: 1px solid #ddd; font-weight: 500; }
@@ -739,6 +715,7 @@
             if(!user.isApproved) { badgeClass = ''; badgeText = '待審核'; }
             
             const isTargetCreator = user.role === 'creator';
+            const myRole = state.currentUser ? state.currentUser.role : 'user';
             let controlsHtml = '';
             
             if (myRole === 'creator' || myRole === 'senior') {
@@ -776,6 +753,42 @@
     }
     function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => renderUserList()); }
     function approveUserSimple(docId) { db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准')); }
+
+    // --- NGS HELPER FUNCTIONS (The Missing Piece) ---
+    function handleCategoryChange() { 
+        const cat = document.getElementById('inputCategory').value; 
+        document.getElementById('ngs-form-container').style.display = (cat === 'NGS收件') ? 'block' : 'none'; 
+    }
+    
+    function handleNgsNeedsChange() {
+        const needs = document.getElementById('ngsNeeds').value;
+        document.getElementById('ngs-extraction-fields').style.display = (needs === '萃取') ? 'block' : 'none';
+        document.getElementById('ngs-qc-fields').style.display = (needs === 'QC') ? 'block' : 'none';
+    }
+    
+    function handleDropdownChange(selectId, inputId) {
+        const val = document.getElementById(selectId).value;
+        document.getElementById(inputId).style.display = (val === '其他') ? 'block' : 'none';
+    }
+    
+    function generateNgsTitle() {
+        const unit = document.getElementById('ngsUnit').value.trim();
+        const pi = document.getElementById('ngsPI').value.trim();
+        const needs = document.getElementById('ngsNeeds').value;
+        let subType = '';
+        
+        if (needs === '萃取') {
+            const sel = document.getElementById('ngsExpTypeSelect').value;
+            subType = (sel === '其他') ? document.getElementById('ngsExpTypeInput').value.trim() : sel;
+        } else if (needs === 'QC') {
+            const sel = document.getElementById('ngsNucleicTypeSelect').value;
+            subType = (sel === '其他') ? document.getElementById('ngsNucleicTypeInput').value.trim() : sel;
+        }
+        
+        if (unit && pi && subType) {
+            document.getElementById('inputTitle').innerText = `${unit}-${pi}-${subType} 收件`;
+        }
+    }
 
     /* --- TASKS RENDER --- */
     function renderTasks() {
