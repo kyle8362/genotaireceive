@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v53 NGS Fixed)</title>
+    <title>中區收送件進度追蹤系統 (v55 UI Polish)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/firebase@9.22.2/firebase-database-compat.js"></script>
 
     <style>
         :root {
@@ -15,7 +16,7 @@
             --sidebar-bg: #ffffff; --text-main: #111827; --text-light: #6b7280;
             --border: #e5e7eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
             --genesis: #7e22ce; --line-green: #06c755; --blue: #2563eb;
-            --assign-bg: #4338ca; /* Deep Indigo */
+            --assign-bg: #4338ca;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
@@ -28,56 +29,78 @@
         .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
         .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
-        /* Layout */
+        /* Layout Structure */
         #app-screen { display: flex; width: 100%; height: 100%; position: relative; }
-        #mobile-menu-btn { display: none; position: absolute; top: 15px; left: 15px; z-index: 1100; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: var(--primary); }
-        #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 900; backdrop-filter: blur(2px); }
         
-        /* === SIDEBAR SCROLL FIX === */
-        aside { width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s ease; padding: 0; }
+        /* SIDEBAR FIXED WIDTH & NO SHRINK */
+        aside { 
+            width: 280px; 
+            min-width: 280px; /* Force minimum width */
+            flex-shrink: 0;   /* Prevent shrinking */
+            background: var(--sidebar-bg); 
+            border-right: 1px solid var(--border); 
+            display: flex; 
+            flex-direction: column; 
+            box-sizing: border-box; 
+            transition: transform 0.3s ease; 
+            padding: 0;
+            z-index: 50; 
+        }
+        
         .sidebar-fixed { padding: 1.5rem 1.5rem 0.5rem 1.5rem; flex-shrink: 0; background: var(--sidebar-bg); z-index: 10; }
         .sidebar-scroll { padding: 0.5rem 1.5rem 1.5rem 1.5rem; flex-grow: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
         .sidebar-scroll::-webkit-scrollbar { width: 5px; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
         
+        /* Mobile Menu */
+        #mobile-menu-btn { display: none; position: absolute; top: 15px; left: 15px; z-index: 1100; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: var(--primary); }
+        #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 900; backdrop-filter: blur(2px); }
+        
         .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
         .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; flex-shrink: 0; }
         .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
         
-        .sidebar-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: block; font-size: 0.9rem; border: 1px solid transparent; width: 100%; }
+        .sidebar-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: block; font-size: 0.9rem; border: 1px solid transparent; width: 100%; white-space: nowrap; }
         .sidebar-btn:hover { opacity: 0.9; }
         .btn-nav-active { background: var(--primary); color: white; border-color: var(--primary); }
         .btn-nav-inactive { background: white; color: var(--text-light); border: 1px solid var(--border); }
         
-        .admin-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: none; font-size: 0.9rem; }
+        .admin-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: none; font-size: 0.9rem; white-space: nowrap; }
         .btn-perm { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
         .btn-stats { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
         .btn-settings { background: #f0fdfa; color: #0f766e; border: 1px solid #ccfbf1; } 
         .btn-import { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
         .btn-client-search { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
         .btn-assign-settings { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+        .btn-purchase { background: #fdf4ff; color: #86198f; border: 1px solid #f0abfc; }
 
         .sidebar-section h3 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem; }
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
         
-        /* SEARCH BOX */
         .search-box { position: relative; margin-bottom: 20px; }
         .search-box input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 0.9rem; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 6px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .search-item { padding: 10px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
         .search-item:hover { background: #f0fdfa; color: var(--primary); }
-        .search-item:last-child { border-bottom: none; }
-
+        
         .history-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
         .history-item { padding: 10px; cursor: pointer; border-radius: 6px; color: var(--text-main); margin-bottom: 4px; display: flex; justify-content: space-between; }
         .history-item:hover { background: #f8fafc; }
         .history-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
 
-        main { flex-grow: 1; padding: 2rem; overflow-y: auto; position: relative; }
+        /* MAIN CONTENT AREA */
+        main { 
+            flex-grow: 1; 
+            padding: 2rem; 
+            overflow-y: auto; 
+            overflow-x: auto; /* Allow horizontal scroll if table is too wide */
+            position: relative; 
+            min-width: 0; /* Important for flex child shrinkage */
+        }
         .view-section { display: none; height: 100%; flex-direction: column; }
         .view-section.active { display: flex; }
 
-        /* Task View */
+        /* Task View Styles */
         header { margin-bottom: 2rem; }
         header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
         .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
@@ -96,7 +119,6 @@
 
         details { margin-bottom: 10px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: white; }
         details summary { padding: 12px; cursor: pointer; font-weight: 600; background: #f9fafb; list-style: none; display: flex; justify-content: space-between; align-items: center; }
-        details summary:hover { background: #f3f4f6; color: var(--primary); }
         .details-content { padding: 10px; background: #fff; }
         .category-group.overdue-section .cat-title { color: #dc2626; } 
         
@@ -119,22 +141,7 @@
         .task-item.completed-item .task-title { color: #9ca3af; text-decoration: line-through; }
         .ngs-badge { display: inline-block; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #fdfdfd; margin-right: 5px; margin-top: 3px; color: #555; }
         
-        /* === ENHANCED ASSIGN BADGE === */
-        .assign-badge { 
-            display: inline-block; 
-            font-size: 0.95rem; 
-            background-color: var(--assign-bg); 
-            color: white; 
-            padding: 4px 10px; 
-            border-radius: 6px; 
-            margin-left: 10px; 
-            vertical-align: middle; 
-            font-weight: 800; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            white-space: nowrap;
-            letter-spacing: 0.5px;
-            border: 1px solid #312e81;
-        }
+        .assign-badge { display: inline-block; font-size: 0.95rem; background-color: var(--assign-bg); color: white; padding: 4px 10px; border-radius: 6px; margin-left: 10px; vertical-align: middle; font-weight: 800; box-shadow: 0 2px 4px rgba(0,0,0,0.3); white-space: nowrap; letter-spacing: 0.5px; border: 1px solid #312e81; }
 
         .action-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .btn-icon { background: none; border: 1px solid transparent; cursor: pointer; font-size: 1.2rem; padding: 2px 6px; color: #9ca3af; border-radius: 4px; }
@@ -147,7 +154,7 @@
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
 
-        /* Client Search */
+        /* Client Search Styles */
         .cust-header { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .cust-search-bar { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
         .btn-google-form { background: #4285F4; color: white; padding: 10px 15px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border:none; cursor:pointer;}
@@ -190,6 +197,7 @@
         /* User List and Settings Styles */
         .user-list, .settings-list, .assign-list { list-style: none; padding: 0; margin: 0; }
         .user-item { display: flex; flex-direction: column; padding: 15px; border: 1px solid #eee; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; }
+        .user-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .user-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
         .user-role-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; margin-left: 8px; border: 1px solid #ddd; font-weight: 500; }
@@ -224,6 +232,55 @@
             .fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 28px; }
             .cust-header { flex-direction: column; align-items: stretch; }
         }
+
+        /* --- PURCHASING SYSTEM STYLES (SCOPED) --- */
+        #purchaseView .pur-toolbar-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px;}
+        #purchaseView .pur-toolbar-left { display: flex; gap: 10px; align-items: center; }
+        #purchaseView .pur-btn-base { border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; transition: 0.2s; }
+        #purchaseView .pur-btn-lg { padding: 10px 20px; font-size: 15px; }
+        #purchaseView .pur-btn-sm { padding: 6px 12px; font-size: 13px; color: white; white-space: nowrap; }
+        
+        #purchaseView .pur-btn-add { background-color: #e67e22; color: white; } #purchaseView .pur-btn-add:hover { background-color: #d35400; }
+        #purchaseView .pur-btn-filter { background-color: #34495e; color: white; } #purchaseView .pur-btn-filter:hover { background-color: #2c3e50; }
+        #purchaseView .pur-btn-action { background-color: #3498db; color:white; } #purchaseView .pur-btn-action:hover { background-color: #2980b9; }
+        #purchaseView .pur-btn-final { background-color: #27ae60; color:white; } #purchaseView .pur-btn-final:hover { background-color: #219150; }
+        #purchaseView .pur-btn-modify { background-color: #f39c12; color:white; } #purchaseView .pur-btn-modify:hover { background-color: #d68910; }
+        #purchaseView .pur-btn-delete { background-color: #c0392b; color:white; } #purchaseView .pur-btn-delete:hover { background-color: #a93226; }
+        #purchaseView .pur-btn-restore { background-color: #2ecc71; color:white; } #purchaseView .pur-btn-restore:hover { background-color: #27ae60; }
+        #purchaseView .pur-btn-revert { background-color: #7f8c8d; color:white; } #purchaseView .pur-btn-revert:hover { background-color: #616a6b; }
+
+        #purchaseView table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        #purchaseView th { background-color: #2c3e50; color: white; padding: 12px; text-align: center; white-space: nowrap; border: 1px solid #ddd;}
+        #purchaseView td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: middle; background:white; }
+        #purchaseView tr:nth-child(even) td { background-color: #fcfcfc; }
+        
+        #purchaseView .pur-badge { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; padding:5px; }
+        #purchaseView .st-new { background-color: #95a5a6; } 
+        #purchaseView .st-pur { background-color: #17a2b8; } 
+        #purchaseView .st-sap { background-color: #6f42c1; } 
+        #purchaseView .st-ordered { background-color: #28a745; } 
+        #purchaseView .st-cancel { background-color: #d63031; }
+        
+        #purchaseView .row-cancelled { color: #aaa !important; background-color: #f0f0f0 !important; }
+        #purchaseView .row-cancelled td { background-color: #f0f0f0 !important; color: #aaa !important;}
+        #purchaseView .row-cancelled strong { text-decoration: line-through; }
+        
+        .pur-active-filter { background: #dff9fb; color: #22a6b3; padding: 5px 10px; border-radius: 15px; font-size: 12px; margin-left: 10px; display: none;}
+        
+        /* Tooltip for logs */
+        .tooltip-container { position: relative; display: inline-block; cursor: pointer; color: #555; font-size: 18px; }
+        .tooltip-container .tooltip-text { visibility: hidden; width: 300px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; top: -10px; left: 120%; opacity: 0; transition: opacity 0.3s; font-size: 12px; line-height: 1.5; white-space: pre-wrap; box-shadow: 2px 2px 10px rgba(0,0,0,0.3); }
+        .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+        /* BATCH BUTTONS & INPUTS */
+        .pur-btn-add { background-color: #38bdf8 !important; color: white; font-size: 14px; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; }
+        .pur-btn-add:hover { background-color: #0ea5e9 !important; }
+        
+        .pur-batch-field { width: 100% !important; display: block; margin-bottom: 10px; }
+        
+        .pur-input-group { margin-bottom: 15px; text-align: left; }
+        .pur-input-group label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
+        .pur-input-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -258,6 +315,7 @@
         </div>
 
         <div class="sidebar-scroll">
+            <div class="admin-btn btn-purchase" id="purchaseBtn" onclick="switchTab('purchase')" style="display:none;">📦 QIAGEN 採購進度</div>
             <div class="admin-btn btn-perm" id="adminPanelBtn" onclick="openUserModal()">👥 成員權限管理</div>
             <div class="admin-btn btn-settings" id="salesSettingsBtn" onclick="openSalesSettings()">⚙️ 標籤選單後台設定</div>
             <div class="admin-btn btn-assign-settings" id="assignSettingsBtn" onclick="openAssignSettingsModal()">👤 指派任務帳號設定</div>
@@ -314,6 +372,37 @@
                 <div style="grid-column: 1/-1; text-align:center; color:#9ca3af; margin-top:50px;">請輸入關鍵字開始查詢</div>
             </div>
         </div>
+
+        <div id="purchaseView" class="view-section">
+            <header>
+                 <h1>中區 QIAGEN 採購流程進度表</h1>
+                 <div class="pur-toolbar-row">
+                    <div class="pur-toolbar-left">
+                        <button class="pur-btn-base pur-btn-lg" style="background:#e67e22;color:white;" onclick="PurchaseController.openModal('add')">➕ 新增採購</button>
+                        <button class="pur-btn-base pur-btn-lg" style="background:#34495e;color:white;" onclick="PurchaseController.openModal('filter')">⚡ 篩選條件</button>
+                        <span id="purActiveFilterDisplay" class="pur-active-filter"></span>
+                    </div>
+                    <div>
+                        <input type="text" id="purSearchInput" class="cust-search-bar" style="width:250px;" placeholder="🔎 搜尋單號..." onkeyup="PurchaseController.renderTable()">
+                    </div>
+                 </div>
+            </header>
+            <table id="purchaseTable">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">建立日期</th>
+                        <th style="width: 50px;">紀錄</th>
+                        <th style="width: 140px;">訂單/庫存編號</th>
+                        <th>PUR 單號資訊</th>
+                        <th>SAP 單號資訊</th>
+                        <th>最終下單確認</th>
+                        <th style="width: 120px;">狀態</th>
+                        <th style="width: 240px;">執行操作</th>
+                    </tr>
+                </thead>
+                <tbody id="purTableBody"></tbody>
+            </table>
+        </div>
     </main>
 </div>
 
@@ -351,8 +440,26 @@
     </div>
 </div>
 
+<div id="purModal" class="modal-overlay">
+    <div class="modal-card" style="width: 500px;">
+        <h3 id="purModalTitle" style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+            <span>標題</span>
+            <div id="purBatchBtnContainer" style="display:none; gap:5px;">
+                <button class="pur-btn-add" onclick="PurchaseController.addBatchInputs(1)">+1</button>
+                <button class="pur-btn-add" onclick="PurchaseController.addBatchInputs(5)">+5</button>
+                <button class="pur-btn-add" onclick="PurchaseController.addBatchInputs(10)">+10</button>
+            </div>
+        </h3>
+        <div id="purModalBody" style="max-height:60vh; overflow-y:auto; margin-bottom:15px;"></div>
+        <div style="text-align:right; border-top:1px solid #eee; padding-top:10px;">
+            <button class="btn btn-cancel" onclick="document.getElementById('purModal').style.display='none'">取消</button>
+            <button class="btn btn-save" id="purModalConfirmBtn">確認</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    // --- FIREBASE CONFIGURATION ---
+    // --- MAIN FIREBASE (Firestore) ---
     const firebaseConfig = {
       apiKey: "AIzaSyBPcmgaT4f3nfyJrJOXnAeYCwH19SwZvCA",
       authDomain: "tasktrack-app-206f8.firebaseapp.com",
@@ -365,8 +472,20 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    // --- PURCHASE FIREBASE (Realtime Database) ---
+    const purchaseConfig = {
+      apiKey: "AIzaSyDhbjXi1MoVPt2-yIOsB-OZFUtQsqtYvBs",
+      authDomain: "realtime-database-ea408.firebaseapp.com",
+      databaseURL: "https://realtime-database-ea408-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "realtime-database-ea408",
+      storageBucket: "realtime-database-ea408.firebasestorage.app",
+      messagingSenderId: "434463345733",
+      appId: "1:434463345733:web:1a60ba14b33cf602d7272c"
+    };
+    const purchaseApp = firebase.initializeApp(purchaseConfig, "purchaseApp");
+    const rtdb = purchaseApp.database();
+
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
-    // ⚠️ 您的 API 網址 (請確認後端已更新為讀取 building/floor 分開的版本)
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw9sCxtJ-rcRLdkwwGJgBCUCKxCFXujD4Ciq_fJxFqbly4Wldb-9nTSE5kqTst16hKg2Q/exec";
 
     let state = {
@@ -383,18 +502,29 @@
     /* --- TAB SWITCHING --- */
     function switchTab(tab) {
         state.activeTab = tab;
-        document.getElementById('taskView').classList.remove('active'); document.getElementById('customerView').classList.remove('active');
+        document.getElementById('taskView').classList.remove('active'); 
+        document.getElementById('customerView').classList.remove('active');
+        document.getElementById('purchaseView').classList.remove('active'); // Hide Purchase
+        
         document.getElementById('btnTabTasks').className = `sidebar-btn ${tab==='tasks'?'btn-nav-active':'btn-nav-inactive'}`;
         document.getElementById('btnTabCustomers').className = `sidebar-btn ${tab==='customers'?'btn-nav-active':'btn-nav-inactive'}`;
+        const pBtn = document.getElementById('purchaseBtn');
+        if(pBtn) pBtn.className = `admin-btn btn-purchase ${tab==='purchase'?'btn-nav-active':''}`; 
+
         if (tab === 'tasks') {
             document.getElementById('taskView').classList.add('active');
             if(document.getElementById('taskSearchSection')) document.getElementById('taskSearchSection').style.display = 'block'; 
             document.getElementById('taskDateSection').style.display = 'block';
-        } else {
+        } else if (tab === 'customers') {
             document.getElementById('customerView').classList.add('active');
             if(document.getElementById('taskSearchSection')) document.getElementById('taskSearchSection').style.display = 'none'; 
             document.getElementById('taskDateSection').style.display = 'none';
             if(state.customers.length === 0) fetchCustomers();
+        } else if (tab === 'purchase') {
+            document.getElementById('purchaseView').classList.add('active');
+            if(document.getElementById('taskSearchSection')) document.getElementById('taskSearchSection').style.display = 'none'; 
+            document.getElementById('taskDateSection').style.display = 'none';
+            PurchaseController.init(); // Init Purchase Data
         }
         if(window.innerWidth <= 768) toggleSidebar();
     }
@@ -414,7 +544,6 @@
             else if (state.currentUser.role !== me.role) { state.currentUser.role = me.role; localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser)); updateUIForRole(); }
         }
     });
-    // Listen for Settings
     db.collection('settings').doc('ngs_sales').onSnapshot(doc => {
         if(doc.exists) state.salesOptions = doc.data().list || ['Jeff', '廖軒逵'];
         else { state.salesOptions = ['Jeff', '廖軒逵']; db.collection('settings').doc('ngs_sales').set({ list: state.salesOptions }); }
@@ -458,14 +587,11 @@
         const val = input.value.trim().toLowerCase();
         list.innerHTML = '';
         list.style.display = 'none';
-        
         if (!val) return;
-
         const matches = state.tasks.filter(t => {
             const rawTitle = t.title ? t.title.replace(/<[^>]+>/g, '') : '';
             return rawTitle.toLowerCase().includes(val);
         });
-
         if (matches.length > 0) {
             list.style.display = 'block';
             matches.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -526,12 +652,17 @@
         if(state.currentUser.role === 'creator') roleName = ' (創世神)'; else if(state.currentUser.role === 'senior') roleName = ' (高級管理者)'; else if(state.currentUser.role === 'admin') roleName = ' (管理者)';
         const dispName = getUserDisplayName(state.currentUser.name);
         document.getElementById('displayUsername').innerText = dispName + roleName; document.getElementById('userAvatar').innerText = dispName[0].toUpperCase();
+        
+        // Show/Hide Purchase Button
+        const canViewPurchase = ['creator', 'senior', 'admin'].includes(state.currentUser.role);
+        document.getElementById('purchaseBtn').style.display = canViewPurchase ? 'block' : 'none';
+
         const canManage = ['creator','senior','admin'].includes(state.currentUser.role);
         const canConfig = ['creator','senior'].includes(state.currentUser.role);
         document.getElementById('adminPanelBtn').style.display = canManage ? 'block' : 'none';
         document.getElementById('statsPanelBtn').style.display = canConfig ? 'block' : 'none';
         document.getElementById('salesSettingsBtn').style.display = canConfig ? 'block' : 'none';
-        document.getElementById('assignSettingsBtn').style.display = canConfig ? 'block' : 'none'; // Separate Btn
+        document.getElementById('assignSettingsBtn').style.display = canConfig ? 'block' : 'none'; 
         document.getElementById('importBtn').style.display = canManage ? 'block' : 'none'; 
     }
 
@@ -561,7 +692,6 @@
             approvedUsers.forEach(u => {
                 const checked = currentAllowed.includes(u.username) ? 'checked' : '';
                 const dName = u.nickname || u.username;
-                // Important: Use data attributes for easier selection to avoid character escaping issues
                 checkboxes += `<label class="assign-check-item"><input type="checkbox" class="assign-checkbox" data-cat="${cat}" data-user="${u.username}" ${checked}> ${dName}</label>`;
             });
 
@@ -574,7 +704,6 @@
     function saveAssignmentRules() {
         const newRules = {};
         ORDERED_CATEGORIES.forEach(cat => {
-            // Select checkboxes for this specific category that are checked
             const checkedBoxes = Array.from(document.querySelectorAll(`.assign-checkbox[data-cat="${cat}"]:checked`));
             newRules[cat] = checkedBoxes.map(cb => cb.getAttribute('data-user'));
         });
@@ -681,15 +810,18 @@
 
     /* --- USER MANAGEMENT --- */
     function openUserModal() {
+        renderUserList(); 
+        document.getElementById('userModal').style.display = 'flex';
+    }
+
+    function renderUserList() {
         const list = document.getElementById('userListDisplay'); 
-        const myRole = state.currentUser ? state.currentUser.role : 'user'; 
+        if(!list) return; 
         const filterRole = document.getElementById('userFilterSelect') ? document.getElementById('userFilterSelect').value : 'all'; 
         
         list.innerHTML = '';
         
-        // Sorting Logic: Creator > Senior > Admin > User > Pending
         const roleOrder = { 'creator': 0, 'senior': 1, 'admin': 2, 'user': 3, 'pending': 4 };
-        
         let displayUsers = [...state.users];
         displayUsers.sort((a,b) => {
             const rA = !a.isApproved ? 4 : (roleOrder[a.role]!==undefined ? roleOrder[a.role] : 3);
@@ -697,7 +829,6 @@
             return rA - rB;
         });
 
-        // Filtering Logic
         if (filterRole !== 'all') {
             if (filterRole === 'pending') {
                 displayUsers = displayUsers.filter(u => !u.isApproved);
@@ -742,9 +873,6 @@
         });
         document.getElementById('userModal').style.display = 'flex';
     }
-    
-    // Alias function for 'renderUserList' as some HTML might call it
-    const renderUserList = openUserModal;
 
     function togglePasswordVisibility(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
     function updateUser(docId) {
@@ -754,7 +882,7 @@
     function deleteUser(docId) { if(confirm('確定要刪除？')) db.collection('users').doc(docId).delete().then(() => renderUserList()); }
     function approveUserSimple(docId) { db.collection('users').doc(docId).update({ isApproved: true }).then(() => alert('已核准')); }
 
-    // --- NGS HELPER FUNCTIONS (The Missing Piece) ---
+    // --- NGS HELPER FUNCTIONS ---
     function handleCategoryChange() { 
         const cat = document.getElementById('inputCategory').value; 
         document.getElementById('ngs-form-container').style.display = (cat === 'NGS收件') ? 'block' : 'none'; 
@@ -776,7 +904,6 @@
         const pi = document.getElementById('ngsPI').value.trim();
         const needs = document.getElementById('ngsNeeds').value;
         let subType = '';
-        
         if (needs === '萃取') {
             const sel = document.getElementById('ngsExpTypeSelect').value;
             subType = (sel === '其他') ? document.getElementById('ngsExpTypeInput').value.trim() : sel;
@@ -784,7 +911,6 @@
             const sel = document.getElementById('ngsNucleicTypeSelect').value;
             subType = (sel === '其他') ? document.getElementById('ngsNucleicTypeInput').value.trim() : sel;
         }
-        
         if (unit && pi && subType) {
             document.getElementById('inputTitle').innerText = `${unit}-${pi}-${subType} 收件`;
         }
@@ -912,6 +1038,228 @@
     function closeModal() { document.getElementById('taskModal').style.display='none'; state.editingTaskId=null; }
     function showHistory(id) { const t = state.tasks.find(x=>x.id===id); if(!t) return; const list = document.getElementById('logList'); list.innerHTML=''; (t.logs||[]).forEach(l => { const d=new Date(l.time); const timeStr=`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes()}`; const userDisp = getUserDisplayName(l.user); list.innerHTML+=`<li class="log-item"><div class="log-time">${timeStr}</div><div class="log-content"><span class="log-user">${userDisp}</span> ${l.desc}</div></li>`; }); document.getElementById('historyModal').style.display='flex'; }
     document.getElementById('taskModal').addEventListener('click', e => { if(e.target.id==='taskModal') closeModal(); });
+    
+    // --- PURCHASE SYSTEM LOGIC (Integrated) ---
+    const PurchaseController = {
+        filterYear: 'All', filterStatus: 'All',
+        init: () => {
+            document.getElementById('purTableBody').innerHTML = '<tr><td colspan="8">資料讀取中...</td></tr>';
+            const ref = rtdb.ref('purchaseOrders');
+            ref.on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (val) {
+                    const list = Object.keys(val).map(key => ({ ...val[key], firebaseKey: key }));
+                    PurchaseService._localData = list.reverse();
+                    PurchaseController.renderTable();
+                } else {
+                    PurchaseService._localData = [];
+                    PurchaseController.renderTable();
+                }
+            });
+        },
+        renderTable: () => {
+            const tbody = document.getElementById('purTableBody');
+            const searchVal = document.getElementById('purSearchInput').value.toUpperCase();
+            const filterDisplay = document.getElementById('purActiveFilterDisplay');
+            if(PurchaseController.filterYear !== 'All' || PurchaseController.filterStatus !== 'All') {
+                filterDisplay.style.display = 'inline-block';
+                filterDisplay.innerText = `篩選: ${PurchaseController.filterYear} / ${PurchaseController.filterStatus}`;
+            } else { filterDisplay.style.display = 'none'; }
+            
+            tbody.innerHTML = '';
+            const data = PurchaseService._localData;
+            if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="color:#888;">無資料</td></tr>'; return; }
+            
+            data.forEach((item, index) => {
+                if (searchVal && !item.id.toUpperCase().includes(searchVal)) return;
+                if (PurchaseController.filterStatus !== "All" && item.status !== PurchaseController.filterStatus) return;
+                if (PurchaseController.filterYear !== "All" && !item.createDate.startsWith(PurchaseController.filterYear)) return;
+                tbody.innerHTML += PurchaseService.createRowHtml(item, index);
+            });
+        },
+        openModal: (action, index) => { PurchaseService.showModal(action, index); },
+        addBatchInputs: (count) => { 
+            const area = document.getElementById('purBatchInputArea');
+            for(let i=0; i<count; i++) {
+                const input = document.createElement('input');
+                input.type = 'text'; input.className = 'modal-input pur-batch-field'; input.placeholder = '例如：A2026-001';
+                area.appendChild(input);
+            }
+        }
+    };
+    
+    const PurchaseService = {
+        _localData: [],
+        createRowHtml: (item, index) => {
+            const isCancelled = (item.status === '採購取消');
+            const rowClass = isCancelled ? "row-cancelled" : "";
+            let badgeClass = "";
+            switch(item.status) {
+                case '新建立': badgeClass = "st-new"; break;
+                case '已填PUR': badgeClass = "st-pur"; break;
+                case '已填SAP': badgeClass = "st-sap"; break;
+                case '已下單': badgeClass = "st-ordered"; break;
+                case '採購取消': badgeClass = "st-cancel"; break;
+                default: badgeClass = "st-new";
+            }
+            let buttonsHtml = "";
+            if (isCancelled) {
+                 buttonsHtml = `<button class="pur-btn-base pur-btn-sm pur-btn-restore" onclick="PurchaseController.openModal('restore', ${index})">♻️ 恢復</button>`;
+            } else {
+                 let mainBtn = "";
+                 if (item.status === '新建立') mainBtn = `<button class="pur-btn-base pur-btn-sm pur-btn-action" onclick="PurchaseController.openModal('fillPur', ${index})">填寫 PUR</button>`;
+                 else if (item.status === '已填PUR') mainBtn = `<button class="pur-btn-base pur-btn-sm pur-btn-action" onclick="PurchaseController.openModal('fillSap', ${index})">填寫 SAP</button>`;
+                 else if (item.status === '已填SAP') mainBtn = `<button class="pur-btn-base pur-btn-sm pur-btn-final" onclick="PurchaseController.openModal('confirmOrder', ${index})">✅ 下單</button>`;
+                 else if (item.status === '已下單') mainBtn = `<button class="pur-btn-base pur-btn-sm pur-btn-revert" onclick="PurchaseController.openModal('revertOrder', ${index})">↩️ 退回</button>`;
+                 
+                 buttonsHtml = `<div style="display:flex;gap:5px;justify-content:center;">${mainBtn}<button class="pur-btn-base pur-btn-sm pur-btn-modify" onclick="PurchaseController.openModal('modify', ${index})">🛠</button><button class="pur-btn-base pur-btn-sm pur-btn-delete" onclick="PurchaseController.openModal('delete', ${index})">🗑️</button></div>`;
+            }
+            const logText = (item.logs || []).join("\n");
+            return `<tr class="${rowClass}"><td>${item.createDate}</td><td><div class="tooltip-container">📝<span class="tooltip-text">${logText}</span></div></td><td><strong>${item.id}</strong></td><td>${item.pur.val||'--'}</td><td>${item.sap.val||'--'}</td><td>${item.ordered.val||'--'}</td><td><div class="pur-badge ${badgeClass}">${item.status}</div></td><td>${buttonsHtml}</td></tr>`;
+        },
+        showModal: (action, index) => {
+            const modal = document.getElementById('purModal');
+            const title = document.getElementById('purModalTitle').querySelector('span');
+            const body = document.getElementById('purModalBody');
+            const btn = document.getElementById('purModalConfirmBtn');
+            const batchBtns = document.getElementById('purBatchBtnContainer');
+            const item = (index !== undefined) ? PurchaseService._localData[index] : null;
+            const currentUser = getUserDisplayName(state.currentUser?.name || 'Unknown');
+            const timeStr = new Date().toLocaleString('zh-TW', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+
+            modal.style.display = 'flex';
+            batchBtns.style.display = 'none';
+            btn.className = "btn btn-save"; 
+
+            if (action === 'add') {
+                title.innerText = "新增採購訂單";
+                batchBtns.style.display = "flex";
+                body.innerHTML = `<div class="modal-label" style="margin-bottom:10px;">輸入編號 (可多筆)：</div><div id="purBatchInputArea"><input type="text" class="modal-input pur-batch-field" placeholder="例如：A2026-001"></div>`;
+                btn.innerText = "確認新增";
+                btn.onclick = () => {
+                    const inputs = document.querySelectorAll('.pur-batch-field');
+                    let count = 0;
+                    inputs.forEach(inp => {
+                        const val = inp.value.trim();
+                        if(val) {
+                            rtdb.ref('purchaseOrders').push({
+                                id: val, createDate: getTodayStr().replace(/-/g,'/'), timestamp: Date.now(),
+                                pur: {val:"", time:""}, sap: {val:"", time:""}, ordered: {val:"", time:""},
+                                status: '新建立', logs: [`${timeStr} - ${currentUser} - 建立訂單 (${val})`]
+                            });
+                            count++;
+                        }
+                    });
+                    if(count>0) modal.style.display='none';
+                };
+            } else if (action === 'fillPur') {
+                title.innerText = "填寫 PUR 單號";
+                body.innerHTML = `<div class="pur-input-group"><label>PUR 單號：</label><input type="text" id="pInput" class="modal-input" value="${item.pur.val}" autofocus></div>`;
+                btn.innerText = "儲存";
+                btn.onclick = () => {
+                    const val = document.getElementById('pInput').value;
+                    if(val) {
+                        const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 填寫PUR: ${val}`];
+                        rtdb.ref('purchaseOrders/'+item.firebaseKey).update({ pur: {val:val, time:timeStr}, status:'已填PUR', logs: newLogs });
+                        modal.style.display='none';
+                    }
+                };
+            } else if (action === 'fillSap') {
+                title.innerText = "填寫 SAP 單號";
+                body.innerHTML = `<div class="pur-input-group"><label>SAP 單號：</label><input type="text" id="pInput" class="modal-input" value="${item.sap.val}" autofocus></div>`;
+                btn.innerText = "儲存";
+                btn.onclick = () => {
+                    const val = document.getElementById('pInput').value;
+                    if(val) {
+                        const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 填寫SAP: ${val}`];
+                        rtdb.ref('purchaseOrders/'+item.firebaseKey).update({ sap: {val:val, time:timeStr}, status:'已填SAP', logs: newLogs });
+                        modal.style.display='none';
+                    }
+                };
+            } else if (action === 'confirmOrder') {
+                title.innerText = "最終確認";
+                body.innerHTML = `<div style="text-align:center; padding:20px; font-size:1.1rem;">確定 <b>${item.id}</b> 已完成下單？</div>`;
+                btn.innerText = "確認下單";
+                btn.onclick = () => {
+                    const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 確認已下單`];
+                    rtdb.ref('purchaseOrders/'+item.firebaseKey).update({ ordered: {val:'已下單', time:timeStr}, status:'已下單', logs: newLogs });
+                    modal.style.display='none';
+                };
+            } else if (action === 'delete') {
+                title.innerText = "刪除確認";
+                body.innerHTML = `<div style="color:#ef4444; font-weight:bold; text-align:center; padding:20px;">確定要刪除 ${item.id} 嗎？</div>`;
+                btn.innerText = "確認刪除";
+                btn.style.backgroundColor = "#ef4444";
+                btn.onclick = () => {
+                    const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 刪除`];
+                    rtdb.ref('purchaseOrders/'+item.firebaseKey).update({ status:'採購取消', logs: newLogs });
+                    modal.style.display='none';
+                };
+            } else if (action === 'restore') {
+                title.innerText = "恢復採購";
+                body.innerHTML = `<div style="color:#10b981; font-weight:bold; text-align:center; padding:20px;">確定恢復 ${item.id}？</div>`;
+                btn.innerText = "恢復";
+                btn.onclick = () => {
+                    let s = '新建立';
+                    if(item.ordered.val) s='已下單'; else if(item.sap.val) s='已填SAP'; else if(item.pur.val) s='已填PUR';
+                    const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 恢復採購`];
+                    rtdb.ref('purchaseOrders/'+item.firebaseKey).update({ status:s, logs: newLogs });
+                    modal.style.display='none';
+                };
+            } else if (action === 'modify') {
+                title.innerText = "修改資料";
+                body.innerHTML = `
+                    <div class="pur-input-group"><label>編號</label><input id="mId" class="modal-input" value="${item.id}"></div>
+                    <div class="pur-input-group"><label>PUR</label><input id="mPur" class="modal-input" value="${item.pur.val}"></div>
+                    <div class="pur-input-group"><label>SAP</label><input id="mSap" class="modal-input" value="${item.sap.val}"></div>
+                `;
+                btn.innerText = "儲存修改";
+                btn.onclick = () => {
+                    const nId = document.getElementById('mId').value;
+                    const nPur = document.getElementById('mPur').value;
+                    const nSap = document.getElementById('mSap').value;
+                    const changes = [];
+                    if(nId!==item.id) changes.push(`ID: ${item.id}->${nId}`);
+                    if(nPur!==item.pur.val) changes.push(`PUR: ${item.pur.val}->${nPur}`);
+                    if(nSap!==item.sap.val) changes.push(`SAP: ${item.sap.val}->${nSap}`);
+                    if(changes.length>0) {
+                        const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 修改: ${changes.join(',')}`];
+                        rtdb.ref('purchaseOrders/'+item.firebaseKey).update({
+                            id: nId, pur: {...item.pur, val:nPur}, sap: {...item.sap, val:nSap}, logs: newLogs
+                        });
+                    }
+                    modal.style.display='none';
+                };
+            } else if (action === 'revertOrder') {
+                title.innerText = "取消下單";
+                body.innerHTML = `<div style="text-align:center; padding:20px;">確定將 ${item.id} 退回未下單狀態？</div>`;
+                btn.innerText = "確認退回";
+                btn.onclick = () => {
+                    let s = '新建立';
+                    if(item.sap.val) s='已填SAP'; else if(item.pur.val) s='已填PUR';
+                    const newLogs = [...(item.logs||[]), `${timeStr} - ${currentUser} - 退回下單狀態`];
+                    rtdb.ref('purchaseOrders/'+item.firebaseKey).update({ ordered:{val:'', time:''}, status:s, logs: newLogs });
+                    modal.style.display='none';
+                };
+            } else if (action === 'filter') {
+                title.innerText = "篩選條件";
+                body.innerHTML = `
+                    <div class="pur-input-group"><label>年度</label><select id="pfYear" class="modal-select"><option value="All">全部</option><option value="2025">2025</option><option value="2026">2026</option></select></div>
+                    <div class="pur-input-group"><label>狀態</label><select id="pfStatus" class="modal-select"><option value="All">全部</option><option value="新建立">新建立</option><option value="已填PUR">已填PUR</option><option value="已填SAP">已填SAP</option><option value="已下單">已下單</option><option value="採購取消">採購取消</option></select></div>
+                `;
+                document.getElementById('pfYear').value = PurchaseController.filterYear;
+                document.getElementById('pfStatus').value = PurchaseController.filterStatus;
+                btn.innerText = "套用";
+                btn.onclick = () => {
+                    PurchaseController.filterYear = document.getElementById('pfYear').value;
+                    PurchaseController.filterStatus = document.getElementById('pfStatus').value;
+                    PurchaseController.renderTable();
+                    modal.style.display='none';
+                };
+            }
+        }
+    };
 </script>
 </body>
 </html>
+
