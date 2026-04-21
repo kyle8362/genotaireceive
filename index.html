@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v71 Final Stable)</title>
+    <title>中區收送件進度追蹤系統 (v74 Final Stable)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -126,6 +126,13 @@
         .ngs-badge { display: inline-block; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #fdfdfd; margin-right: 5px; margin-top: 3px; color: #555; }
         
         .assign-badge { display: inline-block; font-size: 0.95rem; background-color: var(--assign-bg); color: white; padding: 4px 10px; border-radius: 6px; margin-left: 10px; vertical-align: middle; font-weight: 800; box-shadow: 0 2px 4px rgba(0,0,0,0.3); white-space: nowrap; letter-spacing: 0.5px; border: 1px solid #312e81; }
+
+        /* v72: 客戶地址自動配對 badge */
+        .loc-badge { display: inline-block; font-size: 0.8rem; padding: 3px 8px; border-radius: 4px; margin-top: 6px; margin-right: 5px; font-weight: 500; cursor: pointer; border: 1px solid transparent; white-space: nowrap; user-select: none; }
+        .loc-badge:hover { filter: brightness(0.95); }
+        .loc-badge-high { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .loc-badge-med  { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+        .loc-badge-none { background: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
 
         .action-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .btn-icon { background: none; border: 1px solid transparent; cursor: pointer; font-size: 1.2rem; padding: 2px 6px; color: #9ca3af; border-radius: 4px; }
@@ -510,6 +517,110 @@
     function toggleSidebar() { document.querySelector('aside').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('active'); }
     function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => alert("已複製通知內容！")).catch(err => prompt("請手動複製:", text)); }
 
+    // --- v74: 客戶地址自動配對 ---
+    // 配對順序：1) PI 姓名精準 2) 單位名前 2 字（支援簡寫、多筆同地址）
+    const LOC_MATCH_CATEGORIES = ["定序收件", "引子送件"];
+
+    function escAttr(s) {
+        return (s == null ? '' : String(s))
+            .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+    }
+
+    function findMatchingCustomer(task) {
+        if (!state.customers || !state.customers.length) return null;
+        const text = (task.title || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
+
+        // 1. PI 姓名【】精準配對：恰好一筆 customer.name 或 contact 相符
+        const names = [...text.matchAll(/【([^】]+)】/g)]
+            .map(m => m[1].trim())
+            .filter(s => s && !/^\d+$/.test(s) && s.length >= 2);
+        for (const name of names) {
+            const candidates = state.customers.filter(c =>
+                (c.name && c.name.includes(name)) || (c.contact && c.contact.includes(name))
+            );
+            if (candidates.length === 1) return { customer: candidates[0], confidence: 'medium' };
+        }
+
+        // 2. 單位名 fallback：抓 title 第一個中文詞的前 2 字當 key
+        //    - 1 筆符合 → 用它
+        //    - 多筆：在這些候選人中，再用 title 內的聯絡人姓名 token 精準篩
+        //      例：「茂盛醫院 / 銷貨單給陳怡君」→ 多筆茂盛醫院-XXX → 用「陳怡君」挑出 茂盛醫院-陳怡君
+        //    - 還是多筆且全部同地址 → 用第一筆
+        //    - 多筆不同地址且無法精準篩 → 跳過（不亂猜）
+        const firstWord = (text.match(/[\u4e00-\u9fff]{2,}/) || [])[0];
+        if (firstWord) {
+            const key = firstWord.substring(0, 2);
+            const unitCandidates = state.customers.filter(c =>
+                (c.unit && c.unit.includes(key)) || (c.name && c.name.includes(key))
+            );
+            if (unitCandidates.length === 1) {
+                return { customer: unitCandidates[0], confidence: 'medium' };
+            }
+            if (unitCandidates.length > 1) {
+                // 在單位 候選人中，用 title 內 2-4 字中文 token 精準配對 name / contact
+                const tokens = text.match(/[\u4e00-\u9fff]{2,4}/g) || [];
+                for (const token of tokens) {
+                    if (token.includes(key)) continue; // 跳過單位 key 本身
+                    const refined = unitCandidates.filter(c =>
+                        (c.name && c.name.includes(token)) || (c.contact && c.contact.includes(token))
+                    );
+                    if (refined.length === 1) return { customer: refined[0], confidence: 'medium' };
+                }
+                // 無法精準篩 → 看是否全部同地址
+                const first = unitCandidates[0];
+                const sameAddr = unitCandidates.every(c =>
+                    (c.building || '') === (first.building || '') &&
+                    (c.floor || '') === (first.floor || '')
+                );
+                if (sameAddr) return { customer: first, confidence: 'medium' };
+            }
+        }
+
+        return null;
+    }
+
+    function renderLocationBadge(task) {
+        const match = findMatchingCustomer(task);
+        if (!match) {
+            const text = (task.title || '').replace(/<[^>]+>/g, ' ');
+            const firstName = (text.match(/【([^】\d]+)】/) || ['', ''])[1].trim();
+            return `<span class="loc-badge loc-badge-none" onclick="openCustomerFromTask(event, '${escAttr(firstName)}')">📍 查位置</span>`;
+        }
+        const c = match.customer;
+        const locStr = [c.building, c.floor].filter(Boolean).join(' ') || (c.name || c.unit || '位置');
+        const tooltip = [
+            c.unit ? '單位：' + c.unit : '',
+            c.name ? '主持人：' + c.name : '',
+            (c.building || c.floor) ? '位置：' + [c.building, c.floor].filter(Boolean).join(' ') : '',
+            c.contact ? '聯絡：' + c.contact : '',
+            c.phone ? '電話：' + c.phone : '',
+            c.note ? '備註：' + c.note : ''
+        ].filter(Boolean).join('\n');
+        // v73: PI 配對已驗證準確，統一綠色 badge 不加問號
+        const searchKey = c.name || c.contact || c.unit || '';
+        return `<span class="loc-badge loc-badge-high" title="${escAttr(tooltip)}" onclick="openCustomerFromTask(event, '${escAttr(searchKey)}')">📍 ${escAttr(locStr)}</span>`;
+    }
+
+    async function openCustomerFromTask(evt, searchKey) {
+        if (evt && evt.stopPropagation) evt.stopPropagation();
+        switchTab('customers');
+        if (!state.customers || state.customers.length === 0) {
+            try { await fetchCustomers(); } catch(e) {}
+        }
+        const input = document.getElementById('custSearchInput');
+        if (input) { input.value = searchKey || ''; handleCustomerSearch(); }
+    }
+
+    async function preloadCustomers() {
+        if (state.customers && state.customers.length) return;
+        try {
+            const res = await fetch(GAS_API_URL);
+            state.customers = await res.json();
+            if (state.activeTab === 'tasks') renderTasks();
+        } catch (e) { console.warn('客戶資料預載失敗:', e); }
+    }
+
     // --- Task Rendering Core (MUST be defined before listeners) ---
     function createTaskElement(task, isOverdue = false) {
         const div = document.createElement('div'); div.className = `task-item ${isOverdue?'overdue-item':''} ${task.completed?'completed-item':''} ${task.isDeleted?'deleted-item':''}`;
@@ -537,8 +648,12 @@
             else { const encodedText = encodeURIComponent(lineText); rightButtonsHtml += `<a href="https://line.me/R/share?text=${encodedText}" target="_blank" class="btn-icon btn-line" style="text-decoration:none;" title="LINE通知">💬</a>`; }
         }
         let assignedBadge = task.assignedTo ? `<span class="assign-badge">${getUserDisplayName(task.assignedTo)}</span>` : '';
+        let locBadgeHtml = '';
+        if (!task.isDeleted && LOC_MATCH_CATEGORIES.includes(task.category)) {
+            locBadgeHtml = renderLocationBadge(task);
+        }
         const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
-        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title} ${assignedBadge}</div>${ngsInfoHtml}${metaHtml}</div><div class="action-area">${rightButtonsHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
+        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title} ${assignedBadge}</div>${locBadgeHtml}${ngsInfoHtml}${metaHtml}</div><div class="action-area">${rightButtonsHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
         return div;
     }
 
@@ -1383,9 +1498,12 @@
         if(doc.exists) state.salesOptions = doc.data().list || ['Jeff', '廖軒逵'];
         else { state.salesOptions = ['Jeff', '廖軒逵']; db.collection('settings').doc('ngs_sales').set({ list: state.salesOptions }); }
     });
-    db.collection('settings').doc('assignment_rules').onSnapshot(doc => { 
-        state.assignmentRules = doc.exists ? doc.data() : {}; 
+    db.collection('settings').doc('assignment_rules').onSnapshot(doc => {
+        state.assignmentRules = doc.exists ? doc.data() : {};
     });
+
+    // v72: 預載客戶資料，供任務地址自動配對
+    preloadCustomers();
 
 </script>
 </body>
