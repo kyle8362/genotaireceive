@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v74 Final Stable)</title>
+    <title>中區收送件進度追蹤系統 (v75 Final Stable)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -677,7 +677,41 @@
             const pct = all.length===0?0:Math.round((all.filter(t=>t.completed).length/all.length)*100);
             const group = document.createElement('div'); group.className = 'category-group';
             group.innerHTML = `<div class="category-header-row"><div class="cat-title">${cat} <span class="badge-count">${active.length}</span></div><div style="font-size:0.8rem; color:#6b7280; font-weight:600;">${pct}%</div></div><div class="cat-progress-track"><div class="cat-progress-fill" style="width: ${pct}%"></div></div>`;
-            if (active.length > 0) active.forEach(t => group.appendChild(createTaskElement(t))); else group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
+            if (active.length > 0) {
+                let ordered = active;
+                if (cat === '定序收件') {
+                    // 解析每筆：
+                    //   idnum = title 第 1 行 【 之前
+                    //   unit  = title 第 2 行 → 去掉【主持人】、聯絡人後再切到「—／－」前的學校/機構名
+                    //           (例：國立中興大學—生物科技學研究所【楊長賢】 包秀晨 → 國立中興大學)
+                    const parsed = active.map(t => {
+                        const lines = (t.title || '').split('<br>');
+                        const idnum = (lines[0] || '').split('【')[0].trim();
+                        const line2 = (lines[1] || '').trim();
+                        const bIdx = line2.indexOf('【');
+                        let unit;
+                        if (bIdx > 0) unit = line2.substring(0, bIdx).trim();
+                        else { const sp = line2.lastIndexOf(' '); unit = sp > 0 ? line2.substring(0, sp).trim() : line2; }
+                        // 再切到「—」或「－」前，留學校/機構名
+                        const dashIdx = unit.search(/[—－]/);
+                        if (dashIdx > 0) unit = unit.substring(0, dashIdx).trim();
+                        return { t, idnum, unit };
+                    });
+                    // 群組之間以該 unit 的最大 idnum 降冪；群組內以 idnum 降冪
+                    const unitMax = new Map();
+                    parsed.forEach(p => { if (!unitMax.has(p.unit) || p.idnum > unitMax.get(p.unit)) unitMax.set(p.unit, p.idnum); });
+                    parsed.sort((a, b) => {
+                        const ua = unitMax.get(a.unit), ub = unitMax.get(b.unit);
+                        if (ua !== ub) return ub.localeCompare(ua);
+                        if (a.unit !== b.unit) return a.unit.localeCompare(b.unit);
+                        return b.idnum.localeCompare(a.idnum);
+                    });
+                    ordered = parsed.map(p => p.t);
+                }
+                ordered.forEach(t => group.appendChild(createTaskElement(t)));
+            } else {
+                group.innerHTML += `<div style="font-size:0.9rem; color:#d1d5db; padding-left:10px; margin-bottom:10px;">無待辦事項</div>`;
+            }
             container.appendChild(group);
         });
         const completedTasks = dayTasks.filter(t => t.completed && !t.isDeleted);
