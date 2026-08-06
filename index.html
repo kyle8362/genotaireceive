@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v81 Modular)</title>
+    <title>中區收送件進度追蹤系統 (v82 Modular · 讀取優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -71,6 +71,11 @@
         input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text-main); box-sizing: border-box; font-family: inherit; }
 
         .search-box { position: relative; margin-bottom: 20px; }
+        .search-range-select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; margin-bottom: 6px; background: white; color: var(--text-main); font-family: inherit; }
+        #searchCustomRange input[type="date"] { font-size: 0.85rem; padding: 6px; }
+        .search-range-hint { font-size: 0.75rem; color: #9ca3af; line-height: 1.5; margin-top: -14px; margin-bottom: 16px; }
+        .search-range-hint.loading { color: var(--primary); }
+        #taskWarnBanner { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; padding: 12px 14px; margin-bottom: 1.5rem; font-size: 0.9rem; line-height: 1.7; max-width: 900px; }
         .search-box input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 0.9rem; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 6px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .search-item { padding: 10px; font-size: 0.85rem; border-bottom: 1px solid #f3f4f6; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
@@ -186,6 +191,14 @@
         .stat-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
         .stat-fill { height: 100%; background: var(--primary); }
 
+        /* ---------- 維護模式畫面 ---------- */
+        #maintenance-screen { position: fixed; inset: 0; background: var(--bg); z-index: 3000; display: flex; justify-content: center; align-items: center; padding: 1.5rem; }
+        #maintenance-screen .mt-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); max-width: 460px; width: 100%; padding: 2.5rem 2rem; text-align: center; }
+        #maintenance-screen .mt-icon { font-size: 3rem; line-height: 1; margin-bottom: 1rem; }
+        #maintenance-screen .mt-title { font-size: 1.35rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem; }
+        #maintenance-screen .mt-detail { font-size: 0.95rem; color: var(--text-light); line-height: 1.8; }
+        #maintenance-screen .mt-foot { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--border); font-size: 0.8rem; color: #9ca3af; }
+
         @media (max-width: 768px) {
             #mobile-menu-btn { display: block; }
             #sidebar-overlay { display: none; }
@@ -242,10 +255,21 @@
 
             <div class="sidebar-section" id="taskSearchSection">
                 <h3>🔍 搜尋任務</h3>
+                <select id="searchRangeSelect" class="search-range-select" onchange="window.handleSearchRangeChange()">
+                    <option value="7">近 7 天</option>
+                    <option value="15">近 15 天</option>
+                    <option value="30" selected>近 30 天</option>
+                    <option value="custom">自訂區間 (最多 30 天)</option>
+                </select>
+                <div id="searchCustomRange" style="display:none;">
+                    <input type="date" id="searchStartDate" onchange="window.handleSearchRangeChange()">
+                    <input type="date" id="searchEndDate" onchange="window.handleSearchRangeChange()" style="margin-top:4px;">
+                </div>
                 <div class="search-box">
                     <input type="text" id="searchTaskInput" placeholder="輸入關鍵字..." oninput="window.handleSearch()">
                     <ul class="search-results" id="searchResults"></ul>
                 </div>
+                <div id="searchRangeHint" class="search-range-hint"></div>
             </div>
 
             <div class="sidebar-section" id="taskDateSection">
@@ -270,6 +294,7 @@
                     <div class="progress-track"><div class="progress-fill" id="overallProgressBar" style="width: 0%"></div></div>
                 </div>
             </header>
+            <div id="taskWarnBanner" style="display:none;"></div>
             <div class="task-container" id="taskListContainer"></div>
             <button class="fab" onclick="window.openModal()">+</button>
         </div>
@@ -324,6 +349,16 @@
      ===================================================================== -->
 <script>
     // ==========================================
+    // 0. 維護模式開關（Beta 站關站用）
+    //    true  = 關站：顯示維護畫面，不連線資料庫、不還原登入、不載入模組
+    //    false = 正常開放
+    //    Beta 站請設 true；正式站保持 false
+    // ==========================================
+    const MAINTENANCE_MODE   = false;
+    const MAINTENANCE_TITLE  = '系統暫停使用';
+    const MAINTENANCE_DETAIL = '本站為測試環境，目前未開放。<br>如需使用請改用正式版網址，或聯絡系統管理員。';
+
+    // ==========================================
     // 1. FIREBASE INIT (主資料庫：任務、使用者、設定)
     // ==========================================
     const firebaseConfig = {
@@ -340,11 +375,27 @@
     try { mainApp = firebase.app("mainApp"); } catch(e) { mainApp = firebase.initializeApp(firebaseConfig, "mainApp"); }
     const db = mainApp.firestore();
 
+    // 開啟本機持久化快取（必須在任何讀寫之前呼叫）
+    // 效果：onSnapshot 重新建立時會帶 resume token 從本機續傳，
+    //       只有「上次之後真正變動過的文件」才會計費。
+    // 失敗情境（多分頁不支援、無痕模式、瀏覽器不支援）一律靜默忽略，功能不受影響。
+    db.enablePersistence({ synchronizeTabs: true })
+      .then(() => console.info('[Firestore] 本機持久化已啟用'))
+      .catch(e => console.warn('[Firestore] 本機持久化未啟用（不影響功能）:', e.code || e.message));
+
     // ==========================================
     // 2. GLOBAL STATE
     // ==========================================
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw9sCxtJ-rcRLdkwwGJgBCUCKxCFXujD4Ciq_fJxFqbly4Wldb-9nTSE5kqTst16hKg2Q/exec";
+
+    // ---------- Firestore 讀取成本控制設定 ----------
+    const SEARCH_MAX_RANGE_DAYS = 30;   // 自訂搜尋區間上限（天）
+    const STATS_WARN_DAYS       = 92;   // 統計區間超過此天數會先提示
+    const PURGE_AFTER_DAYS      = 365;  // 自動清除多久以前的任務（天）
+    const PURGE_BATCH           = 300;  // 每批刪除筆數（Firestore batch 上限 500）
+    const PURGE_MAX_ROUNDS      = 10;   // 單次執行最多幾批，避免一次跑太久
+    const PURGE_CONFIRM         = true; // true=刪除前先詢問；false=靜默自動刪除
 
     let state = {
         currentUser: null, currentDate: new Date().toISOString().split('T')[0], activeTab: 'tasks',
@@ -353,10 +404,30 @@
     };
     let assigningTaskId = null;
 
+    // 任務訂閱：拆成「當日」與「先前未完成」兩個窄範圍查詢
+    let dayTaskDocs = [];        // where('date','==',currentDate)
+    let overdueTaskDocs = [];    // where('completed','==',false).where('date','<',currentDate)
+    let unsubDayTasks = null;
+    let unsubOverdueTasks = null;
+
+    // 搜尋用的一次性資料快取，key = "起日|迄日"
+    let searchCache = {};
+    let searchFetching = null;
+
     // ==========================================
     // 3. 共用工具
     // ==========================================
     function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+
+    // 日期字串工具（皆使用 YYYY-MM-DD，字串比較即等於日期比較）
+    function shiftDateStr(dateStr, days) {
+        const d = new Date(dateStr + 'T00:00:00');
+        d.setDate(d.getDate() + days);
+        return d.toISOString().split('T')[0];
+    }
+    function daysBetween(a, b) {
+        return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+    }
     function formatDoc(cmd, value) { document.execCommand(cmd, false, value); document.getElementById('inputTitle').focus(); }
     function getUserDisplayName(username) { const u = state.users.find(x => x.username === username); return (u && u.nickname) ? u.nickname : username; }
     function toggleSidebar() { document.querySelector('aside').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('active'); }
@@ -473,7 +544,10 @@
         mountModal(html) { document.getElementById('module-mount-modals').insertAdjacentHTML('beforeend', html); },
         injectStyle(css) { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); },
 
-        boot() { bootApp(); }
+        boot() {
+            if (MAINTENANCE_MODE) { showMaintenanceScreen(); return; }
+            bootApp();
+        }
     };
 
     // ==========================================
@@ -603,6 +677,70 @@
         }
     }
 
+    // ==========================================
+    // 5-1. 任務訂閱（窄範圍）
+    //   原本：db.collection('tasks').onSnapshot()  → 每次載入讀取整個 collection
+    //   現在：拆成兩個查詢，只訂閱畫面真正需要的資料
+    //     A. 當日任務   where('date','==',currentDate)
+    //     B. 先前未完成 where('completed','==',false).where('date','<',currentDate)
+    //   合併後寫回 state.tasks，因此 renderTasks 與任務 CRUD 完全不需修改。
+    // ==========================================
+    function mergeTaskDocs() {
+        // A 與 B 的日期條件互斥（== 與 <），不會重複
+        state.tasks = dayTaskDocs.concat(overdueTaskDocs);
+        if (state.activeTab === 'tasks') renderTasks();
+        AppCore.emit('tasks:changed', state.tasks);
+    }
+
+    function showTaskWarning(html) {
+        const el = document.getElementById('taskWarnBanner');
+        if (!el) return;
+        if (!html) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        el.style.display = 'block';
+        el.innerHTML = html;
+    }
+
+    function subscribeTasksForDate(dateStr) {
+        if (unsubDayTasks) { unsubDayTasks(); unsubDayTasks = null; }
+        if (unsubOverdueTasks) { unsubOverdueTasks(); unsubOverdueTasks = null; }
+        dayTaskDocs = [];
+        overdueTaskDocs = [];
+
+        // A. 當日任務（含已完成、已刪除，供「已完成項目」「被刪除項目」區塊使用）
+        unsubDayTasks = db.collection('tasks')
+            .where('date', '==', dateStr)
+            .onSnapshot(snap => {
+                dayTaskDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                mergeTaskDocs();
+            }, err => {
+                console.error('[tasks/day] 訂閱失敗:', err);
+                showTaskWarning('⚠️ 當日任務讀取失敗：' + (err.message || err.code) +
+                    '<br>請重新整理頁面；若持續發生請聯絡系統管理員。');
+            });
+
+        // B. 先前未完成（此查詢需要 completed + date 的複合索引，見 README）
+        unsubOverdueTasks = db.collection('tasks')
+            .where('completed', '==', false)
+            .where('date', '<', dateStr)
+            .onSnapshot(snap => {
+                overdueTaskDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                showTaskWarning('');
+                mergeTaskDocs();
+            }, err => {
+                console.error('[tasks/overdue] 訂閱失敗:', err);
+                overdueTaskDocs = [];
+                mergeTaskDocs();
+                if (String(err.code) === 'failed-precondition' || /index/i.test(err.message || '')) {
+                    showTaskWarning('⚠️ <b>「先前未完成」區塊暫時無法顯示</b><br>' +
+                        'Firestore 尚未建立必要的複合索引（completed + date）。<br>' +
+                        '請開啟瀏覽器 Console（F12），點擊錯誤訊息中的連結一鍵建立，約 1 分鐘後即可正常顯示。<br>' +
+                        '<span style="color:#6b7280;font-size:0.85rem;">當日任務不受影響，可正常使用。</span>');
+                } else {
+                    showTaskWarning('⚠️ 先前未完成讀取失敗：' + (err.message || err.code));
+                }
+            });
+    }
+
     function changeDate(d, addHistory = true) {
         state.currentDate = d;
         document.getElementById('dateSearch').value = d;
@@ -616,6 +754,7 @@
             localStorage.setItem('tt_history', JSON.stringify(hist));
             renderHistory();
         }
+        subscribeTasksForDate(d);   // 切換日期 → 重新訂閱該日範圍
         renderTasks();
     }
 
@@ -869,61 +1008,226 @@
         alert(`匯入完成！成功: ${successCount}`); document.getElementById('importModal').style.display = 'none';
     }
 
+    // ==========================================
+    // 7-1. 搜尋任務（區間限定 + 一次性抓取 + 快取）
+    //   原本：從 state.tasks（全量訂閱）篩選
+    //   現在：依所選區間做一次 get()，同一區間只讀一次，之後在記憶體中篩選
+    // ==========================================
+    function getSearchRange() {
+        const sel = document.getElementById('searchRangeSelect');
+        const mode = sel ? sel.value : '30';
+        const today = getTodayStr();
+
+        if (mode !== 'custom') {
+            const days = parseInt(mode, 10);
+            return { start: shiftDateStr(today, -(days - 1)), end: today, label: '近 ' + days + ' 天' };
+        }
+
+        const s = document.getElementById('searchStartDate').value;
+        const e = document.getElementById('searchEndDate').value;
+        if (!s || !e) return null;
+        if (s > e) { alert('開始日期不能晚於結束日期'); return null; }
+        const span = daysBetween(s, e) + 1;
+        if (span > SEARCH_MAX_RANGE_DAYS) {
+            alert('自訂區間最多 ' + SEARCH_MAX_RANGE_DAYS + ' 天，目前為 ' + span + ' 天。\n\n區間越大讀取的資料越多，為控制 Firestore 額度故設此上限。');
+            return null;
+        }
+        return { start: s, end: e, label: s + ' ~ ' + e };
+    }
+
+    function setSearchHint(text, loading) {
+        const el = document.getElementById('searchRangeHint');
+        if (!el) return;
+        el.className = 'search-range-hint' + (loading ? ' loading' : '');
+        el.innerText = text || '';
+    }
+
+    function ensureSearchData(range) {
+        const key = range.start + '|' + range.end;
+        if (searchCache[key]) return Promise.resolve(searchCache[key]);
+        if (searchFetching && searchFetching.key === key) return searchFetching.promise;
+
+        setSearchHint('⏳ 讀取 ' + range.label + ' 的資料...', true);
+        const promise = db.collection('tasks')
+            .where('date', '>=', range.start)
+            .where('date', '<=', range.end)
+            .get()
+            .then(snap => {
+                const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                searchCache[key] = list;
+                searchFetching = null;
+                setSearchHint('已載入 ' + range.label + '，共 ' + list.length + ' 筆（本次登入期間不會重複讀取）', false);
+                return list;
+            })
+            .catch(err => {
+                searchFetching = null;
+                console.error('[search] 讀取失敗:', err);
+                setSearchHint('❌ 讀取失敗：' + (err.message || err.code), false);
+                return [];
+            });
+        searchFetching = { key: key, promise: promise };
+        return promise;
+    }
+
+    function handleSearchRangeChange() {
+        const sel = document.getElementById('searchRangeSelect');
+        const custom = document.getElementById('searchCustomRange');
+        const isCustom = sel.value === 'custom';
+        custom.style.display = isCustom ? 'block' : 'none';
+
+        if (isCustom) {
+            const s = document.getElementById('searchStartDate');
+            const e = document.getElementById('searchEndDate');
+            if (!s.value || !e.value) {
+                e.value = getTodayStr();
+                s.value = shiftDateStr(getTodayStr(), -(SEARCH_MAX_RANGE_DAYS - 1));
+            }
+        }
+        // 區間變更 → 清空結果，等使用者輸入關鍵字時才讀取
+        document.getElementById('searchResults').style.display = 'none';
+        const range = getSearchRange();
+        if (!range) { setSearchHint('', false); return; }
+        const key = range.start + '|' + range.end;
+        setSearchHint(searchCache[key]
+            ? '已載入 ' + range.label + '，共 ' + searchCache[key].length + ' 筆'
+            : '將搜尋 ' + range.label + '（輸入關鍵字後才讀取資料）', false);
+        if (document.getElementById('searchTaskInput').value.trim()) handleSearch();
+    }
+
+    function renderSearchResults(matches) {
+        const list = document.getElementById('searchResults');
+        const input = document.getElementById('searchTaskInput');
+        list.innerHTML = '';
+        list.style.display = 'block';
+        if (!matches.length) {
+            list.innerHTML = '<li style="padding:10px; color:#999; text-align:center;">此區間內無符合結果</li>';
+            return;
+        }
+        matches.sort((a, b) => new Date(b.date) - new Date(a.date));
+        matches.slice(0, 20).forEach(t => {
+            const li = document.createElement('li'); li.className = 'search-item';
+            const rawTitle = (t.title || '').replace(/<[^>]+>/g, '');
+            const tag = t.isDeleted ? ' 🗑️' : (t.completed ? ' ✅' : '');
+            li.innerHTML = `<div style="font-weight:bold;">${rawTitle}</div><div style="font-size:0.8rem; color:#666;">📅 ${t.date}${tag}</div>`;
+            li.onclick = () => { changeDate(t.date); input.value = ''; list.style.display = 'none'; if(window.innerWidth <= 768) toggleSidebar(); };
+            list.appendChild(li);
+        });
+        if (matches.length > 20) {
+            const li = document.createElement('li');
+            li.style.cssText = 'padding:8px; color:#9ca3af; text-align:center; font-size:0.8rem;';
+            li.innerText = '共 ' + matches.length + ' 筆，僅顯示前 20 筆';
+            list.appendChild(li);
+        }
+    }
+
     function handleSearch() {
         const input = document.getElementById('searchTaskInput');
         const list = document.getElementById('searchResults');
         const val = input.value.trim().toLowerCase();
         list.innerHTML = ''; list.style.display = 'none';
         if (!val) return;
-        const matches = state.tasks.filter(t => {
-            const rawTitle = t.title ? t.title.replace(/<[^>]+>/g, '') : '';
-            return rawTitle.toLowerCase().includes(val);
-        });
-        if (matches.length > 0) {
-            list.style.display = 'block';
-            matches.sort((a,b) => new Date(b.date) - new Date(a.date));
-            matches.slice(0, 20).forEach(t => {
-                const li = document.createElement('li'); li.className = 'search-item';
-                const rawTitle = t.title.replace(/<[^>]+>/g, '');
-                li.innerHTML = `<div style="font-weight:bold;">${rawTitle}</div><div style="font-size:0.8rem; color:#666;">📅 ${t.date}</div>`;
-                li.onclick = () => { changeDate(t.date); input.value = ''; list.style.display = 'none'; if(window.innerWidth <= 768) toggleSidebar(); };
-                list.appendChild(li);
+
+        const range = getSearchRange();
+        if (!range) return;
+
+        ensureSearchData(range).then(tasks => {
+            // 使用者可能已改變關鍵字，取當下最新值
+            const cur = input.value.trim().toLowerCase();
+            if (!cur) return;
+            const matches = tasks.filter(t => {
+                const rawTitle = t.title ? t.title.replace(/<[^>]+>/g, '') : '';
+                return rawTitle.toLowerCase().includes(cur);
             });
-        } else { list.style.display = 'block'; list.innerHTML = '<li style="padding:10px; color:#999; text-align:center;">無符合結果</li>'; }
+            renderSearchResults(matches);
+        });
     }
 
+    // ==========================================
+    // 7-2. 任務完成統整（改為按需一次性抓取）
+    //   原本：開啟即從 state.tasks（全量）統計，預設整年 → 開一次就讀上萬筆
+    //   現在：預設本月、不自動查詢，按下「查詢」才讀該區間
+    // ==========================================
     function openStatsModal() {
         const modal = document.getElementById('statsModal');
         const userSelect = document.getElementById('statsUserSelect');
         const startInput = document.getElementById('statsDateStart');
         const endInput = document.getElementById('statsDateEnd');
+
+        // 檢索帳號清單改由 users 集合產生（已在記憶體中，不額外讀取 tasks）
         userSelect.innerHTML = '<option value="all">-- 所有帳號 (總覽) --</option>';
-        const uniqueUsers = [...new Set(state.tasks.filter(t=>t.completed && t.completedBy).map(t=>t.completedBy))];
-        uniqueUsers.sort().forEach(u => { const opt = document.createElement('option'); opt.value = u; opt.innerText = getUserDisplayName(u); userSelect.appendChild(opt); });
-        const year = new Date().getFullYear();
-        startInput.value = `${year}-01-01`; endInput.value = `${year}-12-31`;
-        updateStats();
+        state.users.filter(u => u.isApproved)
+            .sort((a, b) => a.username.localeCompare(b.username))
+            .forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.username;
+                opt.innerText = u.nickname ? (u.nickname + '（' + u.username + '）') : u.username;
+                userSelect.appendChild(opt);
+            });
+
+        // 預設本月 1 日 ~ 今天
+        const today = getTodayStr();
+        startInput.value = today.substring(0, 8) + '01';
+        endInput.value = today;
+
+        document.getElementById('statsResultDisplay').innerHTML =
+            '<div style="text-align:center; padding:24px; color:#9ca3af; line-height:1.8;">' +
+            '請選擇日期區間與帳號後，按下「查詢」。<br>' +
+            '<span style="font-size:0.85rem;">區間越大讀取的資料越多，建議一次查詢一個月。</span></div>';
         modal.style.display = 'flex';
     }
 
-    function updateStats() {
-        const start = document.getElementById('statsDateStart').value; const end = document.getElementById('statsDateEnd').value;
-        const selectedUser = document.getElementById('statsUserSelect').value; const display = document.getElementById('statsResultDisplay'); display.innerHTML = '';
-        if(!start || !end) return;
-        const validTasks = state.tasks.filter(t => !t.completed || t.isDeleted || !t.completedBy ? false : (t.date >= start && t.date <= end));
+    async function updateStats() {
+        const start = document.getElementById('statsDateStart').value;
+        const end = document.getElementById('statsDateEnd').value;
+        const selectedUser = document.getElementById('statsUserSelect').value;
+        const display = document.getElementById('statsResultDisplay');
+
+        if (!start || !end) return alert('請選擇開始與結束日期');
+        if (start > end) return alert('開始日期不能晚於結束日期');
+
+        const span = daysBetween(start, end) + 1;
+        if (span > STATS_WARN_DAYS) {
+            const ok = confirm('此區間共 ' + span + ' 天。\n\n查詢會一次讀取該區間內所有任務，區間越大消耗的 Firestore 讀取額度越多。\n\n確定要繼續嗎？');
+            if (!ok) return;
+        }
+
+        display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--primary);">⏳ 查詢中...</div>';
+        let tasks;
+        try {
+            const snap = await db.collection('tasks')
+                .where('date', '>=', start)
+                .where('date', '<=', end)
+                .get();
+            tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+            console.error('[stats] 查詢失敗:', e);
+            display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">查詢失敗：' + (e.message || e.code) + '</div>';
+            return;
+        }
+        renderStats(tasks, selectedUser, span);
+    }
+
+    function renderStats(tasks, selectedUser, span) {
+        const display = document.getElementById('statsResultDisplay');
+        display.innerHTML = '';
+        const footer = '<div style="text-align:right; font-size:0.75rem; color:#9ca3af; margin-top:10px;">查詢區間 ' + span + ' 天，讀取 ' + tasks.length + ' 筆</div>';
+
+        const validTasks = tasks.filter(t => t.completed && !t.isDeleted && t.completedBy);
+
         if (selectedUser === 'all') {
             const userCounts = {}; let total = 0;
             validTasks.forEach(t => { if(!userCounts[t.completedBy]) userCounts[t.completedBy]=0; userCounts[t.completedBy]++; total++; });
-            if(total === 0) { display.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">此區間無完成資料</div>'; return; }
+            if(total === 0) { display.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">此區間無完成資料</div>' + footer; return; }
             Object.entries(userCounts).sort((a,b)=>b[1]-a[1]).forEach(([user, count]) => {
                 const pct = Math.round((count/total)*100);
                 const card = document.createElement('div'); card.className = 'stat-card';
                 card.innerHTML = `<div class="stat-header"><span>${getUserDisplayName(user)}</span> <span>${count} 件</span></div><div class="stat-bar-container"><div class="stat-label"><span>佔比</span><span>${pct}%</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
                 display.appendChild(card);
             });
+            display.insertAdjacentHTML('beforeend', footer);
         } else {
             const userTasks = validTasks.filter(t => t.completedBy === selectedUser); const total = userTasks.length;
-            if(total === 0) { display.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">帳號 ${getUserDisplayName(selectedUser)} 在此區間無完成資料</div>`; return; }
+            if(total === 0) { display.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">帳號 ${getUserDisplayName(selectedUser)} 在此區間無完成資料</div>` + footer; return; }
             const catCounts = {}; ORDERED_CATEGORIES.forEach(c => catCounts[c]=0);
             userTasks.forEach(t => { if(catCounts[t.category]!==undefined) catCounts[t.category]++; });
             const card = document.createElement('div'); card.className = 'stat-card';
@@ -933,8 +1237,65 @@
                 card.innerHTML += `<div style="margin-top:10px;"><div class="stat-label"><span>${cat}</span><span>${count} (${pct}%)</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
             });
             display.appendChild(card);
+            display.insertAdjacentHTML('beforeend', footer);
         }
     }
+
+    // ==========================================
+    // 7-3. 自動清除超過一年的任務
+    //   軟刪除（isDeleted:true）的文件原本永遠留在 collection，
+    //   會持續墊高每次查詢的成本，故加入定期實體刪除。
+    //   執行條件：creator / senior 登入，每天最多一次。
+    // ==========================================
+    async function purgeOldTasks(options) {
+        const opts = options || {};
+        const cutoff = shiftDateStr(getTodayStr(), -PURGE_AFTER_DAYS);
+        let totalDeleted = 0;
+
+        for (let round = 0; round < PURGE_MAX_ROUNDS; round++) {
+            const snap = await db.collection('tasks')
+                .where('date', '<', cutoff)
+                .limit(PURGE_BATCH)
+                .get();
+            if (snap.empty) break;
+
+            if (round === 0 && opts.confirm) {
+                const more = snap.size >= PURGE_BATCH ? ' 以上' : '';
+                const ok = confirm(
+                    '偵測到 ' + snap.size + more + ' 筆日期早於 ' + cutoff + ' 的任務（超過 ' + PURGE_AFTER_DAYS + ' 天）。\n\n' +
+                    '刪除後無法復原，且「任務完成統整」將無法再統計這些資料。\n\n確定要清除嗎？'
+                );
+                if (!ok) { console.info('[purge] 使用者取消'); return 0; }
+            }
+
+            const batch = db.batch();
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            totalDeleted += snap.size;
+            console.info('[purge] 已刪除 ' + snap.size + ' 筆（累計 ' + totalDeleted + '）');
+            if (snap.size < PURGE_BATCH) break;
+        }
+        return totalDeleted;
+    }
+
+    function maybeRunAutoPurge() {
+        if (!hasRole(['creator', 'senior'])) return;          // 僅最高權限帳號負責清理
+        const today = getTodayStr();
+        if (localStorage.getItem('tt_last_purge') === today) return;   // 每天最多一次
+        localStorage.setItem('tt_last_purge', today);                  // 先記錄，取消也不重複詢問
+
+        purgeOldTasks({ confirm: PURGE_CONFIRM })
+            .then(n => { if (n > 0) alert('已清除 ' + n + ' 筆超過 ' + PURGE_AFTER_DAYS + ' 天的舊任務。'); })
+            .catch(e => console.warn('[purge] 執行失敗（不影響使用）:', e));
+    }
+
+    // 供 Console 手動執行：purgeOldTasksNow()
+    window.purgeOldTasksNow = function () {
+        return purgeOldTasks({ confirm: true }).then(n => {
+            alert(n > 0 ? ('已清除 ' + n + ' 筆。') : '目前沒有超過 ' + PURGE_AFTER_DAYS + ' 天的任務。');
+            return n;
+        });
+    };
 
     // ==========================================
     // 8. AUTH & 角色 UI
@@ -994,6 +1355,8 @@
         changeDate(state.currentDate, false);
         switchTab(firstAllowedView() || 'tasks');   // 無任何權限時 switchTab 會顯示提示畫面
         AppCore.emit('user:login', state.currentUser);
+        handleSearchRangeChange();                  // 初始化搜尋區間提示
+        setTimeout(maybeRunAutoPurge, 4000);        // 延遲執行，不與初始載入搶資源
     }
 
     function updateUIForRole() {
@@ -1037,6 +1400,27 @@
     // ==========================================
     // 9. BOOT（模組全部載入後才呼叫）
     // ==========================================
+    function showMaintenanceScreen() {
+        var authEl = document.getElementById('auth-screen');
+        var appEl = document.getElementById('app-screen');
+        var menuBtn = document.getElementById('mobile-menu-btn');
+        if (authEl) authEl.style.display = 'none';
+        if (appEl) appEl.style.display = 'none';
+        if (menuBtn) menuBtn.style.display = 'none';
+
+        var wrap = document.createElement('div');
+        wrap.id = 'maintenance-screen';
+        wrap.innerHTML =
+            '<div class="mt-card">' +
+                '<div class="mt-icon">🔧</div>' +
+                '<div class="mt-title">' + MAINTENANCE_TITLE + '</div>' +
+                '<div class="mt-detail">' + MAINTENANCE_DETAIL + '</div>' +
+                '<div class="mt-foot">中區收送件進度追蹤系統</div>' +
+            '</div>';
+        document.body.appendChild(wrap);
+        console.info('[MAINTENANCE_MODE] 已啟用，資料庫連線與模組載入皆已停止。');
+    }
+
     function bootApp() {
         // 初始化所有模組
         AppCore._modules.forEach(m => {
@@ -1052,11 +1436,7 @@
         }
 
         // Firestore listeners（核心資料，透過事件廣播給模組）
-        db.collection('tasks').onSnapshot(snapshot => {
-            state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            if(state.activeTab === 'tasks') renderTasks();
-            AppCore.emit('tasks:changed', state.tasks);
-        });
+        // 註：tasks 不在此處訂閱，改由 changeDate() → subscribeTasksForDate() 依日期窄範圍訂閱
 
         db.collection('users').onSnapshot(snapshot => {
             state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
@@ -1094,9 +1474,9 @@
 <!-- =====================================================================
      MODULES：每個檔案自成一格，互不相依
      ===================================================================== -->
-<script src="modules/customer.module.js?v=81"></script>
-<script src="modules/purchase.module.js?v=81"></script>
-<script src="modules/member-settings.module.js?v=81"></script>
+<script src="modules/customer.module.js?v=82"></script>
+<script src="modules/purchase.module.js?v=82"></script>
+<script src="modules/member-settings.module.js?v=82"></script>
 
 <script>
     // 所有模組註冊完成後才啟動
