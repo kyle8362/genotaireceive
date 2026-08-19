@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v82 Modular · 讀取優化)</title>
+    <title>中區收送件進度追蹤系統 (v83 Modular · 讀取優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -191,12 +191,17 @@
         .stat-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
         .stat-fill { height: 100%; background: var(--primary); }
 
-        /* ---------- 維護模式畫面 ---------- */
-        #maintenance-screen { position: fixed; inset: 0; background: var(--bg); z-index: 3000; display: flex; justify-content: center; align-items: center; padding: 1.5rem; }
-        #maintenance-screen .mt-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); max-width: 460px; width: 100%; padding: 2.5rem 2rem; text-align: center; }
-        #maintenance-screen .mt-icon { font-size: 3rem; line-height: 1; margin-bottom: 1rem; }
-        #maintenance-screen .mt-title { font-size: 1.35rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem; }
-        #maintenance-screen .mt-detail { font-size: 0.95rem; color: var(--text-light); line-height: 1.8; }
+        /* ---------- 維護模式 / 強制更新畫面 ---------- */
+        #maintenance-screen,
+        #force-update-screen { position: fixed; inset: 0; background: var(--bg); z-index: 3000; display: flex; justify-content: center; align-items: center; padding: 1.5rem; }
+        #maintenance-screen .mt-card,
+        #force-update-screen .mt-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); max-width: 460px; width: 100%; padding: 2.5rem 2rem; text-align: center; }
+        #maintenance-screen .mt-icon,
+        #force-update-screen .mt-icon { font-size: 3rem; line-height: 1; margin-bottom: 1rem; }
+        #maintenance-screen .mt-title,
+        #force-update-screen .mt-title { font-size: 1.35rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.75rem; }
+        #maintenance-screen .mt-detail,
+        #force-update-screen .mt-detail { font-size: 0.95rem; color: var(--text-light); line-height: 1.8; }
         #maintenance-screen .mt-foot { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--border); font-size: 0.8rem; color: #9ca3af; }
 
         @media (max-width: 768px) {
@@ -388,6 +393,12 @@
     // ==========================================
     const ORDERED_CATEGORIES = ["定序收件", "引子送件", "產前收件", "業務交辦事項", "NGS收件"];
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw9sCxtJ-rcRLdkwwGJgBCUCKxCFXujD4Ciq_fJxFqbly4Wldb-9nTSE5kqTst16hKg2Q/exec";
+
+    // ---------- 版本與遠端強制更新 ----------
+    // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
+    // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
+    const APP_VERSION = 83;
+    let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
     const SEARCH_MAX_RANGE_DAYS = 30;   // 自訂搜尋區間上限（天）
@@ -1400,6 +1411,40 @@
     // ==========================================
     // 9. BOOT（模組全部載入後才呼叫）
     // ==========================================
+
+    // 遠端強制更新：純讀取，絕不寫入。
+    // Firestore 建立 settings/app_control 文件，欄位 minVersion（數字）。
+    // 將 minVersion 設為新版本號，所有跑舊版的分頁會立刻顯示提示並停止運作。
+    function watchAppVersion() {
+        db.collection('settings').doc('app_control').onSnapshot(doc => {
+            if (!doc.exists) return;
+            const minV = Number(doc.data().minVersion || 0);
+            if (minV > APP_VERSION) showForceUpdateScreen(minV);
+        }, err => console.warn('[app_control] 版本監聽失敗（不影響使用）:', err.code || err.message));
+    }
+
+    function showForceUpdateScreen(minV) {
+        if (document.getElementById('force-update-screen')) return;   // 避免重複顯示
+
+        // 立即切斷所有 Firestore 監聽，停止一切背景活動
+        try { if (unsubDayTasks) unsubDayTasks(); } catch (e) {}
+        try { if (unsubOverdueTasks) unsubOverdueTasks(); } catch (e) {}
+        try { db.terminate(); } catch (e) {}
+
+        const wrap = document.createElement('div');
+        wrap.id = 'force-update-screen';
+        wrap.innerHTML =
+            '<div class="mt-card">' +
+                '<div class="mt-icon">🔄</div>' +
+                '<div class="mt-title">系統已更新</div>' +
+                '<div class="mt-detail">您目前使用的是舊版本（v' + APP_VERSION + '），系統已更新至 v' + minV + '。<br>' +
+                    '請點擊下方按鈕重新載入。</div>' +
+                '<button onclick="location.reload(true)" style="margin-top:1.5rem; background:var(--primary); color:#fff; border:none; padding:12px 32px; border-radius:8px; font-size:1rem; font-weight:600; cursor:pointer; font-family:inherit;">重新載入</button>' +
+            '</div>';
+        document.body.appendChild(wrap);
+        console.warn('[app_control] 版本過舊（本機 v' + APP_VERSION + ' < 要求 v' + minV + '），已停止所有連線。');
+    }
+
     function showMaintenanceScreen() {
         var authEl = document.getElementById('auth-screen');
         var appEl = document.getElementById('app-screen');
@@ -1438,6 +1483,8 @@
         // Firestore listeners（核心資料，透過事件廣播給模組）
         // 註：tasks 不在此處訂閱，改由 changeDate() → subscribeTasksForDate() 依日期窄範圍訂閱
 
+        watchAppVersion();   // 遠端強制更新監聽（只讀）
+
         db.collection('users').onSnapshot(snapshot => {
             state.users = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
 
@@ -1458,11 +1505,26 @@
             AppCore.emit('users:changed', state.users);
         });
 
+        // ⚠️ 此監聽器「只讀不寫」。
+        // 舊版曾在 else 分支內寫入，形成「寫入 → 觸發快照 → 再寫入」的無限迴圈，
+        // 造成單一瀏覽器分頁每秒寫入約 30 次、數分鐘內耗盡整日寫入額度。切勿還原。
         db.collection('settings').doc('ngs_sales').onSnapshot(doc => {
-            if(doc.exists) state.salesOptions = doc.data().list || ['Jeff', '廖軒逵'];
-            else { state.salesOptions = ['Jeff', '廖軒逵']; db.collection('settings').doc('ngs_sales').set({ list: state.salesOptions }); }
+            if (doc.exists) state.salesOptions = doc.data().list || [];
             AppCore.emit('salesOptions:changed', state.salesOptions);
         });
+
+        // 預設值初始化：整個頁面生命週期最多執行一次，且強制向伺服器確認（不看本機快取）
+        if (!salesDefaultInitDone) {
+            salesDefaultInitDone = true;
+            db.collection('settings').doc('ngs_sales').get({ source: 'server' })
+              .then(doc => {
+                  if (!doc.exists) {
+                      console.info('[ngs_sales] 文件不存在，建立預設值（僅此一次）');
+                      return db.collection('settings').doc('ngs_sales').set({ list: ['Jeff', '廖軒逵'] });
+                  }
+              })
+              .catch(e => console.warn('[ngs_sales] 初始化檢查略過:', e.code || e.message));
+        }
 
         db.collection('settings').doc('assignment_rules').onSnapshot(doc => {
             state.assignmentRules = doc.exists ? doc.data() : {};
@@ -1474,9 +1536,9 @@
 <!-- =====================================================================
      MODULES：每個檔案自成一格，互不相依
      ===================================================================== -->
-<script src="modules/customer.module.js?v=82"></script>
-<script src="modules/purchase.module.js?v=82"></script>
-<script src="modules/member-settings.module.js?v=82"></script>
+<script src="modules/customer.module.js?v=83"></script>
+<script src="modules/purchase.module.js?v=83"></script>
+<script src="modules/member-settings.module.js?v=83"></script>
 
 <script>
     // 所有模組註冊完成後才啟動
