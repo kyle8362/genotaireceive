@@ -108,6 +108,21 @@
     #tempHistoryModal .temp-log-user { color: var(--primary); font-weight: 600; }
     #tempAssignModal .temp-user-row { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; font-weight: 600; }
     #tempAssignModal .temp-user-row:hover { background: #f8fafc; }
+    #tempAssignModal .temp-user-row:last-child { border-bottom: none; }
+
+    /* ---------- 電腦版：彈窗加寬，方便輸入 ---------- */
+    #tempTaskModal .modal-card    { width: 640px; }
+    #tempImportModal .modal-card  { width: 720px; }
+    #tempAssignModal .modal-card  { width: 420px; }
+    #tempHistoryModal .modal-card { width: 520px; }
+
+    #tempTaskModal h3, #tempImportModal h3, #tempAssignModal h3, #tempHistoryModal h3 {
+        margin-top: 0; color: #111827; border-bottom: 1px solid #eee; padding-bottom: 10px;
+    }
+    #tempTaskModal textarea   { min-height: 130px; font-size: 1rem; line-height: 1.7; }
+    #tempImportModal textarea { min-height: 280px; font-size: 0.95rem; line-height: 1.7; }
+    #tempTaskModal select, #tempTaskModal input[type="date"],
+    #tempImportModal select   { font-size: 1rem; padding: 11px; }
 
     /* ---------- 手機版（與主系統任務看板一致的排版邏輯）---------- */
     @media (max-width: 768px) {
@@ -136,10 +151,10 @@
         #tempTasksView .temp-cat-title { font-size: 0.95rem; }
 
         /* 彈窗滿版，避免超出畫面 */
-        #tempTaskModal .modal-box,
-        #tempImportModal .modal-box,
-        #tempAssignModal .modal-box,
-        #tempHistoryModal .modal-box { width: 100%; max-width: 100%; margin: 0 8px; }
+        #tempTaskModal .modal-card,
+        #tempImportModal .modal-card,
+        #tempAssignModal .modal-card,
+        #tempHistoryModal .modal-card { width: 100%; max-width: 100%; margin: 0 8px; padding: 1.25rem; }
         #tempImportModal textarea { min-height: 150px; }
         #tempAssignModal .temp-user-row { padding: 14px 10px; font-size: 1rem; }
     }
@@ -184,7 +199,7 @@
     // =====================================================================
     var MODAL_HTML = `
     <div class="modal-overlay" id="tempTaskModal">
-        <div class="modal-box">
+        <div class="modal-card">
             <h3 id="tempTaskModalTitle">新增臨時收件</h3>
             <div class="temp-field">
                 <label>日期</label>
@@ -198,42 +213,42 @@
                 <label>內容</label>
                 <textarea id="tempTaskTitle" placeholder="例：260819A1 中興大學—獸醫系【王小明】"></textarea>
             </div>
-            <div style="text-align:right; margin-top:1rem;">
-                <button class="btn-secondary" onclick="TempReceiveModule.closeModal('tempTaskModal')">取消</button>
-                <button class="btn-primary" onclick="TempReceiveModule.saveTask()">儲存</button>
+            <div class="modal-btns">
+                <button class="btn btn-cancel" onclick="TempReceiveModule.closeModal('tempTaskModal')">取消</button>
+                <button class="btn btn-save" onclick="TempReceiveModule.saveTask()">儲存</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="tempImportModal">
-        <div class="modal-box">
+        <div class="modal-card">
             <h3>批量匯入臨時收件</h3>
             <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:10px;">一行一筆，最多 ${IMPORT_LIMIT} 筆。空行會自動略過。</p>
             <select id="tempImportCategory"></select>
             <textarea id="tempImportTextarea" placeholder="一行一筆..."></textarea>
-            <div style="text-align:right; margin-top:1rem;">
-                <button class="btn-secondary" onclick="TempReceiveModule.closeModal('tempImportModal')">取消</button>
-                <button class="btn-primary" id="tempImportConfirmBtn" onclick="TempReceiveModule.processImport()">開始匯入</button>
+            <div class="modal-btns">
+                <button class="btn btn-cancel" onclick="TempReceiveModule.closeModal('tempImportModal')">取消</button>
+                <button class="btn btn-save" id="tempImportConfirmBtn" onclick="TempReceiveModule.processImport()">開始匯入</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="tempAssignModal">
-        <div class="modal-box">
+        <div class="modal-card">
             <h3>指派臨時收件</h3>
             <ul id="tempAssignList" style="list-style:none; padding:0; max-height:320px; overflow-y:auto;"></ul>
-            <div style="text-align:right; margin-top:1rem;">
-                <button class="btn-secondary" onclick="TempReceiveModule.closeModal('tempAssignModal')">關閉</button>
+            <div class="modal-btns">
+                <button class="btn btn-cancel" onclick="TempReceiveModule.closeModal('tempAssignModal')">關閉</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="tempHistoryModal">
-        <div class="modal-box">
+        <div class="modal-card">
             <h3>操作紀錄</h3>
             <div id="tempHistoryContent" style="max-height:360px; overflow-y:auto;"></div>
-            <div style="text-align:right; margin-top:1rem;">
-                <button class="btn-secondary" onclick="TempReceiveModule.closeModal('tempHistoryModal')">關閉</button>
+            <div class="modal-btns">
+                <button class="btn btn-cancel" onclick="TempReceiveModule.closeModal('tempHistoryModal')">關閉</button>
             </div>
         </div>
     </div>`;
