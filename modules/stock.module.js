@@ -1,13 +1,8 @@
 /* =====================================================================
- * 模組：QIAGEN 備庫存系統 (stock)
+ * 模組：QIAGEN 備庫存系統 (stock)  ─ v84
  * ---------------------------------------------------------------------
- * 以 iframe 內嵌外部庫存系統網頁，點左側按鈕即在右側顯示，
- * 不需跳出本系統。
- *
- * 權限：宣告 permKey = 'stock'，
- *       「成員設定管理 → 成員權限」會自動長出勾選框，
- *       未勾選的帳號看不到按鈕，也無法進入此分頁。
- *
+ * 以 iframe 內嵌外部庫存系統網頁，點左側按鈕即在右側顯示。
+ * 權限：permKey = 'stock'，由「成員設定管理 → 成員權限」控管。
  * 要改網址只動下方 STOCK_URL 一行。
  * ===================================================================== */
 (function () {
@@ -18,55 +13,60 @@
     /* ---------- 設定區 ---------- */
     var STOCK_URL = 'https://qiagen-stock-production.up.railway.app/';
 
-    // 未在「成員權限」個別勾選時的預設值。
-    //   ['creator','senior']            = 僅創世神／高級管理者預設可見
-    //   ['creator','senior','admin']    = 加上管理者
-    //   null                            = 全員預設可見
-    // 一旦管理員在成員權限勾／取消，勾選結果優先於此。
+    // 未在「成員權限」個別勾選時的預設值
+    //   ['creator','senior']         = 僅創世神／高級管理者
+    //   ['creator','senior','admin'] = 加上管理者
+    //   null                         = 全員預設可見
     var DEFAULT_ACCESS_ROLES = ['creator', 'senior'];
 
-    var loaded = false;   // 首次進入才載入 iframe，平時不佔資源
+    var loaded = false;
 
-    /* ---------- CSS（全部以 #stockView 收斂） ---------- */
+    /* ---------- CSS ---------- */
     var CSS = `
     .btn-stock { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
 
     #stockView { height: 100%; }
-    #stockView header { margin-bottom: 1rem; }
-    #stockView .stock-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-    #stockView .stock-btn { padding: 8px 14px; border-radius: 6px; border: 1px solid #bbf7d0; background: #fff; color: #15803d; font-weight: 600; font-size: 0.88rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
-    #stockView .stock-btn:hover { background: #f0fdf4; }
-    #stockView .stock-hint { font-size: 0.8rem; color: var(--text-light); }
 
-    #stockView .stock-frame-wrap { position: relative; flex-grow: 1; min-height: 480px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
+    /* 標題與按鈕同一列：標題靠左、操作鈕靠右上 */
+    #stockView .stock-head {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    #stockView .stock-head h1 { margin: 0; font-size: 1.5rem; color: #111827; line-height: 1.3; }
+    #stockView .stock-head .sub { font-size: 0.8rem; color: var(--text-light); margin-top: 2px; }
+    #stockView .stock-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    #stockView .stock-btn { padding: 7px 13px; border-radius: 6px; border: 1px solid #bbf7d0; background: #fff; color: #15803d; font-weight: 600; font-size: 0.85rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    #stockView .stock-btn:hover { background: #f0fdf4; }
+
+    #stockView .stock-frame-wrap { position: relative; flex-grow: 1; min-height: 560px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
     #stockView iframe { width: 100%; height: 100%; border: 0; display: block; }
-    #stockView .stock-loading { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; background: #fff; color: var(--primary); font-size: 0.95rem; }
-    #stockView .stock-blocked { display: none; padding: 1.25rem; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; font-size: 0.9rem; line-height: 1.8; margin-bottom: 12px; }
+    #stockView .stock-loading { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: #fff; color: var(--primary); font-size: 0.95rem; }
+    #stockView .stock-blocked { display: none; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; font-size: 0.88rem; line-height: 1.7; margin-bottom: 10px; }
 
     @media (max-width: 768px) {
-        #stockView .stock-frame-wrap { min-height: 70vh; }
-        #stockView .stock-btn { flex-grow: 1; text-align: center; padding: 11px 14px; }
+        #stockView .stock-head { flex-direction: column; align-items: stretch; }
+        #stockView .stock-actions { width: 100%; }
+        #stockView .stock-btn { flex: 1; text-align: center; padding: 10px 12px; }
+        #stockView .stock-frame-wrap { min-height: 72vh; }
     }
     `;
 
     /* ---------- HTML ---------- */
     var VIEW_HTML = `
     <div id="stockView" class="view-section">
-        <header>
-            <h1>QIAGEN 備庫存系統</h1>
-            <div class="date-header">外部系統內嵌畫面</div>
-        </header>
-
-        <div class="stock-blocked" id="stockBlocked">
-            ⚠️ <b>此頁面無法內嵌顯示</b><br>
-            外部系統可能設定了禁止內嵌的安全標頭，或需要先登入。<br>
-            請改用下方「在新視窗開啟」按鈕操作。
+        <div class="stock-head">
+            <div>
+                <h1>QIAGEN 備庫存系統</h1>
+                <div class="sub">外部系統內嵌畫面</div>
+            </div>
+            <div class="stock-actions">
+                <button class="stock-btn" onclick="StockModule.reload()">🔄 重新載入</button>
+                <button class="stock-btn" onclick="StockModule.openExternal()">↗ 新視窗開啟</button>
+            </div>
         </div>
 
-        <div class="stock-toolbar">
-            <button class="stock-btn" onclick="StockModule.reload()">🔄 重新載入</button>
-            <button class="stock-btn" onclick="StockModule.openExternal()">↗ 在新視窗開啟</button>
-            <span class="stock-hint">若畫面空白或要求登入，請先用「在新視窗開啟」登入一次。</span>
+        <div class="stock-blocked" id="stockBlocked">
+            ⚠️ <b>此頁面無法內嵌顯示</b>　外部系統可能禁止內嵌或需先登入，請改用「新視窗開啟」。
         </div>
 
         <div class="stock-frame-wrap" id="stockFrameWrap">
@@ -96,7 +96,6 @@
         frame.src = STOCK_URL;
         loaded = true;
 
-        // 若 8 秒仍未觸發 onload，判定為被外部系統阻擋
         setTimeout(function () {
             var l = document.getElementById('stockLoading');
             if (l && l.style.display !== 'none') showBlocked();
@@ -109,14 +108,8 @@
         if (b) b.style.display = 'block';
     }
 
-    function reload() {
-        loaded = false;
-        loadFrame();
-    }
-
-    function openExternal() {
-        window.open(STOCK_URL, '_blank', 'noopener');
-    }
+    function reload() { loaded = false; loadFrame(); }
+    function openExternal() { window.open(STOCK_URL, '_blank', 'noopener'); }
 
     /* =================================================================
      * 模組定義
@@ -127,7 +120,6 @@
         navButtonId: 'stockBtn',
         navButtonClass: 'btn-stock',
 
-        // 讓「成員設定管理 → 成員權限」自動長出這一項勾選框
         permKey: 'stock',
         permLabel: '📊 QIAGEN 備庫存系統',
         requiredRoles: DEFAULT_ACCESS_ROLES || undefined,
@@ -138,12 +130,8 @@
             core.mountView(VIEW_HTML);
         },
 
-        // 切到此分頁時才載入 iframe
-        activate: function () {
-            if (!loaded) loadFrame();
-        },
+        activate: function () { if (!loaded) loadFrame(); },
 
-        /* --- 對外 API（HTML onclick 用） --- */
         reload: reload,
         openExternal: openExternal
     };
