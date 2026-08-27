@@ -1,12 +1,12 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)
+ * 模組：成員設定管理 (memberSettings)  ─ v85
  * ---------------------------------------------------------------------
- * 把原本三個獨立彈窗整合成一個彈窗 + 三個分頁：
- *   ① 成員權限   ← 原「成員權限管理」
- *   ② 標籤選單   ← 原「標籤選單後台設定」(NGS 負責業務)
- *   ③ 指派帳號   ← 原「指派任務帳號設定」
+ * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
+ *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
  *
- * 這是純彈窗模組（沒有主畫面 view），對外只暴露 window.MemberSettingsModule。
+ * 內含三個分頁：
+ *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
+ *
  * 權限：
  *   入口按鈕        creator / senior / admin
  *   ① 成員權限分頁  creator / senior / admin
@@ -24,103 +24,125 @@
         { key: 'assign', label: '👤 指派帳號', roles: ['creator', 'senior'] }
     ];
 
-    /* ---------- CSS（全部收斂在 #memberSettingsModal 內） ---------- */
+    /* ---------- CSS（全部收斂在 #memberSettingsView 內） ---------- */
     var CSS = `
-    #memberSettingsModal .ms-tabs { display: flex; gap: 6px; border-bottom: 2px solid var(--border); margin: 0 0 18px 0; flex-wrap: wrap; }
-    #memberSettingsModal .ms-tab { padding: 10px 16px; border: none; background: transparent; cursor: pointer; font-size: 0.95rem; font-weight: 600; color: var(--text-light); border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 6px 6px 0 0; }
-    #memberSettingsModal .ms-tab:hover { background: #f8fafc; color: var(--text-main); }
-    #memberSettingsModal .ms-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #f0fdfa; }
-    #memberSettingsModal .ms-panel { display: none; }
-    #memberSettingsModal .ms-panel.active { display: block; }
-    #memberSettingsModal .ms-panel-desc { font-size: 0.85rem; color: var(--text-light); background: #f9fafb; border: 1px solid #eee; border-radius: 6px; padding: 10px; margin-bottom: 14px; }
-    #memberSettingsModal .ms-body { max-height: 55vh; overflow-y: auto; padding-right: 4px; }
+    #memberSettingsView { height: 100%; }
+    #memberSettingsView .ms-head { margin-bottom: 14px; }
+    #memberSettingsView .ms-head h1 { margin: 0; font-size: 1.5rem; color: #111827; line-height: 1.3; }
+    #memberSettingsView .ms-head .sub { font-size: 0.8rem; color: var(--text-light); margin-top: 2px; }
+
+    #memberSettingsView .ms-tabs { display: flex; gap: 6px; border-bottom: 2px solid var(--border); margin: 0 0 18px 0; flex-wrap: wrap; }
+    #memberSettingsView .ms-tab { padding: 10px 16px; border: none; background: transparent; cursor: pointer; font-size: 0.95rem; font-weight: 600; color: var(--text-light); border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 6px 6px 0 0; font-family: inherit; }
+    #memberSettingsView .ms-tab:hover { background: #f8fafc; color: var(--text-main); }
+    #memberSettingsView .ms-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #f0fdfa; }
+
+    #memberSettingsView .ms-panel { display: none; }
+    #memberSettingsView .ms-panel.active { display: block; }
+    #memberSettingsView .ms-panel-desc { font-size: 0.85rem; color: var(--text-light); background: #f9fafb; border: 1px solid #eee; border-radius: 6px; padding: 10px; margin-bottom: 14px; max-width: 900px; }
+
+    /* 分頁化後不再限制高度，交給 main 的捲軸處理 */
+    #memberSettingsView .ms-body { max-width: 900px; padding-bottom: 60px; }
+    #memberSettingsView .user-list { list-style: none; padding: 0; margin: 0; }
 
     /* ① 成員權限 */
-    #memberSettingsModal .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    #memberSettingsModal .user-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
-    #memberSettingsModal .user-role-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; margin-left: 8px; border: 1px solid #ddd; font-weight: 500; }
-    #memberSettingsModal .role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
-    #memberSettingsModal .role-senior  { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
-    #memberSettingsModal .role-admin   { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
-    #memberSettingsModal .role-user    { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
-    #memberSettingsModal .role-pending { background: #fff7ed; color: #c2410c; border-color: #ffedd5; }
-    #memberSettingsModal .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
-    #memberSettingsModal .user-edit-row input, #memberSettingsModal .user-edit-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; }
-    #memberSettingsModal .readonly-text { font-size: 0.85rem; color: #6b7280; }
-    #memberSettingsModal .btn-approve { padding: 7px 14px; border: none; border-radius: 6px; background: var(--primary); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
-    #memberSettingsModal .btn-approve:hover { background: #0d9488; }
-    #memberSettingsModal .btn-reject { padding: 7px 14px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: var(--danger); cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-left: 8px; }
-    #memberSettingsModal .btn-reject:hover { background: #fee2e2; }
-    #memberSettingsModal .btn-icon-eye { background: none; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; padding: 6px 8px; }
+    #memberSettingsView .user-item { display: flex; flex-direction: column; padding: 15px; border: 1px solid #eee; background: white; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: 0.2s; }
+    #memberSettingsView .user-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
+    #memberSettingsView .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    #memberSettingsView .user-name { font-weight: 700; font-size: 1.05rem; color: #1f2937; }
+    #memberSettingsView .user-role-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; margin-left: 8px; border: 1px solid #ddd; font-weight: 500; }
+    #memberSettingsView .role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+    #memberSettingsView .role-senior  { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
+    #memberSettingsView .role-admin   { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+    #memberSettingsView .role-user    { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+    #memberSettingsView .role-pending { background: #fff7ed; color: #c2410c; border-color: #ffedd5; }
+    #memberSettingsView .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+    #memberSettingsView .user-edit-row input, #memberSettingsView .user-edit-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
+    #memberSettingsView .readonly-text { font-size: 0.85rem; color: #6b7280; }
+    #memberSettingsView .btn-approve { padding: 7px 14px; border: none; border-radius: 6px; background: var(--primary); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; font-family: inherit; }
+    #memberSettingsView .btn-approve:hover { background: #0d9488; }
+    #memberSettingsView .btn-reject { padding: 7px 14px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: var(--danger); cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-left: 8px; font-family: inherit; }
+    #memberSettingsView .btn-reject:hover { background: #fee2e2; }
+    #memberSettingsView .btn-icon-eye { background: none; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; padding: 6px 8px; }
 
     /* 分頁使用權限勾選區 */
-    #memberSettingsModal .ms-perm-row { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-bottom: 10px; gap: 8px; }
-    #memberSettingsModal .ms-perm-title { width: 100%; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 2px; }
-    #memberSettingsModal .ms-perm-item { display: flex; align-items: center; font-size: 0.9rem; background: white; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; white-space: nowrap; }
-    #memberSettingsModal .ms-perm-item:hover { border-color: var(--primary); }
-    #memberSettingsModal .ms-perm-item input { margin-right: 6px; }
-    #memberSettingsModal .ms-perm-item input:disabled { cursor: not-allowed; }
-    #memberSettingsModal .ms-perm-item.is-locked { background: #faf5ff; border-color: #e9d5ff; color: #6b21a8; cursor: default; }
-    #memberSettingsModal .ms-perm-hint { width: 100%; font-size: 0.78rem; color: #9ca3af; margin-top: 2px; }
+    #memberSettingsView .ms-perm-row { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-bottom: 10px; gap: 8px; }
+    #memberSettingsView .ms-perm-title { width: 100%; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 2px; }
+    #memberSettingsView .ms-perm-item { display: flex; align-items: center; font-size: 0.9rem; background: white; padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+    #memberSettingsView .ms-perm-item:hover { border-color: var(--primary); }
+    #memberSettingsView .ms-perm-item input { margin-right: 6px; }
+    #memberSettingsView .ms-perm-item input:disabled { cursor: not-allowed; }
+    #memberSettingsView .ms-perm-item.is-locked { background: #faf5ff; border-color: #e9d5ff; color: #6b21a8; cursor: default; }
+    #memberSettingsView .ms-perm-hint { width: 100%; font-size: 0.78rem; color: #9ca3af; margin-top: 2px; }
 
     /* ② 標籤選單 */
-    #memberSettingsModal .settings-list { list-style: none; padding: 0; margin: 0; }
-    #memberSettingsModal .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
-    #memberSettingsModal .setting-item:last-child { border-bottom: none; }
+    #memberSettingsView .settings-list { list-style: none; padding: 0; margin: 0; border: 1px solid #eee; border-radius: 8px; background: #fff; }
+    #memberSettingsView .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid #eee; }
+    #memberSettingsView .setting-item:last-child { border-bottom: none; }
+    #memberSettingsView .ms-add-row { display: flex; gap: 10px; margin-bottom: 15px; max-width: 900px; }
+    #memberSettingsView .ms-add-row input { flex-grow: 1; padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
 
     /* ③ 指派帳號 */
-    #memberSettingsModal .assign-section { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
-    #memberSettingsModal .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
-    #memberSettingsModal .assign-checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; }
-    #memberSettingsModal .assign-check-item { display: flex; align-items: center; font-size: 0.9rem; background: white; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
-    #memberSettingsModal .assign-check-item:hover { border-color: var(--primary); }
-    #memberSettingsModal .assign-check-item input { margin-right: 6px; }
+    #memberSettingsView .assign-section { border: 1px solid #eee; padding: 12px; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
+    #memberSettingsView .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
+    #memberSettingsView .assign-checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; }
+    #memberSettingsView .assign-check-item { display: flex; align-items: center; font-size: 0.9rem; background: white; padding: 5px 9px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+    #memberSettingsView .assign-check-item:hover { border-color: var(--primary); }
+    #memberSettingsView .assign-check-item input { margin-right: 6px; }
+    #memberSettingsView .ms-save-row { text-align: right; margin-top: 15px; max-width: 900px; }
+
+    @media (max-width: 768px) {
+        #memberSettingsView .ms-body,
+        #memberSettingsView .ms-panel-desc,
+        #memberSettingsView .ms-add-row,
+        #memberSettingsView .ms-save-row { max-width: 100%; }
+        #memberSettingsView .ms-tab { flex-grow: 1; text-align: center; padding: 10px 8px; font-size: 0.88rem; }
+        #memberSettingsView .user-edit-row input,
+        #memberSettingsView .user-edit-row select { width: 100% !important; }
+        #memberSettingsView .ms-add-row { flex-direction: column; }
+    }
     `;
 
-    /* ---------- HTML ---------- */
-    var MODAL_HTML = `
-    <div class="modal-overlay" id="memberSettingsModal">
-        <div class="modal-card" style="width: 720px;">
-            <h3 style="margin-top:0;">👤 成員設定管理</h3>
+    /* ---------- HTML（主畫面，不再是彈窗） ---------- */
+    var VIEW_HTML = `
+    <div id="memberSettingsView" class="view-section">
+        <div class="ms-head">
+            <h1>成員設定管理</h1>
+            <div class="sub">帳號權限、標籤選單與指派規則</div>
+        </div>
 
-            <div class="ms-tabs" id="msTabs"></div>
+        <div class="ms-tabs" id="msTabs"></div>
 
-            <!-- ① 成員權限 -->
-            <div class="ms-panel" id="msPanel-perm">
-                <div class="user-edit-row" style="justify-content:flex-end;">
-                    <select id="msUserFilter" onchange="MemberSettingsModule.renderUsers()">
-                        <option value="all">顯示全部</option>
-                        <option value="creator">🟣 創世神</option>
-                        <option value="senior">高級管理者</option>
-                        <option value="admin">管理者</option>
-                        <option value="user">一般者</option>
-                        <option value="pending">待審核</option>
-                    </select>
-                </div>
-                <div class="ms-body"><ul class="user-list" id="msUserList"></ul></div>
+        <!-- ① 成員權限 -->
+        <div class="ms-panel" id="msPanel-perm">
+            <div class="user-edit-row" style="justify-content:flex-end; max-width:900px;">
+                <select id="msUserFilter" onchange="MemberSettingsModule.renderUsers()">
+                    <option value="all">顯示全部</option>
+                    <option value="creator">🟣 創世神</option>
+                    <option value="senior">高級管理者</option>
+                    <option value="admin">管理者</option>
+                    <option value="user">一般者</option>
+                    <option value="pending">待審核</option>
+                </select>
             </div>
+            <div class="ms-body"><ul class="user-list" id="msUserList"></ul></div>
+        </div>
 
-            <!-- ② 標籤選單 -->
-            <div class="ms-panel" id="msPanel-sales">
-                <div class="ms-panel-desc">此清單為新增 NGS 收件時「負責業務」下拉選單的來源。</div>
-                <div style="display:flex; gap:10px; margin-bottom:15px;">
-                    <input type="text" id="msNewSalesName" placeholder="輸入新業務姓名" style="flex-grow:1; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    <button class="btn btn-save" onclick="MemberSettingsModule.addSales()">新增</button>
-                </div>
-                <div class="ms-body"><ul class="settings-list" id="msSalesList"></ul></div>
+        <!-- ② 標籤選單 -->
+        <div class="ms-panel" id="msPanel-sales">
+            <div class="ms-panel-desc">此清單為新增 NGS 收件時「負責業務」下拉選單的來源。</div>
+            <div class="ms-add-row">
+                <input type="text" id="msNewSalesName" placeholder="輸入新業務姓名">
+                <button class="btn btn-save" onclick="MemberSettingsModule.addSales()">新增</button>
             </div>
+            <div class="ms-body"><ul class="settings-list" id="msSalesList"></ul></div>
+        </div>
 
-            <!-- ③ 指派帳號 -->
-            <div class="ms-panel" id="msPanel-assign">
-                <div class="ms-panel-desc">勾選各分類「可被指派」的帳號。若某分類完全未勾選，該分類會開放給所有已核准帳號。</div>
-                <div class="ms-body" id="msAssignContainer"></div>
-                <div style="text-align:right; margin-top:15px;">
-                    <button class="btn btn-save" onclick="MemberSettingsModule.saveAssignRules()">儲存指派設定</button>
-                </div>
-            </div>
-
-            <div class="modal-btns">
-                <button class="btn btn-cancel" onclick="MemberSettingsModule.close()">關閉</button>
+        <!-- ③ 指派帳號 -->
+        <div class="ms-panel" id="msPanel-assign">
+            <div class="ms-panel-desc">勾選各分類「可被指派」的帳號。若某分類完全未勾選，該分類會開放給所有已核准帳號。</div>
+            <div class="ms-body" id="msAssignContainer"></div>
+            <div class="ms-save-row">
+                <button class="btn btn-save" onclick="MemberSettingsModule.saveAssignRules()">儲存指派設定</button>
             </div>
         </div>
     </div>`;
@@ -134,6 +156,7 @@
 
     function renderTabBar() {
         var bar = document.getElementById('msTabs');
+        if (!bar) return;
         bar.innerHTML = '';
         visibleTabs().forEach(function (t) {
             var b = document.createElement('button');
@@ -160,14 +183,9 @@
     /* =================================================================
      * ① 成員權限
      * ================================================================= */
-    /**
-     * 產生「分頁使用權限」勾選區
-     * @param {object}  user     使用者資料
-     * @param {boolean} editable 是否可勾選（僅創世神／高級管理者可編輯）
-     */
     function permCheckboxesHtml(user, editable) {
-        var items = core.getPermissionItems();      // 由核心 + 各模組自動組成
-        var perms = core.getPermsFor(user);         // 含預設值推算結果
+        var items = core.getPermissionItems();
+        var perms = core.getPermsFor(user);
         var isCreator = (user.role === 'creator');
         var locked = isCreator || !editable;
 
@@ -261,7 +279,6 @@
                         '</div>';
                 }
             } else {
-                // admin：只能核准，不能改角色
                 var actionBtn = !user.isApproved
                     ? '<button class="btn-approve" onclick="MemberSettingsModule.approveUser(\'' + user.docId + '\')">核准申請</button>'
                     : '<span style="color:#10b981; font-size:0.85rem;">已核准</span>';
@@ -288,7 +305,6 @@
         };
         if (roleEl && !roleEl.disabled) payload.role = roleEl.value;
 
-        // 收集分頁使用權限勾選結果（disabled 的不寫入，例如創世神）
         var boxes = document.querySelectorAll('#msUserList .ms-perm-cb[data-doc="' + docId + '"]');
         var perms = {};
         var hasEditable = false;
@@ -415,23 +431,11 @@
     }
 
     /* =================================================================
-     * 開關彈窗
+     * 分頁是否正在顯示（供事件即時刷新用）
      * ================================================================= */
-    function open() {
-        var tabs = visibleTabs();
-        if (!tabs.length) return alert('您沒有權限使用此功能');
-        document.getElementById('memberSettingsModal').style.display = 'flex';
-        if (!tabs.some(function (t) { return t.key === activeTab; })) activeTab = tabs[0].key;
-        showTab(activeTab);
-    }
-
-    function close() {
-        document.getElementById('memberSettingsModal').style.display = 'none';
-    }
-
-    function isOpen() {
-        var m = document.getElementById('memberSettingsModal');
-        return !!m && m.style.display === 'flex';
+    function isVisible() {
+        var v = document.getElementById('memberSettingsView');
+        return !!v && v.classList.contains('active');
     }
 
     /* =================================================================
@@ -439,7 +443,7 @@
      * ================================================================= */
     var MemberSettingsModule = {
         key: 'memberSettings',
-        viewId: null,                  // 純彈窗，沒有主畫面
+        viewId: 'memberSettingsView',          // v85：改為主畫面分頁
         navButtonId: 'memberSettingsBtn',
         navButtonClass: 'btn-member-settings',
         requiredRoles: ['creator', 'senior', 'admin'],
@@ -447,25 +451,33 @@
         init: function (appCore) {
             core = appCore;
             core.injectStyle(CSS);
-            core.mountModal(MODAL_HTML);
+            core.mountView(VIEW_HTML);
 
-            // 資料變動時，若彈窗開著就即時刷新對應分頁
             core.on('users:changed', function () {
-                if (!isOpen()) return;
+                if (!isVisible()) return;
                 if (activeTab === 'perm') renderUsers();
                 if (activeTab === 'assign') renderAssignRules();
             });
             core.on('salesOptions:changed', function () {
-                if (isOpen() && activeTab === 'sales') renderSales();
+                if (isVisible() && activeTab === 'sales') renderSales();
             });
             core.on('assignmentRules:changed', function () {
-                if (isOpen() && activeTab === 'assign') renderAssignRules();
+                if (isVisible() && activeTab === 'assign') renderAssignRules();
             });
         },
 
-        /* --- 對外 API（HTML onclick 用） --- */
-        open: open,
-        close: close,
+        // 切到此分頁時執行
+        activate: function () {
+            var tabs = visibleTabs();
+            if (!tabs.length) return;
+            if (!tabs.some(function (t) { return t.key === activeTab; })) activeTab = tabs[0].key;
+            showTab(activeTab);
+        },
+
+        /* --- 對外 API --- */
+        // 保留 open()：舊的 onclick="MemberSettingsModule.open()" 仍可運作，
+        // 只是行為改為切換分頁而非開彈窗。
+        open: function () { core.switchTab('memberSettings'); },
         showTab: showTab,
         renderUsers: renderUsers,
         updateUser: updateUser,
