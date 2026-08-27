@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v83 Modular · 讀取優化)</title>
+    <title>中區收送件進度追蹤系統 (v84 Modular · 1150827)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -241,6 +241,7 @@
                 <div>
                     <div style="font-weight: 600;" id="displayUsername">User</div>
                     <div class="logout-link" onclick="window.logout()">登出帳號</div>
+                    <div id="appVersionLabel" style="font-size:0.72rem; color:#9ca3af; margin-top:3px;"></div>
                 </div>
             </div>
 
@@ -398,7 +399,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 83;
+    const APP_VERSION = 84;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -1363,6 +1364,8 @@
     function initApp() {
         document.getElementById('auth-screen').style.display = 'none';
         document.getElementById('app-screen').style.display = 'flex';
+        var vEl = document.getElementById('appVersionLabel');
+        if (vEl) vEl.innerText = 'v' + APP_VERSION;
         updateUIForRole();
         changeDate(state.currentDate, false);
         switchTab(firstAllowedView() || 'tasks');   // 無任何權限時 switchTab 會顯示提示畫面
