@@ -254,7 +254,7 @@
             <!-- 模組專屬入口按鈕：id 由各 module 宣告，權限由 AppCore 統一控制 -->
             <div class="admin-btn btn-purchase" id="purchaseBtn" onclick="window.switchTab('purchase')">📦 QIAGEN 採購進度</div>
             <div class="admin-btn btn-stock" id="stockBtn" onclick="window.switchTab('stock')">📊 QIAGEN 備庫存系統</div>
-            <div class="admin-btn btn-member-settings" id="memberSettingsBtn" onclick="MemberSettingsModule.open()">👤 成員設定管理</div>
+            <div class="admin-btn btn-member-settings" id="memberSettingsBtn" onclick="window.switchTab('memberSettings')">👤 成員設定管理</div>
 
             <!-- 任務看板自有的管理功能 -->
             <div class="admin-btn btn-import" id="importBtn" onclick="window.openImportModal()">📥 批量匯入任務</div>
@@ -399,7 +399,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 84;
+    const APP_VERSION = 85;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -1543,7 +1543,7 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=83"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=83"></script>
+<script src="modules/member-settings.module.js?v=85"></script>
 <script src="modules/temp-receive.module.js?v=83"></script>
 
 <script>
