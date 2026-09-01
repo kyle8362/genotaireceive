@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：QIAGEN 採購進度 (purchase)  ─ v89
+ * 模組：QIAGEN 採購進度 (purchase)  ─ v90
  * ---------------------------------------------------------------------
  * 連自己的 Realtime Database，自帶 CSS + HTML + JS。
  * 對外只暴露 window.PurchaseModule；核心完全不需要知道採購的資料結構。
@@ -53,7 +53,7 @@
     #purchaseView .pur-toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     #purchaseView .pur-btn-base { border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; transition: 0.2s; }
     #purchaseView .pur-btn-lg { padding: 10px 20px; font-size: 15px; }
-    #purchaseView .pur-btn-sm { padding: 4px 8px; font-size: 13px; color: white; white-space: nowrap; }
+    #purchaseView .pur-btn-sm { padding: clamp(3px, 0.35vw, 5px) clamp(4px, 0.55vw, 9px); font-size: clamp(10px, 0.82vw, 13px); color: white; white-space: nowrap; }
     #purchaseView .pur-search { width: 230px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; font-family: inherit; box-sizing: border-box; }
     #purchaseView .pur-search:focus { outline: none; border-color: #34495e; }
 
@@ -69,17 +69,31 @@
        v89：min-width:0 + max-width:100% — 作為 flex item 時預設 min-width:auto，
             會被 1152px 寬的表格撐開，使整個頁面可橫向滑動。
             設為 0 後橫向捲動被限制在此容器內。 */
-    #purchaseView .pur-table-wrap { width: 100%; max-width: 100%; min-width: 0; clear: both; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    /* v88：表格總寬 = 各欄寬度總和（128+98+160+160+120+120+128+238 = 1152），
-       靠左對齊、右側留白，欄寬不被等比拉伸 */
-    #purchaseView table { width: 100%; max-width: 1152px; min-width: 1152px; border-collapse: collapse; margin: 0 auto 0 0; table-layout: fixed; }
-    #purchaseView th { background-color: #2c3e50; color: white; padding: 12px 8px; text-align: center; white-space: nowrap; border: 1px solid #ddd; }
-    #purchaseView td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: middle; background: white; word-break: break-all; }
+    /* v90：表格已改為 100% 自適應寬度，永不溢出，故不設 overflow。
+       （若設 overflow-x:hidden，會連帶把 overflow-y 轉為 auto，
+         使紀錄欄 300px 寬的 tooltip 被裁切） */
+    #purchaseView .pur-table-wrap { width: 100%; max-width: 100%; min-width: 0; clear: both; }
+    /* v90：表格永遠貼合可用寬度，不再需要橫向滑動。
+       欄寬改用百分比，比例沿用 v88 的 128:98:160:160:120:120:128:238（總和 1152），
+       視窗變窄時所有欄位等比例縮小。 */
+    #purchaseView table { width: 100%; max-width: 100%; min-width: 0; border-collapse: collapse; margin: 0; table-layout: fixed; }
+    /* v90：字級與間距隨視窗寬度等比縮放（1152px 以上為原始大小，變窄則按比例縮小） */
+    #purchaseView table { font-size: clamp(11px, 0.94vw, 15px); }
+    #purchaseView th { background-color: #2c3e50; color: white; padding: clamp(7px, 0.75vw, 12px) clamp(2px, 0.4vw, 8px); text-align: center; white-space: nowrap; border: 1px solid #ddd; font-size: clamp(11px, 0.92vw, 15px); }
+    #purchaseView td { padding: clamp(4px, 0.5vw, 8px) clamp(2px, 0.3vw, 8px); border: 1px solid #ddd; text-align: center; vertical-align: middle; background: white; word-break: break-all; }
+
+    /* 執行操作欄：按鈕群組允許換行，空間不足時自動疊排而非撐開欄位 */
+    #purchaseView .pur-action-group { display: flex; gap: clamp(2px, 0.3vw, 5px); justify-content: center; align-items: center; flex-wrap: wrap; }
     #purchaseView tr:nth-child(even) td { background-color: #fcfcfc; }
-    /* v88：訂單/庫存編號（ORD260800300）與 PUR 單號資訊（PUR260900019）皆為 12 字，
-       在 v87 的 132px 基礎上各再加 3 字元寬度 */
-    #purchaseTable th:nth-child(3) { width: 160px; }
-    #purchaseTable th:nth-child(4) { width: 160px; }
+    /* v90：各欄百分比（合計 100%）— 由 v88 的固定 px 換算而來 */
+    #purchaseTable th:nth-child(1) { width: 11.11%; }   /* 建立日期      128/1152 */
+    #purchaseTable th:nth-child(2) { width:  8.51%; }   /* 紀錄           98/1152 */
+    #purchaseTable th:nth-child(3) { width: 13.89%; }   /* 訂單/庫存編號 160/1152 */
+    #purchaseTable th:nth-child(4) { width: 13.89%; }   /* PUR 單號資訊  160/1152 */
+    #purchaseTable th:nth-child(5) { width: 10.41%; }   /* SAP 單號資訊  120/1152 */
+    #purchaseTable th:nth-child(6) { width: 10.41%; }   /* 最終下單確認  120/1152 */
+    #purchaseTable th:nth-child(7) { width: 11.11%; }   /* 狀態         128/1152 */
+    #purchaseTable th:nth-child(8) { width: 20.67%; }   /* 執行操作     238/1152 */
 
     #purchaseView .pur-badge { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; padding: 5px; }
     #purchaseView .st-new { background-color: #95a5a6; }
@@ -95,7 +109,7 @@
     /* v87：紀錄欄圖示橫向並排（左：編輯紀錄 📝　右：備註 !） */
     #purchaseView .pur-icon-row { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
     #purchaseView .tooltip-container { position: relative; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: #555; font-size: 18px; justify-content: center; flex-shrink: 0; }
-    #purchaseView .tooltip-container .tooltip-text { visibility: hidden; width: 300px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; top: -10px; left: 120%; opacity: 0; transition: opacity 0.3s; font-size: 12px; line-height: 1.5; white-space: pre-wrap; box-shadow: 2px 2px 10px rgba(0,0,0,0.3); }
+    #purchaseView .tooltip-container .tooltip-text { visibility: hidden; width: min(300px, 26vw); background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; top: -10px; left: 120%; opacity: 0; transition: opacity 0.3s; font-size: 12px; line-height: 1.5; white-space: pre-wrap; box-shadow: 2px 2px 10px rgba(0,0,0,0.3); }
     #purchaseView .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
     #purchaseView .note-icon { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; background-color: #e74c3c; color: white; border-radius: 50%; font-size: 14px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.2); cursor: help; }
 
@@ -141,14 +155,14 @@
             <table id="purchaseTable">
                 <thead>
                     <tr>
-                        <th style="width: 128px;">建立日期</th>
-                        <th style="width: 98px;">紀錄</th>
+                        <th>建立日期</th>
+                        <th>紀錄</th>
                         <th>訂單/庫存編號</th>
                         <th>PUR 單號資訊</th>
-                        <th style="width: 120px;">SAP 單號資訊</th>
-                        <th style="width: 120px;">最終下單確認</th>
-                        <th style="width: 128px;">狀態</th>
-                        <th style="width: 238px;">執行操作</th>
+                        <th>SAP 單號資訊</th>
+                        <th>最終下單確認</th>
+                        <th>狀態</th>
+                        <th>執行操作</th>
                     </tr>
                 </thead>
                 <tbody id="purTableBody"></tbody>
@@ -224,7 +238,7 @@
             else if (item.status === '已下單') mainBtn = '<button class="pur-btn-base pur-btn-sm pur-btn-revert" onclick="PurchaseModule.openModal(\'revertOrder\', ' + index + ')">↩️ 退回</button>';
 
             var noteBtn = '<button class="pur-btn-base pur-btn-sm pur-btn-note" onclick="PurchaseModule.openModal(\'editNote\', ' + index + ')">📝</button>';
-            buttonsHtml = '<div style="display:flex;gap:5px;justify-content:center;">' + mainBtn + noteBtn +
+            buttonsHtml = '<div class="pur-action-group">' + mainBtn + noteBtn +
                 '<button class="pur-btn-base pur-btn-sm pur-btn-modify" onclick="PurchaseModule.openModal(\'modify\', ' + index + ')">🛠</button>' +
                 '<button class="pur-btn-base pur-btn-sm pur-btn-delete" onclick="PurchaseModule.openModal(\'delete\', ' + index + ')">🗑️</button></div>';
         }
