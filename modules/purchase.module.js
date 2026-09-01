@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：QIAGEN 採購進度 (purchase)  ─ v87
+ * 模組：QIAGEN 採購進度 (purchase)  ─ v88
  * ---------------------------------------------------------------------
  * 連自己的 Realtime Database，自帶 CSS + HTML + JS。
  * 對外只暴露 window.PurchaseModule；核心完全不需要知道採購的資料結構。
@@ -48,12 +48,13 @@
     var CSS = `
     #purchaseView .pur-head { margin-bottom: 14px; }
     #purchaseView .pur-head h1 { margin: 0; font-size: 1.5rem; color: #111827; line-height: 1.3; }
-    #purchaseView .pur-toolbar-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 0 0 14px 0; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
-    #purchaseView .pur-toolbar-left { display: flex; gap: 10px; align-items: center; }
+    #purchaseView .pur-toolbar-row { display: flex; justify-content: flex-start; align-items: center; width: 100%; margin: 0 0 14px 0; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+    #purchaseView .pur-toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     #purchaseView .pur-btn-base { border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; transition: 0.2s; }
     #purchaseView .pur-btn-lg { padding: 10px 20px; font-size: 15px; }
     #purchaseView .pur-btn-sm { padding: 4px 8px; font-size: 13px; color: white; white-space: nowrap; }
-    #purchaseView .pur-search { width: 250px; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    #purchaseView .pur-search { width: 230px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; font-family: inherit; box-sizing: border-box; }
+    #purchaseView .pur-search:focus { outline: none; border-color: #34495e; }
 
     #purchaseView .pur-btn-action  { background-color: #3498db; color: white; } #purchaseView .pur-btn-action:hover  { background-color: #2980b9; }
     #purchaseView .pur-btn-final   { background-color: #27ae60; color: white; } #purchaseView .pur-btn-final:hover   { background-color: #219150; }
@@ -65,14 +66,16 @@
 
     /* v86：表格獨立容器，確保永遠排在工具列下方、不會擠進按鈕列的空白處 */
     #purchaseView .pur-table-wrap { width: 100%; clear: both; overflow-x: auto; }
-    /* v87：表格總寬 = 各欄寬度總和，靠左對齊，右側留白（不再等比拉伸欄位） */
-    #purchaseView table { width: 100%; max-width: 994px; min-width: 994px; border-collapse: collapse; margin: 0 auto 0 0; table-layout: fixed; }
+    /* v88：表格總寬 = 各欄寬度總和（128+98+160+160+120+120+128+238 = 1152），
+       靠左對齊、右側留白，欄寬不被等比拉伸 */
+    #purchaseView table { width: 100%; max-width: 1152px; min-width: 1152px; border-collapse: collapse; margin: 0 auto 0 0; table-layout: fixed; }
     #purchaseView th { background-color: #2c3e50; color: white; padding: 12px 8px; text-align: center; white-space: nowrap; border: 1px solid #ddd; }
     #purchaseView td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: middle; background: white; word-break: break-all; }
     #purchaseView tr:nth-child(even) td { background-color: #fcfcfc; }
-    /* v87：訂單/庫存編號（ORD260800300）與 PUR 單號資訊（PUR260900019）皆為 12 字，同寬 */
-    #purchaseTable th:nth-child(3) { width: 132px; }
-    #purchaseTable th:nth-child(4) { width: 132px; }
+    /* v88：訂單/庫存編號（ORD260800300）與 PUR 單號資訊（PUR260900019）皆為 12 字，
+       在 v87 的 132px 基礎上各再加 3 字元寬度 */
+    #purchaseTable th:nth-child(3) { width: 160px; }
+    #purchaseTable th:nth-child(4) { width: 160px; }
 
     #purchaseView .pur-badge { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; padding: 5px; }
     #purchaseView .st-new { background-color: #95a5a6; }
@@ -124,10 +127,9 @@
                 <button class="pur-btn-base pur-btn-lg" style="background:#e67e22;color:white;" onclick="PurchaseModule.openModal('add')">➕ 新增採購</button>
                 <button class="pur-btn-base pur-btn-lg" style="background:#34495e;color:white;" onclick="PurchaseModule.openModal('filter')">⚡ 篩選條件</button>
                 <button class="pur-btn-base pur-btn-lg" id="purBulkDeleteBtn" style="background:#c0392b;color:white;display:none;" onclick="PurchaseModule.openModal('bulkDelete')">🗑️ 刪除資料</button>
-                <span id="purActiveFilterDisplay" class="pur-active-filter"></span>
-            </div>
-            <div>
+                <!-- v88：搜尋單號移至按鈕列後方 -->
                 <input type="text" id="purSearchInput" class="pur-search" placeholder="🔎 搜尋單號..." onkeyup="PurchaseModule.renderTable()">
+                <span id="purActiveFilterDisplay" class="pur-active-filter"></span>
             </div>
         </div>
 
@@ -135,14 +137,14 @@
             <table id="purchaseTable">
                 <thead>
                     <tr>
-                        <th style="width: 100px;">建立日期</th>
-                        <th style="width: 70px;">紀錄</th>
+                        <th style="width: 128px;">建立日期</th>
+                        <th style="width: 98px;">紀錄</th>
                         <th>訂單/庫存編號</th>
                         <th>PUR 單號資訊</th>
                         <th style="width: 120px;">SAP 單號資訊</th>
                         <th style="width: 120px;">最終下單確認</th>
-                        <th style="width: 100px;">狀態</th>
-                        <th style="width: 210px;">執行操作</th>
+                        <th style="width: 128px;">狀態</th>
+                        <th style="width: 238px;">執行操作</th>
                     </tr>
                 </thead>
                 <tbody id="purTableBody"></tbody>
