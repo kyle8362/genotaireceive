@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：QIAGEN 採購進度 (purchase)
+ * 模組：QIAGEN 採購進度 (purchase)  ─ v86
  * ---------------------------------------------------------------------
  * 連自己的 Realtime Database，自帶 CSS + HTML + JS。
  * 對外只暴露 window.PurchaseModule；核心完全不需要知道採購的資料結構。
@@ -32,9 +32,23 @@
     var filterStatus = 'All';
     var listenerAttached = false;
 
+    /* v86：狀態排序權重 — 待處理的（新建立→已填PUR→已填SAP）排在表格最前面 */
+    var STATUS_ORDER = {
+        '新建立':   0,
+        '已填PUR':  1,
+        '已填SAP':  2,
+        '已下單':   3,
+        '採購取消': 4
+    };
+    function statusRank(st) {
+        return (STATUS_ORDER[st] !== undefined) ? STATUS_ORDER[st] : 9;
+    }
+
     /* ---------- CSS（全部以 #purchaseView / #purModal 收斂） ---------- */
     var CSS = `
-    #purchaseView .pur-toolbar-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    #purchaseView .pur-head { margin-bottom: 14px; }
+    #purchaseView .pur-head h1 { margin: 0; font-size: 1.5rem; color: #111827; line-height: 1.3; }
+    #purchaseView .pur-toolbar-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 0 0 14px 0; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
     #purchaseView .pur-toolbar-left { display: flex; gap: 10px; align-items: center; }
     #purchaseView .pur-btn-base { border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; transition: 0.2s; }
     #purchaseView .pur-btn-lg { padding: 10px 20px; font-size: 15px; }
@@ -49,12 +63,14 @@
     #purchaseView .pur-btn-revert  { background-color: #7f8c8d; color: white; } #purchaseView .pur-btn-revert:hover  { background-color: #616a6b; }
     #purchaseView .pur-btn-note    { background-color: #6c5ce7; color: white; } #purchaseView .pur-btn-note:hover    { background-color: #5b4cc4; }
 
-    #purchaseView table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-    #purchaseView th { background-color: #2c3e50; color: white; padding: 12px; text-align: center; white-space: nowrap; border: 1px solid #ddd; }
-    #purchaseView td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: middle; background: white; }
+    /* v86：表格獨立容器，確保永遠排在工具列下方、不會擠進按鈕列的空白處 */
+    #purchaseView .pur-table-wrap { width: 100%; clear: both; overflow-x: auto; }
+    #purchaseView table { width: 100%; min-width: 1040px; border-collapse: collapse; margin-top: 0; table-layout: fixed; }
+    #purchaseView th { background-color: #2c3e50; color: white; padding: 12px 8px; text-align: center; white-space: nowrap; border: 1px solid #ddd; }
+    #purchaseView td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: middle; background: white; word-break: break-all; }
     #purchaseView tr:nth-child(even) td { background-color: #fcfcfc; }
-    #purchaseTable th:nth-child(4) { width: auto; min-width: 135px; }
-    #purchaseTable th:last-child { width: 210px; }
+    /* v86：PUR 單號資訊固定為 PUR260900019（12 字）所需寬度 */
+    #purchaseTable th:nth-child(4) { width: 132px; }
 
     #purchaseView .pur-badge { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; padding: 5px; }
     #purchaseView .st-new { background-color: #95a5a6; }
@@ -79,39 +95,55 @@
     #purModal .pur-input-group { margin-bottom: 15px; text-align: left; width: 100%; }
     #purModal .pur-input-group label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
     #purModal .pur-input-group input, #purModal .pur-input-group textarea, #purModal .pur-input-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; font-size: 1rem; }
+
+    /* v86：批次刪除預覽 */
+    #purModal .pur-del-preview { max-height: 200px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; background: #fafafa; padding: 8px; font-size: 0.85rem; line-height: 1.7; }
+    #purModal .pur-del-warn { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 6px; padding: 10px; font-size: 0.85rem; line-height: 1.7; margin-bottom: 12px; }
+
+    @media (max-width: 768px) {
+        #purchaseView .pur-toolbar-row { flex-direction: column; align-items: stretch; }
+        #purchaseView .pur-toolbar-left { flex-wrap: wrap; }
+        #purchaseView .pur-btn-lg { flex: 1; padding: 10px 12px; font-size: 14px; }
+        #purchaseView .pur-search { width: 100%; box-sizing: border-box; }
+    }
     `;
 
     /* ---------- HTML ---------- */
     var VIEW_HTML = `
     <div id="purchaseView" class="view-section">
-        <header>
+        <div class="pur-head">
             <h1>中區 QIAGEN 採購流程進度表</h1>
-            <div class="pur-toolbar-row">
-                <div class="pur-toolbar-left">
-                    <button class="pur-btn-base pur-btn-lg" style="background:#e67e22;color:white;" onclick="PurchaseModule.openModal('add')">➕ 新增採購</button>
-                    <button class="pur-btn-base pur-btn-lg" style="background:#34495e;color:white;" onclick="PurchaseModule.openModal('filter')">⚡ 篩選條件</button>
-                    <span id="purActiveFilterDisplay" class="pur-active-filter"></span>
-                </div>
-                <div>
-                    <input type="text" id="purSearchInput" class="pur-search" placeholder="🔎 搜尋單號..." onkeyup="PurchaseModule.renderTable()">
-                </div>
+        </div>
+
+        <div class="pur-toolbar-row">
+            <div class="pur-toolbar-left">
+                <button class="pur-btn-base pur-btn-lg" style="background:#e67e22;color:white;" onclick="PurchaseModule.openModal('add')">➕ 新增採購</button>
+                <button class="pur-btn-base pur-btn-lg" style="background:#34495e;color:white;" onclick="PurchaseModule.openModal('filter')">⚡ 篩選條件</button>
+                <button class="pur-btn-base pur-btn-lg" id="purBulkDeleteBtn" style="background:#c0392b;color:white;display:none;" onclick="PurchaseModule.openModal('bulkDelete')">🗑️ 刪除資料</button>
+                <span id="purActiveFilterDisplay" class="pur-active-filter"></span>
             </div>
-        </header>
-        <table id="purchaseTable">
-            <thead>
-                <tr>
-                    <th style="width: 100px;">建立日期</th>
-                    <th style="width: 60px;">紀錄</th>
-                    <th style="width: 140px;">訂單/庫存編號</th>
-                    <th>PUR 單號資訊</th>
-                    <th style="width: 120px;">SAP 單號資訊</th>
-                    <th style="width: 120px;">最終下單確認</th>
-                    <th style="width: 100px;">狀態</th>
-                    <th style="width: 210px;">執行操作</th>
-                </tr>
-            </thead>
-            <tbody id="purTableBody"></tbody>
-        </table>
+            <div>
+                <input type="text" id="purSearchInput" class="pur-search" placeholder="🔎 搜尋單號..." onkeyup="PurchaseModule.renderTable()">
+            </div>
+        </div>
+
+        <div class="pur-table-wrap">
+            <table id="purchaseTable">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">建立日期</th>
+                        <th style="width: 60px;">紀錄</th>
+                        <th>訂單/庫存編號</th>
+                        <th>PUR 單號資訊</th>
+                        <th style="width: 120px;">SAP 單號資訊</th>
+                        <th style="width: 120px;">最終下單確認</th>
+                        <th style="width: 100px;">狀態</th>
+                        <th style="width: 210px;">執行操作</th>
+                    </tr>
+                </thead>
+                <tbody id="purTableBody"></tbody>
+            </table>
+        </div>
     </div>`;
 
     var MODAL_HTML = `
@@ -230,13 +262,25 @@
             tbody.innerHTML = '<tr><td colspan="8" style="color:#888;">無資料</td></tr>';
             return;
         }
-        var html = '';
+
+        // 1) 先篩選，保留原始 index（openModal 依 index 取 localData）
+        var rows = [];
         localData.forEach(function (item, index) {
             if (searchVal && String(item.id).toUpperCase().indexOf(searchVal) === -1) return;
             if (filterStatus !== 'All' && item.status !== filterStatus) return;
             if (filterYear !== 'All' && String(item.createDate || '').indexOf(filterYear) !== 0) return;
-            html += createRowHtml(item, index);
+            rows.push({ item: item, index: index });
         });
+
+        // 2) v86：依狀態排序（新建立 / 已填PUR / 已填SAP 在前），同狀態內維持原本的新→舊順序
+        rows.sort(function (a, b) {
+            var d = statusRank(a.item.status) - statusRank(b.item.status);
+            if (d !== 0) return d;
+            return a.index - b.index;
+        });
+
+        var html = '';
+        rows.forEach(function (r) { html += createRowHtml(r.item, r.index); });
         tbody.innerHTML = html || '<tr><td colspan="8" style="color:#888;">無符合條件的資料</td></tr>';
     }
 
@@ -425,7 +469,118 @@
                 renderTable();
                 modal.style.display = 'none';
             };
+
+        } else if (action === 'bulkDelete') {
+            /* ---------- v86：依日期區間批次刪除（僅 creator / senior） ---------- */
+            if (!canBulkDelete()) { alert('此功能僅限創世神／高級管理者使用。'); return; }
+
+            title.innerText = '刪除資料（日期區間）';
+            var today = core.getTodayStr();
+            body.innerHTML =
+                '<div class="pur-del-warn">⚠️ 此操作會<b>永久刪除</b>資料庫中該區間內建立的採購資料，無法復原。<br>' +
+                '若只是要標記為取消，請改用表格中的 🗑️ 按鈕（狀態會變為「採購取消」，資料仍保留）。</div>' +
+                '<div class="pur-input-group"><label>開始日期（建立日期）</label><input type="date" id="pdStart" value="' + today + '"></div>' +
+                '<div class="pur-input-group"><label>結束日期（建立日期）</label><input type="date" id="pdEnd" value="' + today + '"></div>' +
+                '<div class="pur-input-group"><label>狀態限定（選填）</label><select id="pdStatus">' +
+                    '<option value="All">全部狀態</option>' +
+                    '<option value="新建立">僅「新建立」</option>' +
+                    '<option value="已填PUR">僅「已填PUR」</option>' +
+                    '<option value="已填SAP">僅「已填SAP」</option>' +
+                    '<option value="已下單">僅「已下單」</option>' +
+                    '<option value="採購取消">僅「採購取消」</option>' +
+                '</select></div>' +
+                '<div class="pur-input-group"><label>符合條件的資料</label><div class="pur-del-preview" id="pdPreview">請選擇日期區間</div></div>';
+
+            var refreshPreview = function () {
+                var matched = matchDeleteTargets(
+                    document.getElementById('pdStart').value,
+                    document.getElementById('pdEnd').value,
+                    document.getElementById('pdStatus').value
+                );
+                var box = document.getElementById('pdPreview');
+                if (matched === null) { box.innerHTML = '<span style="color:#c0392b;">開始日期不可晚於結束日期</span>'; return; }
+                if (!matched.length) { box.innerHTML = '<span style="color:#888;">此區間內沒有符合條件的資料</span>'; return; }
+                var lines = matched.slice(0, 100).map(function (m) {
+                    return '• ' + m.createDate + '　<b>' + m.id + '</b>　<span style="color:#666;">' + m.status + '</span>';
+                }).join('<br>');
+                if (matched.length > 100) lines += '<br><span style="color:#888;">…共 ' + matched.length + ' 筆，僅列出前 100 筆</span>';
+                box.innerHTML = '<div style="margin-bottom:6px;font-weight:bold;color:#c0392b;">共 ' + matched.length + ' 筆將被刪除</div>' + lines;
+            };
+            ['pdStart', 'pdEnd', 'pdStatus'].forEach(function (id) {
+                document.getElementById(id).onchange = refreshPreview;
+            });
+            refreshPreview();
+
+            btn.innerText = '確認刪除';
+            btn.onclick = function () {
+                var st = document.getElementById('pdStart').value;
+                var en = document.getElementById('pdEnd').value;
+                var stat = document.getElementById('pdStatus').value;
+                var matched = matchDeleteTargets(st, en, stat);
+                if (matched === null) return alert('開始日期不可晚於結束日期');
+                if (!matched.length) return alert('此區間內沒有符合條件的資料');
+
+                var confirmText = '即將永久刪除 ' + matched.length + ' 筆資料\n\n' +
+                    '區間：' + st + ' ~ ' + en + '\n' +
+                    '狀態：' + (stat === 'All' ? '全部' : stat) + '\n\n此操作無法復原，確定要繼續嗎？';
+                if (!confirm(confirmText)) return;
+
+                // 二次確認：需輸入筆數，避免誤觸
+                var typed = prompt('為避免誤刪，請輸入要刪除的筆數「' + matched.length + '」以確認：');
+                if (typed === null) return;
+                if (String(typed).trim() !== String(matched.length)) return alert('輸入不符，已取消刪除。');
+
+                btn.disabled = true;
+                btn.innerText = '刪除中...';
+
+                var updates = {};
+                matched.forEach(function (m) { updates[m.firebaseKey] = null; });
+
+                rtdb.ref(DB_PATH).update(updates)
+                    .then(function () {
+                        alert('已刪除 ' + matched.length + ' 筆資料。');
+                        modal.style.display = 'none';
+                    })
+                    .catch(function (err) {
+                        console.error('[purchase] 批次刪除失敗:', err);
+                        alert('刪除失敗：' + (err.message || err.code));
+                    })
+                    .then(function () {
+                        btn.disabled = false;
+                        btn.innerText = '確認刪除';
+                    });
+            };
         }
+    }
+
+    /* =================================================================
+     * v86：批次刪除輔助
+     * ================================================================= */
+    function canBulkDelete() {
+        return core.hasRole(['creator', 'senior']);
+    }
+
+    // createDate 以 YYYY/MM/DD 儲存；轉為 YYYY-MM-DD 方可與 input[type=date] 比較
+    function normalizeDate(d) {
+        return String(d || '').replace(/\//g, '-');
+    }
+
+    // 回傳符合條件的資料陣列；日期區間無效時回傳 null
+    function matchDeleteTargets(start, end, status) {
+        if (!start || !end) return [];
+        if (start > end) return null;
+        return localData.filter(function (item) {
+            var d = normalizeDate(item.createDate);
+            if (!d || d < start || d > end) return false;
+            if (status && status !== 'All' && item.status !== status) return false;
+            return true;
+        });
+    }
+
+    // 依權限顯示／隱藏「刪除資料」按鈕
+    function refreshBulkDeleteBtn() {
+        var btn = document.getElementById('purBulkDeleteBtn');
+        if (btn) btn.style.display = canBulkDelete() ? 'flex' : 'none';
     }
 
     /* =================================================================
@@ -448,14 +603,17 @@
             core.injectStyle(CSS);
             core.mountView(VIEW_HTML);
             core.mountModal(MODAL_HTML);
+            // 角色若在登入期間被調整，即時更新「刪除資料」按鈕的可見性
+            core.on('users:changed', refreshBulkDeleteBtn);
         },
 
-        activate: function () { attachListener(); },
+        activate: function () { attachListener(); refreshBulkDeleteBtn(); },
 
         /* --- 對外 API（HTML onclick 用） --- */
         openModal: openModal,
         renderTable: renderTable,
-        addBatchInputs: addBatchInputs
+        addBatchInputs: addBatchInputs,
+        refreshBulkDeleteBtn: refreshBulkDeleteBtn
     };
 
     window.PurchaseModule = PurchaseModule;
