@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v90 Modular · 版面優化)</title>
+    <title>中區收送件進度追蹤系統 (v91 Modular · Bug修復)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -464,7 +464,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 90;
+    const APP_VERSION = 91;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -476,7 +476,7 @@
     const PURGE_CONFIRM         = true; // true=刪除前先詢問；false=靜默自動刪除
 
     let state = {
-        currentUser: null, currentDate: new Date().toISOString().split('T')[0], activeTab: 'tasks',
+        currentUser: null, currentDate: getTodayStr(), activeTab: 'tasks',   // v91：改用本地日期
         tasks: [], users: [], salesOptions: [], assignmentRules: {},
         history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
     };
@@ -495,13 +495,22 @@
     // ==========================================
     // 3. 共用工具
     // ==========================================
-    function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+    // v91：一律以「本地時區」格式化日期。
+    //      原本使用 toISOString()，那回傳的是 UTC 日期；台灣為 UTC+8，
+    //      因此每天 00:00~07:59 會取得前一天的日期，導致看板停在昨天。
+    function formatDateLocal(d) {
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    }
+
+    function getTodayStr() { return formatDateLocal(new Date()); }
 
     // 日期字串工具（皆使用 YYYY-MM-DD，字串比較即等於日期比較）
     function shiftDateStr(dateStr, days) {
-        const d = new Date(dateStr + 'T00:00:00');
+        const d = new Date(dateStr + 'T00:00:00');   // 以本地時間解析
         d.setDate(d.getDate() + days);
-        return d.toISOString().split('T')[0];
+        return formatDateLocal(d);                   // 以本地時間輸出
     }
     function daysBetween(a, b) {
         return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
@@ -851,6 +860,27 @@
         const today = getTodayStr();
         changeDate(which === 'tomorrow' ? shiftDateStr(today, 1) : today);
     }
+
+    // v91：跨日自動校正。
+    //      分頁若開著過夜，state.currentDate 會停留在昨天。
+    //      當分頁重新回到前景、且使用者正停在「昨天」（也就是他當時看的今天）時，
+    //      自動切換到新的今天；若使用者是刻意翻到其他日期，則不干擾。
+    let lastKnownToday = getTodayStr();
+    function checkDateRollover() {
+        const today = getTodayStr();
+        if (today === lastKnownToday) return;
+        const previousToday = lastKnownToday;
+        lastKnownToday = today;
+        if (state.currentDate === previousToday) changeDate(today, false);
+        else highlightDateQuickButtons(state.currentDate);   // 只更新按鈕高亮
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) checkDateRollover();
+    });
+    window.addEventListener('focus', checkDateRollover);
+    setInterval(checkDateRollover, 60000);   // 分頁持續開著時每分鐘檢查一次
+
 
     function openSearchPanel() {
         const panel = document.getElementById('searchFloatPanel');
