@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v85 Modular · 版面優化)</title>
+    <title>中區收送件進度追蹤系統 (v86 Modular · 版面優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -75,6 +75,29 @@
         #searchCustomRange input[type="date"] { font-size: 0.85rem; padding: 6px; }
         .search-range-hint { font-size: 0.75rem; color: #9ca3af; line-height: 1.5; margin-top: -14px; margin-bottom: 16px; }
         .search-range-hint.loading { color: var(--primary); }
+
+        /* ===== v86：任務看板 header 日期列 ===== */
+        .task-date-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0.6rem; }
+        .task-date-input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.92rem; font-family: inherit; color: var(--text-main); background: #fff; cursor: pointer; }
+        .task-date-input:hover { border-color: var(--primary); }
+        .task-date-quick { padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .task-date-quick:hover { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
+        .task-date-quick.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .task-date-text { color: var(--text-light); font-weight: 500; font-size: 0.92rem; margin-left: 4px; }
+
+        /* ===== v86：搜尋任務（按鈕 + 浮動面板） ===== */
+        .task-search-bar { position: relative; margin: 0.9rem 0 0 0; }
+        .task-search-toggle { padding: 9px 16px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text-main); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .task-search-toggle:hover { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
+        .task-search-toggle.is-open { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .search-float-panel { display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); padding: 14px; }
+        .search-float-panel.open { display: block; }
+        .search-float-panel .sfp-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+        .search-float-panel .sfp-close { border: none; background: none; font-size: 1rem; color: #9ca3af; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+        .search-float-panel .sfp-close:hover { background: #f3f4f6; color: var(--text-main); }
+        .search-float-panel .search-box { margin-bottom: 0; }
+        .search-float-panel .search-range-hint { margin-top: 6px; margin-bottom: 0; }
+        .search-float-panel input[type="date"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 0.85rem; }
         #taskWarnBanner { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; padding: 12px 14px; margin-bottom: 1.5rem; font-size: 0.9rem; line-height: 1.7; max-width: 900px; }
         .search-box input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 0.9rem; }
         .search-results { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 6px; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -215,6 +238,14 @@
             .task-content { padding-right: 0; margin-bottom: 10px; }
             .action-area { flex-direction: row; width: 100%; justify-content: flex-end; }
             .fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 28px; }
+
+            /* v86：手機版日期列與搜尋面板 */
+            .task-date-bar { gap: 6px; }
+            .task-date-input { flex: 1 1 100%; }
+            .task-date-quick { flex: 1; text-align: center; padding: 9px 10px; }
+            .task-date-text { flex: 1 1 100%; margin-left: 0; font-size: 0.85rem; }
+            .task-search-toggle { width: 100%; }
+            .search-float-panel { width: 100%; left: 0; right: 0; }
         }
     </style>
 </head>
@@ -260,30 +291,6 @@
             <div class="admin-btn btn-import" id="importBtn" onclick="window.openImportModal()">📥 批量匯入任務</div>
             <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="window.openStatsModal()">📊 任務完成統整</div>
 
-            <div class="sidebar-section" id="taskSearchSection">
-                <h3>🔍 搜尋任務</h3>
-                <select id="searchRangeSelect" class="search-range-select" onchange="window.handleSearchRangeChange()">
-                    <option value="7">近 7 天</option>
-                    <option value="15">近 15 天</option>
-                    <option value="30" selected>近 30 天</option>
-                    <option value="custom">自訂區間 (最多 30 天)</option>
-                </select>
-                <div id="searchCustomRange" style="display:none;">
-                    <input type="date" id="searchStartDate" onchange="window.handleSearchRangeChange()">
-                    <input type="date" id="searchEndDate" onchange="window.handleSearchRangeChange()" style="margin-top:4px;">
-                </div>
-                <div class="search-box">
-                    <input type="text" id="searchTaskInput" placeholder="輸入關鍵字..." oninput="window.handleSearch()">
-                    <ul class="search-results" id="searchResults"></ul>
-                </div>
-                <div id="searchRangeHint" class="search-range-hint"></div>
-            </div>
-
-            <div class="sidebar-section" id="taskDateSection">
-                <h3>📅 日期選擇</h3>
-                <input type="date" id="dateSearch" onchange="window.changeDate(this.value)">
-            </div>
-
             <div class="sidebar-section" style="margin-top:20px;">
                 <h3>🕒 最近檢視紀錄</h3>
                 <ul class="history-list" id="historyList"></ul>
@@ -294,8 +301,46 @@
     <main>
         <div id="taskView" class="view-section active">
             <header>
-                <div class="date-header" id="headerDateDisplay"></div>
+                <!-- 日期選擇（v86：由側邊欄移至此，直接由顯示的日期做選擇） -->
+                <div id="taskDateSection">
+                    <div class="task-date-bar">
+                        <input type="date" id="dateSearch" class="task-date-input" onchange="window.changeDate(this.value)">
+                        <button type="button" class="task-date-quick" onclick="window.jumpDate('today')">當日</button>
+                        <button type="button" class="task-date-quick" onclick="window.jumpDate('tomorrow')">明天</button>
+                        <span class="task-date-text" id="headerDateDisplay"></span>
+                    </div>
+                </div>
+
                 <h1>中區收送件即時進度</h1>
+
+                <!-- 搜尋任務（v86：由側邊欄移至此，收合為按鈕，展開為浮動面板） -->
+                <div id="taskSearchSection">
+                    <div class="task-search-bar">
+                        <button type="button" class="task-search-toggle" id="taskSearchToggle" onclick="window.toggleSearchPanel()">🔍 搜尋任務</button>
+                        <div class="search-float-panel" id="searchFloatPanel">
+                            <div class="sfp-head">
+                                <span>搜尋任務</span>
+                                <button type="button" class="sfp-close" onclick="window.closeSearchPanel()">✕</button>
+                            </div>
+                            <select id="searchRangeSelect" class="search-range-select" onchange="window.handleSearchRangeChange()">
+                                <option value="7">近 7 天</option>
+                                <option value="15">近 15 天</option>
+                                <option value="30" selected>近 30 天</option>
+                                <option value="custom">自訂區間 (最多 30 天)</option>
+                            </select>
+                            <div id="searchCustomRange" style="display:none;">
+                                <input type="date" id="searchStartDate" onchange="window.handleSearchRangeChange()">
+                                <input type="date" id="searchEndDate" onchange="window.handleSearchRangeChange()" style="margin-top:4px;">
+                            </div>
+                            <div class="search-box">
+                                <input type="text" id="searchTaskInput" placeholder="輸入關鍵字..." oninput="window.handleSearch()">
+                                <ul class="search-results" id="searchResults"></ul>
+                            </div>
+                            <div id="searchRangeHint" class="search-range-hint"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="overall-progress-container">
                     <div class="progress-label"><span>當日總完成度</span><span id="overallProgressText">0%</span></div>
                     <div class="progress-track"><div class="progress-fill" id="overallProgressBar" style="width: 0%"></div></div>
@@ -399,7 +444,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 85;
+    const APP_VERSION = 86;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -759,6 +804,7 @@
         document.getElementById('dateSearch').value = d;
         const dateObj = new Date(d);
         document.getElementById('headerDateDisplay').innerText = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        highlightDateQuickButtons(d);   // v86：標示「當日 / 明天」按鈕狀態
         if(addHistory) {
             let hist = state.history.filter(x => x !== d);
             hist.unshift(d);
@@ -770,6 +816,64 @@
         subscribeTasksForDate(d);   // 切換日期 → 重新訂閱該日範圍
         renderTasks();
     }
+
+    // ==========================================
+    // 5-1. v86：header 日期快速按鈕 + 搜尋浮動面板
+    // ==========================================
+    function highlightDateQuickButtons(d) {
+        const today = getTodayStr();
+        const tomorrow = shiftDateStr(today, 1);
+        const btns = document.querySelectorAll('.task-date-quick');
+        if (btns.length < 2) return;
+        btns[0].classList.toggle('is-active', d === today);
+        btns[1].classList.toggle('is-active', d === tomorrow);
+    }
+
+    // which = 'today' | 'tomorrow'
+    function jumpDate(which) {
+        const today = getTodayStr();
+        changeDate(which === 'tomorrow' ? shiftDateStr(today, 1) : today);
+    }
+
+    function openSearchPanel() {
+        const panel = document.getElementById('searchFloatPanel');
+        const toggle = document.getElementById('taskSearchToggle');
+        if (!panel) return;
+        panel.classList.add('open');
+        if (toggle) toggle.classList.add('is-open');
+        handleSearchRangeChange();   // 顯示目前區間提示
+        const input = document.getElementById('searchTaskInput');
+        if (input) setTimeout(() => input.focus(), 50);
+    }
+
+    function closeSearchPanel() {
+        const panel = document.getElementById('searchFloatPanel');
+        const toggle = document.getElementById('taskSearchToggle');
+        if (panel) panel.classList.remove('open');
+        if (toggle) toggle.classList.remove('is-open');
+        const results = document.getElementById('searchResults');
+        if (results) results.style.display = 'none';
+    }
+
+    function toggleSearchPanel() {
+        const panel = document.getElementById('searchFloatPanel');
+        if (!panel) return;
+        if (panel.classList.contains('open')) closeSearchPanel();
+        else openSearchPanel();
+    }
+
+    // 點面板以外的地方 → 自動收起
+    document.addEventListener('click', function (e) {
+        const bar = document.querySelector('.task-search-bar');
+        const panel = document.getElementById('searchFloatPanel');
+        if (!bar || !panel || !panel.classList.contains('open')) return;
+        if (!bar.contains(e.target)) closeSearchPanel();
+    });
+
+    // Esc 收起
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeSearchPanel();
+    });
 
     function renderHistory() {
         const ul = document.getElementById('historyList');
@@ -1122,7 +1226,7 @@
             const rawTitle = (t.title || '').replace(/<[^>]+>/g, '');
             const tag = t.isDeleted ? ' 🗑️' : (t.completed ? ' ✅' : '');
             li.innerHTML = `<div style="font-weight:bold;">${rawTitle}</div><div style="font-size:0.8rem; color:#666;">📅 ${t.date}${tag}</div>`;
-            li.onclick = () => { changeDate(t.date); input.value = ''; list.style.display = 'none'; if(window.innerWidth <= 768) toggleSidebar(); };
+            li.onclick = () => { changeDate(t.date); input.value = ''; list.style.display = 'none'; closeSearchPanel(); };
             list.appendChild(li);
         });
         if (matches.length > 20) {
@@ -1541,7 +1645,7 @@
      MODULES：每個檔案自成一格，互不相依
      ===================================================================== -->
 <script src="modules/customer.module.js?v=83"></script>
-<script src="modules/purchase.module.js?v=83"></script>
+<script src="modules/purchase.module.js?v=86"></script>
 <script src="modules/stock.module.js?v=84"></script>
 <script src="modules/member-settings.module.js?v=85"></script>
 <script src="modules/temp-receive.module.js?v=83"></script>
