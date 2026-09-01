@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：QIAGEN 採購進度 (purchase)  ─ v86
+ * 模組：QIAGEN 採購進度 (purchase)  ─ v87
  * ---------------------------------------------------------------------
  * 連自己的 Realtime Database，自帶 CSS + HTML + JS。
  * 對外只暴露 window.PurchaseModule；核心完全不需要知道採購的資料結構。
@@ -65,11 +65,13 @@
 
     /* v86：表格獨立容器，確保永遠排在工具列下方、不會擠進按鈕列的空白處 */
     #purchaseView .pur-table-wrap { width: 100%; clear: both; overflow-x: auto; }
-    #purchaseView table { width: 100%; min-width: 1040px; border-collapse: collapse; margin-top: 0; table-layout: fixed; }
+    /* v87：表格總寬 = 各欄寬度總和，靠左對齊，右側留白（不再等比拉伸欄位） */
+    #purchaseView table { width: 100%; max-width: 994px; min-width: 994px; border-collapse: collapse; margin: 0 auto 0 0; table-layout: fixed; }
     #purchaseView th { background-color: #2c3e50; color: white; padding: 12px 8px; text-align: center; white-space: nowrap; border: 1px solid #ddd; }
     #purchaseView td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: middle; background: white; word-break: break-all; }
     #purchaseView tr:nth-child(even) td { background-color: #fcfcfc; }
-    /* v86：PUR 單號資訊固定為 PUR260900019（12 字）所需寬度 */
+    /* v87：訂單/庫存編號（ORD260800300）與 PUR 單號資訊（PUR260900019）皆為 12 字，同寬 */
+    #purchaseTable th:nth-child(3) { width: 132px; }
     #purchaseTable th:nth-child(4) { width: 132px; }
 
     #purchaseView .pur-badge { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: bold; border-radius: 4px; padding: 5px; }
@@ -83,7 +85,9 @@
     #purchaseView .row-cancelled strong { text-decoration: line-through; }
     #purchaseView .pur-active-filter { background: #dff9fb; color: #22a6b3; padding: 5px 10px; border-radius: 15px; font-size: 12px; margin-left: 10px; display: none; }
 
-    #purchaseView .tooltip-container { position: relative; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: #555; font-size: 18px; justify-content: center; }
+    /* v87：紀錄欄圖示橫向並排（左：編輯紀錄 📝　右：備註 !） */
+    #purchaseView .pur-icon-row { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
+    #purchaseView .tooltip-container { position: relative; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: #555; font-size: 18px; justify-content: center; flex-shrink: 0; }
     #purchaseView .tooltip-container .tooltip-text { visibility: hidden; width: 300px; background-color: #333; color: #fff; text-align: left; border-radius: 6px; padding: 10px; position: absolute; z-index: 100; top: -10px; left: 120%; opacity: 0; transition: opacity 0.3s; font-size: 12px; line-height: 1.5; white-space: pre-wrap; box-shadow: 2px 2px 10px rgba(0,0,0,0.3); }
     #purchaseView .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
     #purchaseView .note-icon { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; background-color: #e74c3c; color: white; border-radius: 50%; font-size: 14px; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.2); cursor: help; }
@@ -132,7 +136,7 @@
                 <thead>
                     <tr>
                         <th style="width: 100px;">建立日期</th>
-                        <th style="width: 60px;">紀錄</th>
+                        <th style="width: 70px;">紀錄</th>
                         <th>訂單/庫存編號</th>
                         <th>PUR 單號資訊</th>
                         <th style="width: 120px;">SAP 單號資訊</th>
@@ -220,10 +224,12 @@
         }
 
         var logText = (item.logs || []).join('\n');
+        // v87：兩個圖示橫向並排 — 依序為「編輯紀錄」與「備註」
         var iconsHtml = '<div class="tooltip-container">📝<span class="tooltip-text">' + logText + '</span></div>';
         if (item.note && item.note.trim() !== '') {
             iconsHtml += '<div class="tooltip-container"><span class="note-icon">!</span><span class="tooltip-text">' + item.note + '</span></div>';
         }
+        iconsHtml = '<div class="pur-icon-row">' + iconsHtml + '</div>';
 
         var ordered = item.ordered || {};
         var orderDisplay = ordered.val || '--';
