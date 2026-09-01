@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v86 Modular · 版面優化)</title>
+    <title>中區收送件進度追蹤系統 (v87 Modular · 版面優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -76,21 +76,32 @@
         .search-range-hint { font-size: 0.75rem; color: #9ca3af; line-height: 1.5; margin-top: -14px; margin-bottom: 16px; }
         .search-range-hint.loading { color: var(--primary); }
 
-        /* ===== v86：任務看板 header 日期列 ===== */
-        .task-date-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0.6rem; }
-        .task-date-input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.92rem; font-family: inherit; color: var(--text-main); background: #fff; cursor: pointer; }
-        .task-date-input:hover { border-color: var(--primary); }
-        .task-date-quick { padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        /* ===== v87：任務看板 header 日期列（日期文字 + 日曆按鈕整併） ===== */
+        .task-date-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0.7rem; }
+        .task-date-display { display: inline-flex; align-items: center; gap: 2px; padding: 5px 6px 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+        .task-date-display:hover { border-color: var(--primary); }
+        .task-date-text { color: var(--text-main); font-weight: 600; font-size: 0.95rem; white-space: nowrap; }
+        /* 日曆按鈕：原生 date input 透明疊在按鈕上方，點擊即開啟系統日曆 */
+        .task-date-picker { position: relative; display: inline-flex; width: 32px; height: 30px; flex-shrink: 0; }
+        .task-date-picker-btn { width: 100%; height: 100%; border: none; background: transparent; border-radius: 6px; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0; }
+        .task-date-picker-btn:hover { background: #f0fdfa; }
+        .task-date-picker input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: none; padding: 0; margin: 0; cursor: pointer; }
+        .task-date-picker input[type="date"]::-webkit-calendar-picker-indicator { width: 100%; height: 100%; position: absolute; inset: 0; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+
+        .task-date-quick { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .task-date-quick:hover { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
         .task-date-quick.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
-        .task-date-text { color: var(--text-light); font-weight: 500; font-size: 0.92rem; margin-left: 4px; }
+
+        /* ===== v87：標題列（標題在左、搜尋按鈕在右） ===== */
+        .task-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .task-title-row h1 { margin: 0; }
 
         /* ===== v86：搜尋任務（按鈕 + 浮動面板） ===== */
-        .task-search-bar { position: relative; margin: 0.9rem 0 0 0; }
+        .task-search-bar { position: relative; margin: 0; }
         .task-search-toggle { padding: 9px 16px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text-main); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
         .task-search-toggle:hover { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
         .task-search-toggle.is-open { background: var(--primary); border-color: var(--primary); color: #fff; }
-        .search-float-panel { display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); padding: 14px; }
+        .search-float-panel { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 300; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); padding: 14px; }
         .search-float-panel.open { display: block; }
         .search-float-panel .sfp-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
         .search-float-panel .sfp-close { border: none; background: none; font-size: 1rem; color: #9ca3af; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
@@ -239,11 +250,12 @@
             .action-area { flex-direction: row; width: 100%; justify-content: flex-end; }
             .fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 28px; }
 
-            /* v86：手機版日期列與搜尋面板 */
+            /* v87：手機版日期列與搜尋面板 */
             .task-date-bar { gap: 6px; }
-            .task-date-input { flex: 1 1 100%; }
+            .task-date-display { flex: 1 1 100%; justify-content: space-between; }
+            .task-date-text { font-size: 0.88rem; }
             .task-date-quick { flex: 1; text-align: center; padding: 9px 10px; }
-            .task-date-text { flex: 1 1 100%; margin-left: 0; font-size: 0.85rem; }
+            .task-title-row { flex-direction: column; align-items: stretch; gap: 10px; }
             .task-search-toggle { width: 100%; }
             .search-float-panel { width: 100%; left: 0; right: 0; }
         }
@@ -301,22 +313,27 @@
     <main>
         <div id="taskView" class="view-section active">
             <header>
-                <!-- 日期選擇（v86：由側邊欄移至此，直接由顯示的日期做選擇） -->
+                <!-- 日期（v87：日期文字與日曆按鈕整併為同一控制項） -->
                 <div id="taskDateSection">
                     <div class="task-date-bar">
-                        <input type="date" id="dateSearch" class="task-date-input" onchange="window.changeDate(this.value)">
+                        <div class="task-date-display">
+                            <span class="task-date-text" id="headerDateDisplay"></span>
+                            <span class="task-date-picker">
+                                <button type="button" class="task-date-picker-btn" title="選擇日期">📅</button>
+                                <input type="date" id="dateSearch" onchange="window.changeDate(this.value)">
+                            </span>
+                        </div>
                         <button type="button" class="task-date-quick" onclick="window.jumpDate('today')">當日</button>
                         <button type="button" class="task-date-quick" onclick="window.jumpDate('tomorrow')">明天</button>
-                        <span class="task-date-text" id="headerDateDisplay"></span>
                     </div>
                 </div>
 
-                <h1>中區收送件即時進度</h1>
-
-                <!-- 搜尋任務（v86：由側邊欄移至此，收合為按鈕，展開為浮動面板） -->
-                <div id="taskSearchSection">
-                    <div class="task-search-bar">
-                        <button type="button" class="task-search-toggle" id="taskSearchToggle" onclick="window.toggleSearchPanel()">🔍 搜尋任務</button>
+                <!-- v87：標題與搜尋按鈕同一列，搜尋在右 -->
+                <div class="task-title-row">
+                    <h1>中區收送件即時進度</h1>
+                    <div id="taskSearchSection">
+                        <div class="task-search-bar">
+                            <button type="button" class="task-search-toggle" id="taskSearchToggle" onclick="window.toggleSearchPanel()">🔍 搜尋任務</button>
                         <div class="search-float-panel" id="searchFloatPanel">
                             <div class="sfp-head">
                                 <span>搜尋任務</span>
@@ -337,6 +354,7 @@
                                 <ul class="search-results" id="searchResults"></ul>
                             </div>
                             <div id="searchRangeHint" class="search-range-hint"></div>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -444,7 +462,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 86;
+    const APP_VERSION = 87;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -1645,7 +1663,7 @@
      MODULES：每個檔案自成一格，互不相依
      ===================================================================== -->
 <script src="modules/customer.module.js?v=83"></script>
-<script src="modules/purchase.module.js?v=86"></script>
+<script src="modules/purchase.module.js?v=87"></script>
 <script src="modules/stock.module.js?v=84"></script>
 <script src="modules/member-settings.module.js?v=85"></script>
 <script src="modules/temp-receive.module.js?v=83"></script>
