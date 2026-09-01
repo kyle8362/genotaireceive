@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：QIAGEN 採購進度 (purchase)  ─ v88
+ * 模組：QIAGEN 採購進度 (purchase)  ─ v89
  * ---------------------------------------------------------------------
  * 連自己的 Realtime Database，自帶 CSS + HTML + JS。
  * 對外只暴露 window.PurchaseModule；核心完全不需要知道採購的資料結構。
@@ -46,9 +46,10 @@
 
     /* ---------- CSS（全部以 #purchaseView / #purModal 收斂） ---------- */
     var CSS = `
+    #purchaseView { min-width: 0; max-width: 100%; }
     #purchaseView .pur-head { margin-bottom: 14px; }
     #purchaseView .pur-head h1 { margin: 0; font-size: 1.5rem; color: #111827; line-height: 1.3; }
-    #purchaseView .pur-toolbar-row { display: flex; justify-content: flex-start; align-items: center; width: 100%; margin: 0 0 14px 0; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
+    #purchaseView .pur-toolbar-row { display: flex; justify-content: flex-start; align-items: center; width: 100%; max-width: 100%; min-width: 0; margin: 0 0 14px 0; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
     #purchaseView .pur-toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     #purchaseView .pur-btn-base { border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; transition: 0.2s; }
     #purchaseView .pur-btn-lg { padding: 10px 20px; font-size: 15px; }
@@ -64,8 +65,11 @@
     #purchaseView .pur-btn-revert  { background-color: #7f8c8d; color: white; } #purchaseView .pur-btn-revert:hover  { background-color: #616a6b; }
     #purchaseView .pur-btn-note    { background-color: #6c5ce7; color: white; } #purchaseView .pur-btn-note:hover    { background-color: #5b4cc4; }
 
-    /* v86：表格獨立容器，確保永遠排在工具列下方、不會擠進按鈕列的空白處 */
-    #purchaseView .pur-table-wrap { width: 100%; clear: both; overflow-x: auto; }
+    /* v86：表格獨立容器，確保永遠排在工具列下方、不會擠進按鈕列的空白處
+       v89：min-width:0 + max-width:100% — 作為 flex item 時預設 min-width:auto，
+            會被 1152px 寬的表格撐開，使整個頁面可橫向滑動。
+            設為 0 後橫向捲動被限制在此容器內。 */
+    #purchaseView .pur-table-wrap { width: 100%; max-width: 100%; min-width: 0; clear: both; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     /* v88：表格總寬 = 各欄寬度總和（128+98+160+160+120+120+128+238 = 1152），
        靠左對齊、右側留白，欄寬不被等比拉伸 */
     #purchaseView table { width: 100%; max-width: 1152px; min-width: 1152px; border-collapse: collapse; margin: 0 auto 0 0; table-layout: fixed; }
