@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v87 Modular · 版面優化)</title>
+    <title>中區收送件進度追蹤系統 (v88 Modular · 版面優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -93,7 +93,7 @@
         .task-date-quick.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
         /* ===== v87：標題列（標題在左、搜尋按鈕在右） ===== */
-        .task-title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .task-title-row { display: flex; justify-content: flex-start; align-items: center; gap: 14px; flex-wrap: wrap; }
         .task-title-row h1 { margin: 0; }
 
         /* ===== v86：搜尋任務（按鈕 + 浮動面板） ===== */
@@ -101,7 +101,7 @@
         .task-search-toggle { padding: 9px 16px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text-main); font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
         .task-search-toggle:hover { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
         .task-search-toggle.is-open { background: var(--primary); border-color: var(--primary); color: #fff; }
-        .search-float-panel { display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 300; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); padding: 14px; }
+        .search-float-panel { display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); padding: 14px; }
         .search-float-panel.open { display: block; }
         .search-float-panel .sfp-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
         .search-float-panel .sfp-close { border: none; background: none; font-size: 1rem; color: #9ca3af; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
@@ -254,7 +254,7 @@
             .task-date-bar { gap: 6px; }
             .task-date-display { flex: 1 1 100%; justify-content: space-between; }
             .task-date-text { font-size: 0.88rem; }
-            .task-date-quick { flex: 1; text-align: center; padding: 9px 10px; }
+            .task-date-quick { flex: 0 0 auto; text-align: center; padding: 9px 18px; }
             .task-title-row { flex-direction: column; align-items: stretch; gap: 10px; }
             .task-search-toggle { width: 100%; }
             .search-float-panel { width: 100%; left: 0; right: 0; }
@@ -324,7 +324,6 @@
                             </span>
                         </div>
                         <button type="button" class="task-date-quick" onclick="window.jumpDate('today')">當日</button>
-                        <button type="button" class="task-date-quick" onclick="window.jumpDate('tomorrow')">明天</button>
                     </div>
                 </div>
 
@@ -462,7 +461,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 87;
+    const APP_VERSION = 88;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -822,7 +821,7 @@
         document.getElementById('dateSearch').value = d;
         const dateObj = new Date(d);
         document.getElementById('headerDateDisplay').innerText = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-        highlightDateQuickButtons(d);   // v86：標示「當日 / 明天」按鈕狀態
+        highlightDateQuickButtons(d);   // v88：標示「當日」按鈕狀態
         if(addHistory) {
             let hist = state.history.filter(x => x !== d);
             hist.unshift(d);
@@ -839,15 +838,12 @@
     // 5-1. v86：header 日期快速按鈕 + 搜尋浮動面板
     // ==========================================
     function highlightDateQuickButtons(d) {
-        const today = getTodayStr();
-        const tomorrow = shiftDateStr(today, 1);
         const btns = document.querySelectorAll('.task-date-quick');
-        if (btns.length < 2) return;
-        btns[0].classList.toggle('is-active', d === today);
-        btns[1].classList.toggle('is-active', d === tomorrow);
+        if (!btns.length) return;
+        btns[0].classList.toggle('is-active', d === getTodayStr());   // 「當日」
     }
 
-    // which = 'today' | 'tomorrow'
+    // which = 'today'（保留參數，日後要加其他快速跳轉時可擴充）
     function jumpDate(which) {
         const today = getTodayStr();
         changeDate(which === 'tomorrow' ? shiftDateStr(today, 1) : today);
@@ -1663,7 +1659,7 @@
      MODULES：每個檔案自成一格，互不相依
      ===================================================================== -->
 <script src="modules/customer.module.js?v=83"></script>
-<script src="modules/purchase.module.js?v=87"></script>
+<script src="modules/purchase.module.js?v=88"></script>
 <script src="modules/stock.module.js?v=84"></script>
 <script src="modules/member-settings.module.js?v=85"></script>
 <script src="modules/temp-receive.module.js?v=83"></script>
