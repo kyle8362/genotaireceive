@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v93 Modular · 資安強化)</title>
+    <title>中區收送件進度追蹤系統 (v95 Modular · 資安升級)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/firebase@9.22.2/firebase-app-check-compat.js"></script>
 
     <style>
         /* =========================================================
@@ -451,6 +452,29 @@
 
     let mainApp;
     try { mainApp = firebase.app("mainApp"); } catch(e) { mainApp = firebase.initializeApp(firebaseConfig, "mainApp"); }
+
+    // ---------- v95：App Check（防止非本站來源直接存取 Firestore）----------
+    // 必須在取用 firestore() 之前啟用。
+    // 使用 reCAPTCHA Enterprise provider（v3 provider 已被 Google 標記為淘汰）。
+    // site key 是公開金鑰，設計上就放在前端；secret key 只填在 Firebase Console。
+    // 金鑰管理位置：Google Cloud Console → 安全性 → Fraud Defense → 金鑰
+    const APPCHECK_SITE_KEY = '6LewMKctAAAAAHpaLJt9ryJojOyZIttpbt9X8ftI';
+
+    if (APPCHECK_SITE_KEY) {
+        try {
+            firebase.appCheck(mainApp).activate(
+                new firebase.appCheck.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),
+                true   // 自動更新 token
+            );
+            console.info('[AppCheck] 已啟用 (reCAPTCHA Enterprise)');
+        } catch (e) {
+            // 啟用失敗時不阻斷系統：Console 未開強制模式前，請求仍會被接受
+            console.warn('[AppCheck] 啟用失敗:', e.message || e);
+        }
+    } else {
+        console.info('[AppCheck] 未設定 site key，略過');
+    }
+
     const db = mainApp.firestore();
 
     // 開啟本機持久化快取（必須在任何讀寫之前呼叫）
@@ -470,7 +494,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 93;
+    const APP_VERSION = 95;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
