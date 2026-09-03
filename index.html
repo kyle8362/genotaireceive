@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v92 Modular · 版面優化)</title>
+    <title>中區收送件進度追蹤系統 (v93 Modular · 資安強化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -470,7 +470,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 92;
+    const APP_VERSION = 93;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -1490,18 +1490,18 @@
                 alert('註冊成功！待管理員核准後方可登入。');
                 toggleAuthMode();
             } else {
-                if (u === 'Admin' && p === 'Abcd1234') {
-                    const q = await db.collection('users').where('username', '==', 'Admin').get();
-                    if(q.empty) await db.collection('users').add({ username: 'Admin', password: p, isApproved: true, role: 'creator', remarks: '創世神', nickname: '系統管理員' });
-                    loginSuccess('Admin', 'creator');
-                } else {
-                    const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                    if (q.empty) alert('帳號或密碼錯誤');
-                    else {
-                        const user = q.docs[0].data();
-                        if (!user.isApproved) alert('⚠️ 您的帳號尚未通過審核。');
-                        else loginSuccess(user.username, user.role || 'user');
-                    }
+                // v93：移除硬編碼的萬用登入。
+                //      原本 Admin/固定密碼會繞過資料庫直接以 creator 身分登入，
+                //      且該密碼寫在前端原始碼中，任何人檢視網頁原始碼即可取得。
+                //      現在所有帳號一律比對 Firestore。
+                //      若日後需要復原最高權限帳號，請從 Firebase Console 直接編輯
+                //      users 集合（Console 不受 Security Rules 與 App Check 限制）。
+                const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+                if (q.empty) alert('帳號或密碼錯誤');
+                else {
+                    const user = q.docs[0].data();
+                    if (!user.isApproved) alert('⚠️ 您的帳號尚未通過審核。');
+                    else loginSuccess(user.username, user.role || 'user');
                 }
             }
         } catch (e) { alert(e.message || '發生錯誤'); console.error(e); }
