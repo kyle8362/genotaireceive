@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v91 Modular · Bug修復)</title>
+    <title>中區收送件進度追蹤系統 (v92 Modular · 版面優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -81,6 +81,8 @@
         .task-date-display { display: inline-flex; align-items: center; gap: 2px; padding: 5px 6px 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; min-width: 0; max-width: 100%; }
         .task-date-display:hover { border-color: var(--primary); }
         .task-date-text { color: var(--text-main); font-weight: 600; font-size: 0.95rem; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        /* v92：電腦版顯示完整日期，手機版顯示短日期 */
+        .task-date-text .date-short { display: none; }
         /* 日曆按鈕：原生 date input 透明疊在按鈕上方，點擊即開啟系統日曆 */
         .task-date-picker { position: relative; display: inline-flex; width: 32px; height: 30px; flex-shrink: 0; }
         .task-date-picker-btn { width: 100%; height: 100%; border: none; background: transparent; border-radius: 6px; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0; }
@@ -129,7 +131,8 @@
         header { margin-bottom: 2rem; }
         header h1 { margin: 0; font-size: 1.8rem; color: #111827; }
         .date-header { color: var(--text-light); margin-bottom: 0.5rem; font-weight: 500; }
-        .overall-progress-container { margin-top: 15px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; }
+        /* v92：寬度 = .task-container 的 900px + .fab 按鈕的 60px，避免橫向突出 */
+        .overall-progress-container { margin-top: 15px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; max-width: 960px; }
         .progress-label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; font-weight: 600; color: #4b5563; }
         .progress-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--success); transition: width 0.5s ease; }
@@ -255,9 +258,12 @@
 
             /* v87：手機版日期列與搜尋面板 */
             .task-date-bar { gap: 6px; }
-            .task-date-display { flex: 1 1 100%; justify-content: space-between; box-sizing: border-box; }
-            .task-date-text { font-size: 0.88rem; white-space: normal; overflow: visible; }
+            /* v92：改為 auto，讓「當日」按鈕與日期框同一行 */
+            .task-date-display { flex: 1 1 auto; justify-content: space-between; box-sizing: border-box; min-width: 0; }
+            .task-date-text { font-size: 0.88rem; white-space: nowrap; overflow: visible; }
             .task-date-quick { flex: 0 0 auto; text-align: center; padding: 9px 18px; }
+            .task-date-text .date-full { display: none; }
+            .task-date-text .date-short { display: inline; }
             .task-title-row { flex-direction: column; align-items: stretch; gap: 10px; }
             .task-search-toggle { width: 100%; }
             .search-float-panel { width: 100%; left: 0; right: 0; }
@@ -464,7 +470,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 91;
+    const APP_VERSION = 92;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -832,7 +838,14 @@
         state.currentDate = d;
         document.getElementById('dateSearch').value = d;
         const dateObj = new Date(d);
-        document.getElementById('headerDateDisplay').innerText = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        // v92：同時輸出完整與簡短兩種格式，由 CSS 依螢幕寬度決定顯示哪一個
+        const WD = ['日', '一', '二', '三', '四', '五', '六'];
+        const dateFull = dateObj.toLocaleDateString('zh-TW', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        const dateShort = dateObj.getFullYear() + '/' + (dateObj.getMonth() + 1) + '/' + dateObj.getDate() +
+                          ' (' + WD[dateObj.getDay()] + ')';
+        document.getElementById('headerDateDisplay').innerHTML =
+            '<span class="date-full">' + dateFull + '</span>' +
+            '<span class="date-short">' + dateShort + '</span>';
         highlightDateQuickButtons(d);   // v88：標示「當日」按鈕狀態
         if(addHistory) {
             let hist = state.history.filter(x => x !== d);
