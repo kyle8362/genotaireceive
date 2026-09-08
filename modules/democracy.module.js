@@ -88,6 +88,19 @@
 
     function toNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
 
+    // 數量下拉選單 1~20。若既有資料超出範圍，把該數字補進選單避免被吃掉。
+    function qtyOptions(current) {
+        var cur = toNum(current);
+        if (cur < 1) cur = 1;
+        var h = '';
+        var extra = (cur > 20);
+        for (var i = 1; i <= 20; i++) {
+            h += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + i + '</option>';
+        }
+        if (extra) h += '<option value="' + cur + '" selected>' + cur + '</option>';
+        return h;
+    }
+
     // 把 'YYYY-MM-DD HH:mm' 轉成剩餘時間文字
     function remainText(deadline) {
         if (!deadline) return '';
@@ -158,12 +171,14 @@
     #democracyView .demo-back { background: none; border: none; color: var(--primary); font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: 12px; font-family: inherit; }
     #democracyView .demo-sec-title { font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0 0 10px 0; }
 
-    /* --- 公告區 --- */
+    /* --- 公告區（單一格跑馬燈輪播） --- */
     #democracyView .demo-board { margin-bottom: 16px; }
-    #democracyView .demo-ann { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid var(--warning); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
-    #democracyView .demo-ann-title { font-weight: 700; font-size: 0.95rem; color: #92400e; }
-    #democracyView .demo-ann-body { font-size: 0.88rem; color: #78350f; margin-top: 4px; white-space: pre-wrap; }
-    #democracyView .demo-ann-date { font-size: 0.78rem; color: #a16207; margin-top: 6px; }
+    #democracyView .demo-marquee { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid var(--warning); border-radius: 8px; padding: 11px 0; margin-bottom: 8px; overflow: hidden; }
+    #democracyView .demo-mq-track { display: inline-flex; white-space: nowrap; animation-name: demoMqScroll; animation-timing-function: linear; animation-iteration-count: infinite; }
+    #democracyView .demo-marquee:hover .demo-mq-track { animation-play-state: paused; }
+    #democracyView .demo-mq-item { padding: 0 30px; font-size: 0.9rem; color: #78350f; }
+    #democracyView .demo-mq-item b { color: #92400e; font-weight: 700; }
+    #democracyView .demo-mq-item .sep { color: #d97706; margin: 0 8px; }
     #democracyView .demo-ongoing { background: var(--primary-light); border: 1px solid #99f6e4; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.88rem; color: #115e59; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
     #democracyView .demo-ongoing b { font-weight: 700; }
 
@@ -199,10 +214,11 @@
     #democracyView .demo-item-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
     #democracyView .demo-item-name { font-weight: 600; font-size: 0.92rem; color: var(--text-main); flex: 1; min-width: 0; word-break: break-all; }
     #democracyView .demo-item-code { font-size: 0.78rem; color: var(--text-light); }
-    #democracyView .demo-item-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    #democracyView .demo-item-fields { display: grid; grid-template-columns: 120px 100px 110px minmax(150px, 1fr); gap: 10px; margin-top: 10px; align-items: end; }
     #democracyView .demo-item-fields label { font-size: 0.78rem; color: var(--text-light); display: block; margin-bottom: 3px; }
-    #democracyView .demo-item-fields input { width: 100%; }
-    #democracyView .demo-item-sub { margin-top: 8px; font-size: 0.85rem; color: var(--primary); font-weight: 600; text-align: right; }
+    #democracyView .demo-item-fields input, #democracyView .demo-item-fields select { width: 100%; }
+    #democracyView .demo-item-sub { font-size: 0.9rem; color: var(--primary); font-weight: 700; padding: 8px 0; }
+    #democracyView .demo-item-ro { font-size: 0.88rem; color: var(--text-main); padding: 8px 0; }
     #democracyView .demo-total { background: var(--primary-light); border-radius: 8px; padding: 12px 14px; font-size: 0.95rem; font-weight: 700; color: #115e59; display: flex; justify-content: space-between; margin: 12px 0; }
     #democracyView .demo-save-bar { display: flex; gap: 10px; }
     #democracyView .demo-save-bar .demo-btn { flex: 1; }
@@ -235,9 +251,18 @@
         #democracyView .demo-card { padding: 12px; }
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
         #democracyView .demo-save-bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; }
-        #democracyView .demo-item-fields { grid-template-columns: 1fr; }
+        #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        #democracyView .demo-f-note { grid-column: 1 / -1; }
         #democracyView table.demo-table { font-size: 0.8rem; }
         #democracyModal .dm-box { max-height: 92vh; }
+    }
+    `;
+
+    /* 跑馬燈動畫（@keyframes 無法以容器 id 收斂，故用專屬名稱避免衝突） */
+    var KEYFRAMES_CSS = `
+    @keyframes demoMqScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @media (prefers-reduced-motion: reduce) {
+        #democracyView .demo-mq-track { animation: none; }
     }
     `;
 
@@ -326,44 +351,55 @@
 
     function latestOrder() { return orders.length ? orders[0] : null; }
 
-    function htmlBoard() {
-        var h = '<div class="demo-board">';
+    function htmlMarquee() {
         var list = activeAnnouncements();
+        if (!list.length) return '';
+        var text = '';
         for (var i = 0; i < list.length; i++) {
             var a = list[i];
-            h += '<div class="demo-ann">' +
-                 '<div class="demo-ann-title">📢 ' + esc(a.title) + '</div>' +
-                 (a.body ? '<div class="demo-ann-body">' + esc(a.body) + '</div>' : '') +
-                 '<div class="demo-ann-date">公告期間 ' + esc(a.startDate || '—') + ' ~ ' + esc(a.endDate || '—') + '</div>' +
-                 '</div>';
+            text += '<span class="demo-mq-item">📢 <b>' + esc(a.title) + '</b>' +
+                    (a.body ? '<span class="sep">｜</span>' + esc(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
+                    '</span>';
         }
-        // 進行中事項提醒（由管理員決定是否公告）
+        // 依內容長度估算一圈的秒數，太快會看不完、太慢會像沒動
+        var chars = 0;
+        for (var k = 0; k < list.length; k++) chars += (list[k].title || '').length + (list[k].body || '').length + 12;
+        var sec = Math.max(18, Math.round(chars * 0.45));
+        // 內容放兩份，動畫跑到 -50% 時剛好接回起點，看起來是連續的
+        return '<div class="demo-marquee"><div class="demo-mq-track" style="animation-duration:' + sec + 's;">' +
+               text + text + '</div></div>';
+    }
+
+    function htmlOngoing() {
         var o = latestOrder();
-        if (homeSettings.showStationery !== false && o && !isLocked(o)) {
-            h += '<div class="demo-ongoing">' +
-                 '<span>🖊️ <b>文具購買登記進行中</b>：' + esc(o.title || '文具採購單') +
-                 '，截止 ' + esc(o.deadline || '未設定') + '（' + remainText(o.deadline) + '）</span>' +
-                 '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.go(\'stationery\')">前往登記</button>' +
-                 '</div>';
-        }
-        h += '</div>';
-        return h;
+        if (homeSettings.showStationery === false || !o || isLocked(o)) return '';
+        return '<div class="demo-ongoing">' +
+               '<span>🖊️ <b>文具購買登記進行中</b>：' + esc(o.title || '文具採購單') +
+               '，截止 ' + esc(o.deadline || '未設定') + '（' + remainText(o.deadline) + '）</span>' +
+               '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.go(\'stationery\')">前往登記</button>' +
+               '</div>';
+    }
+
+    function htmlBoard() {
+        return '<div class="demo-board">' + htmlMarquee() +
+               '<div id="demoOngoing">' + htmlOngoing() + '</div></div>';
+    }
+
+    function htmlStTag() {
+        var o = latestOrder();
+        if (!o) return '<span class="demo-entry-tag demo-tag-closed">尚未開單</span>';
+        if (isLocked(o)) return '<span class="demo-entry-tag demo-tag-closed">目前已結單</span>';
+        return '<span class="demo-entry-tag demo-tag-open">登記中 · ' + remainText(o.deadline) + '</span>';
     }
 
     function htmlHome() {
-        var o = latestOrder();
-        var stTag = o
-            ? (isLocked(o) ? '<span class="demo-entry-tag demo-tag-closed">目前已結單</span>'
-                           : '<span class="demo-entry-tag demo-tag-open">登記中 · ' + remainText(o.deadline) + '</span>')
-            : '<span class="demo-entry-tag demo-tag-closed">尚未開單</span>';
-
         var h = htmlBoard();
         h += '<div class="demo-grid">';
         h += '<div class="demo-entry" onclick="DemocracyModule.go(\'stationery\')">' +
              '<div class="demo-entry-icon">🖊️</div>' +
              '<div class="demo-entry-name">文具購買登記</div>' +
              '<div class="demo-entry-desc">登記你需要的文具用品，由採購同仁統整出單。</div>' +
-             stTag + '</div>';
+             '<span id="demoStTag">' + htmlStTag() + '</span></div>';
         h += '<div class="demo-entry disabled">' +
              '<div class="demo-entry-icon">🗳️</div>' +
              '<div class="demo-entry-name">中區問卷投票統計區</div>' +
@@ -379,8 +415,7 @@
         if (isAdmin()) {
             h += '<div class="demo-admin-bar">' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具單管理</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'catalogAdmin\')">📋 常用品項維護</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
                  '</div>';
         }
         return h;
@@ -496,10 +531,13 @@
      * 常用品項維護（管理員）
      * ================================================================= */
     function htmlCatalogAdmin() {
-        var h = '<button class="demo-back" onclick="DemocracyModule.go(\'home\')">← 返回首頁</button>';
+        var h = '<button class="demo-back" onclick="DemocracyModule.go(\'stAdmin\')">← 返回文具登記設定</button>';
         h += '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
-             '<div class="demo-sec-title" style="margin:0;">常用品項維護</div>' +
-             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openCatalogEditor()">＋ 新增品項</button></div>' +
+             '<div class="demo-sec-title" style="margin:0;">常用品項</div>' +
+             '<div class="demo-row">' +
+             '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openBatchCatalog()">📥 批次輸入</button>' +
+             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openCatalogEditor()">＋ 新增品項</button>' +
+             '</div></div>' +
              '<div class="demo-muted" style="margin-top:8px;">這裡建立的品項，同仁登記時可以直接勾選帶入，不用自己打字。</div></div>';
 
         h += '<div class="demo-card">';
@@ -527,6 +565,58 @@
         }
         h += '</div>';
         return h;
+    }
+
+    /* ---------- 常用品項批次輸入 ---------- */
+    // 每行一筆：編號,品名,單價,單位（逗號可用半形或全形，也接受 Tab 分隔）
+    function parseBatchLine(line) {
+        var parts = line.split(/[\t,，]/);
+        for (var i = 0; i < parts.length; i++) parts[i] = parts[i].trim();
+        // 只有一欄時視為品名
+        if (parts.length === 1) return { code: '', name: parts[0], price: 0, unit: '' };
+        return {
+            code: parts[0] || '',
+            name: parts[1] || '',
+            price: toNum((parts[2] || '').replace(/[$＄,]/g, '')),
+            unit: parts[3] || ''
+        };
+    }
+
+    function openBatchCatalog() {
+        var body =
+            '<div class="dm-field"><label>每行一筆，格式：編號,品名,單價,單位</label>' +
+            '<textarea id="dmBatch" style="min-height:180px;" placeholder="365650,得力Deli經典原子筆/EQ60-BL/藍色/0.7mm,7,支&#10;365651,自動鉛筆 0.5mm,15,支&#10;便利貼 3x3,25,包"></textarea></div>' +
+            '<div class="demo-muted" style="font-size:0.82rem; line-height:1.6;">' +
+            '編號沒有可以留空（例：<code>,便利貼,25,包</code>），也可以只寫品名一欄。<br>' +
+            '從 Excel 直接複製整塊貼上也可以（Tab 分隔），全形逗號一樣認得。<br>' +
+            '單價的 $ 和千分位逗號會自動去掉。</div>';
+        openModal('批次輸入常用品項', body, '匯入', function () {
+            var raw = document.getElementById('dmBatch').value;
+            var lines = raw.split('\n');
+            var items = [];
+            var bad = [];
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                var it = parseBatchLine(line);
+                if (!it.name) { bad.push('第 ' + (i + 1) + ' 行'); continue; }
+                items.push(it);
+            }
+            if (!items.length) { alert('沒有可匯入的資料，請確認每行至少要有品名。'); return false; }
+            var msg = '要匯入 ' + items.length + ' 筆品項嗎？';
+            if (bad.length) msg += '\n\n以下幾行沒有品名，會被跳過：\n' + bad.join('、');
+            if (!confirm(msg)) return false;
+
+            var jobs = items.map(function (it) {
+                return db.collection('catalog').add({
+                    code: it.code, name: it.name, price: it.price, unit: it.unit,
+                    active: true, logs: [logLine('批次匯入品項')]
+                });
+            });
+            Promise.all(jobs).then(function () {
+                alert('已匯入 ' + items.length + ' 筆品項');
+            }).catch(dbErr);
+        });
     }
 
     function openCatalogEditor(id) {
@@ -632,20 +722,27 @@
                  '<div class="demo-item-name">' + esc(it.name) + '</div></div>' +
                  (locked ? '' : '<button class="demo-btn demo-btn-danger demo-btn-sm" onclick="DemocracyModule.removeItem(' + i + ')">移除</button>') +
                  '</div>';
+            var sub = money(toNum(it.price) * toNum(it.qty));
             if (locked) {
-                h += '<div class="demo-item-fields"><div class="demo-muted">單價 ' + money(it.price) + ' × ' + toNum(it.qty) + (it.unit ? esc(it.unit) : '') + '</div>' +
-                     (it.note ? '<div class="demo-muted">備註：' + esc(it.note) + '</div>' : '') + '</div>';
+                h += '<div class="demo-item-fields">' +
+                     '<div><label>單價</label><div class="demo-item-ro">' + money(it.price) + '</div></div>' +
+                     '<div><label>數量</label><div class="demo-item-ro">' + toNum(it.qty) + esc(it.unit || '') + '</div></div>' +
+                     '<div><label>小計</label><div class="demo-item-sub">' + sub + '</div></div>' +
+                     '<div class="demo-f-note"><label>備註</label><div class="demo-item-ro">' + (it.note ? esc(it.note) : '—') + '</div></div>' +
+                     '</div>';
             } else {
                 h += '<div class="demo-item-fields">' +
                      '<div><label>單價（NT$）</label><input class="demo-input" type="number" min="0" value="' + toNum(it.price) +
                      '" onchange="DemocracyModule.editItem(' + i + ',\'price\',this.value)"></div>' +
-                     '<div><label>數量' + (it.unit ? '（' + esc(it.unit) + '）' : '') + '</label><input class="demo-input" type="number" min="1" value="' + toNum(it.qty) +
-                     '" onchange="DemocracyModule.editItem(' + i + ',\'qty\',this.value)"></div>' +
-                     '<div style="grid-column:1/-1;"><label>備註（顏色、規格等）</label><input class="demo-input" value="' + esc(it.note || '') +
+                     '<div><label>數量' + (it.unit ? '（' + esc(it.unit) + '）' : '') + '</label>' +
+                     '<select class="demo-select" onchange="DemocracyModule.editItem(' + i + ',\'qty\',this.value)">' +
+                     qtyOptions(toNum(it.qty)) + '</select></div>' +
+                     '<div><label>小計</label><div class="demo-item-sub">' + sub + '</div></div>' +
+                     '<div class="demo-f-note"><label>備註（顏色、規格等）</label><input class="demo-input" value="' + esc(it.note || '') +
                      '" onchange="DemocracyModule.editItem(' + i + ',\'note\',this.value)"></div>' +
                      '</div>';
             }
-            h += '<div class="demo-item-sub">小計 ' + money(toNum(it.price) * toNum(it.qty)) + '</div></div>';
+            h += '</div>';
         }
 
         h += '<div class="demo-total"><span>合計</span><span>' + money(itemsTotal(pendingItems)) + '</span></div>';
@@ -656,8 +753,8 @@
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openCustomItem()">✏️ 自行填寫品項</button>' +
                  '</div>';
             h += '<div class="demo-save-bar">' +
-                 '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.saveEntry()">儲存我的登記</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.resetEntry()">還原</button>' +
+                 '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.saveEntry()">儲存我的登記</button>' +
                  '</div>';
             h += '<div class="demo-muted" style="margin-top:8px;">改完要按「儲存我的登記」才會送出。結單前都可以再回來修改。</div>';
         }
@@ -789,8 +886,11 @@
     function htmlStationeryAdmin() {
         var h = '<button class="demo-back" onclick="DemocracyModule.go(\'home\')">← 返回首頁</button>';
         h += '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
-             '<div class="demo-sec-title" style="margin:0;">文具單管理</div>' +
-             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openNewOrder()">＋ 開新單</button></div>' +
+             '<div class="demo-sec-title" style="margin:0;">文具登記設定</div>' +
+             '<div class="demo-row">' +
+             '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'catalogAdmin\')">📋 常用品項</button>' +
+             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openNewOrder()">＋ 開新單</button>' +
+             '</div></div>' +
              '<div class="demo-muted" style="margin-top:8px;">最多保留 ' + MAX_ORDERS + ' 筆單據，開新單時會自動刪掉最舊的一筆（含所有人的登記內容）。</div></div>';
 
         var order = viewingOrder();
@@ -1150,11 +1250,20 @@
             render();
         }, dbErr);
 
-        // 每分鐘更新倒數與自動鎖單狀態（僅在本分頁顯示時重繪）
+        // 每分鐘更新倒數與自動鎖單狀態（僅在本分頁顯示時處理）
         if (!tickTimer) {
             tickTimer = setInterval(function () {
                 var v = document.getElementById('democracyView');
-                if (v && v.classList.contains('active')) render();
+                if (!v || !v.classList.contains('active')) return;
+                if (currentScreen === 'home') {
+                    // 首頁只更新倒數的兩處，整頁重繪會讓跑馬燈從頭開始播
+                    var og = document.getElementById('demoOngoing');
+                    if (og) og.innerHTML = htmlOngoing();
+                    var tag = document.getElementById('demoStTag');
+                    if (tag) tag.innerHTML = htmlStTag();
+                } else {
+                    render();
+                }
             }, 60000);
         }
     }
@@ -1194,10 +1303,12 @@
         // 刪掉後預設變成全員可見（大家都要登記文具），管理員仍可個別取消勾選。
         permKey: 'democracy',
         permLabel: '🗳️ 中區的民主聖地',
+        requiredRoles: ['creator'],
 
         init: function (appCore) {
             core = appCore;
             core.injectStyle(CSS);
+            core.injectStyle(KEYFRAMES_CSS);
             core.mountView(VIEW_HTML);
             core.mountModal(MODAL_HTML);
             core.on('users:changed', function () { render(); });
@@ -1219,6 +1330,7 @@
         toggleOngoing: toggleOngoing,
 
         openCatalogEditor: openCatalogEditor,
+        openBatchCatalog: openBatchCatalog,
         toggleCatalog: toggleCatalog,
         deleteCatalog: deleteCatalog,
 
