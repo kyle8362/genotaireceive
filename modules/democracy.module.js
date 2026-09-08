@@ -48,6 +48,9 @@
     var listenerAttached = false;
     var tickTimer = null;
     var modalConfirmFn = null;
+    var saveTimer = null;            // 自動儲存的延遲計時器
+    var saving = false;              // 是否正在寫入
+    var saveFailed = false;          // 上一次寫入是否失敗
 
     /* =================================================================
      * 工具函式
@@ -147,10 +150,25 @@
      * ================================================================= */
     var CSS = `
     #democracyView { min-width: 0; max-width: 100%; }
-    #democracyView .demo-head { flex-shrink: 0; margin-bottom: 14px; }
+    #democracyView .demo-head { flex-shrink: 0; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
     #democracyView .demo-head h1 { margin: 0; font-size: 1.5rem; color: var(--text-main); line-height: 1.3; }
     #democracyView .demo-head .sub { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
+    #democracyView .demo-home-btn { flex-shrink: 0; background: var(--primary); color: #fff; border: none; border-radius: 8px;
+        padding: 11px 20px; font-size: 0.92rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        box-shadow: 0 2px 6px rgba(15,118,110,0.25); }
+    #democracyView .demo-home-btn:hover { background: #0d635c; }
     #democracyView .demo-body { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; }
+
+    /* --- 儲存狀態指示燈 --- */
+    #democracyView .demo-sec-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    #democracyView .demo-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; padding: 4px 11px; border-radius: 999px; }
+    #democracyView .demo-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    #democracyView .demo-st-edit { background: #fffbeb; color: #b45309; }
+    #democracyView .demo-st-edit .demo-dot { background: var(--warning); }
+    #democracyView .demo-st-saved { background: var(--primary-light); color: #115e59; }
+    #democracyView .demo-st-saved .demo-dot { background: var(--success); }
+    #democracyView .demo-st-err { background: #fef2f2; color: #991b1b; }
+    #democracyView .demo-st-err .demo-dot { background: var(--danger); }
 
     /* --- 通用元件 --- */
     #democracyView .demo-card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
@@ -220,8 +238,6 @@
     #democracyView .demo-item-sub { font-size: 0.9rem; color: var(--primary); font-weight: 700; padding: 8px 0; }
     #democracyView .demo-item-ro { font-size: 0.88rem; color: var(--text-main); padding: 8px 0; }
     #democracyView .demo-total { background: var(--primary-light); border-radius: 8px; padding: 12px 14px; font-size: 0.95rem; font-weight: 700; color: #115e59; display: flex; justify-content: space-between; margin: 12px 0; }
-    #democracyView .demo-save-bar { display: flex; gap: 10px; }
-    #democracyView .demo-save-bar .demo-btn { flex: 1; }
 
     /* --- 彈窗 --- */
     #democracyModal { display: none; position: fixed; inset: 0; background: rgba(17,24,39,0.5); z-index: 1200; align-items: center; justify-content: center; padding: 16px; }
@@ -232,11 +248,6 @@
     #democracyModal .dm-btn { border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
     #democracyModal .dm-btn-ok { background: var(--primary); color: #fff; }
     #democracyModal .dm-btn-cancel { background: #fff; color: var(--text-main); border: 1px solid var(--border); }
-
-    /* --- 儲存提示（浮在畫面下方） --- */
-    #democracyToast { display: none; position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%);
-        background: #111827; color: #fff; padding: 12px 22px; border-radius: 999px; font-size: 0.9rem; font-weight: 600;
-        z-index: 1300; box-shadow: 0 4px 16px rgba(0,0,0,0.25); max-width: 90vw; text-align: center; }
     #democracyModal .dm-field { margin-bottom: 14px; }
     #democracyModal .dm-field label { display: block; font-size: 0.82rem; color: var(--text-light); margin-bottom: 5px; }
     #democracyModal .dm-field input, #democracyModal .dm-field textarea, #democracyModal .dm-field select {
@@ -255,7 +266,6 @@
         #democracyView .demo-grid { grid-template-columns: 1fr; }
         #democracyView .demo-card { padding: 12px; }
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
-        #democracyView .demo-save-bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; }
         #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         #democracyView .demo-f-note { grid-column: 1 / -1; }
         #democracyView table.demo-table { font-size: 0.8rem; }
@@ -277,8 +287,11 @@
     var VIEW_HTML = `
     <div id="democracyView" class="view-section">
         <div class="demo-head">
-            <h1>🗳️ 中區的民主聖地</h1>
-            <div class="sub">中區同仁的登記、投票與團購專區</div>
+            <div>
+                <h1>🗳️ 中區的民主聖地</h1>
+                <div class="sub">中區同仁的登記、投票與團購專區</div>
+            </div>
+            <div id="demoHomeBtn"></div>
         </div>
         <div class="demo-body" id="demoBody">
             <div id="demoScreen"></div>
@@ -292,8 +305,7 @@
             <div class="dm-body" id="dmBody"></div>
             <div class="dm-foot" id="dmFoot"></div>
         </div>
-    </div>
-    <div id="democracyToast"></div>`;
+    </div>`;
 
     var DEFAULT_FOOT =
         '<button class="dm-btn dm-btn-cancel" onclick="DemocracyModule.closeModal()">取消</button>' +
@@ -309,25 +321,6 @@
         document.getElementById('dmOk').textContent = okText || '確定';
         modalConfirmFn = onConfirm || null;
         document.getElementById('democracyModal').style.display = 'flex';
-    }
-
-    // 底部按鈕自訂的彈窗（例如「請幫我儲存 / 我就是不要儲存啦」）
-    function openModalCustom(title, bodyHtml, footHtml) {
-        document.getElementById('dmTitle').textContent = title;
-        document.getElementById('dmBody').innerHTML = bodyHtml;
-        document.getElementById('dmFoot').innerHTML = footHtml;
-        modalConfirmFn = null;
-        document.getElementById('democracyModal').style.display = 'flex';
-    }
-
-    var toastTimer = null;
-    function showToast(msg, ms) {
-        var el = document.getElementById('democracyToast');
-        if (!el) return;
-        el.textContent = msg;
-        el.style.display = 'block';
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(function () { el.style.display = 'none'; }, ms || 2500);
     }
 
     function closeModal() {
@@ -347,6 +340,7 @@
      * 畫面切換
      * ================================================================= */
     function showScreen(name) {
+        if (saveTimer) flushSave();          // 離開前先把待存的內容寫出去
         currentScreen = name;
         render();
         var body = document.getElementById('demoBody');
@@ -354,6 +348,11 @@
     }
 
     function render() {
+        var btn = document.getElementById('demoHomeBtn');
+        if (btn) {
+            btn.innerHTML = (currentScreen === 'home') ? ''
+                : '<button class="demo-home-btn" onclick="DemocracyModule.go(\'home\')">🏠 回首頁</button>';
+        }
         var el = document.getElementById('demoScreen');
         if (!el) return;
         if (currentScreen === 'stationery') el.innerHTML = htmlStationery();
@@ -452,8 +451,7 @@
      * 公告管理（管理員）
      * ================================================================= */
     function htmlAnnouncementAdmin() {
-        var h = '<button class="demo-back" onclick="DemocracyModule.go(\'home\')">← 返回首頁</button>';
-        h += '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
+        var h = '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
              '<div class="demo-sec-title" style="margin:0;">公告管理</div>' +
              '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openAnnEditor()">＋ 新增公告</button>' +
              '</div>';
@@ -715,7 +713,7 @@
 
     function htmlStationery() {
         var order = latestOrder();
-        var h = '<button class="demo-back" onclick="DemocracyModule.leaveStationery()">← 返回首頁</button>';
+        var h = '';
 
         if (!order) {
             h += '<div class="demo-card"><div class="demo-empty">目前沒有進行中的文具採購單。<br>等管理員開單後就可以登記了。</div></div>';
@@ -734,7 +732,10 @@
             h += '<div class="demo-lockmsg">這張單已結單，無法再修改。下面是你這次登記的內容，如需變更請找採購同仁。</div>';
         }
 
-        h += '<div class="demo-sec-title">我的登記（' + pendingItems.length + ' 項）</div>';
+        h += '<div class="demo-sec-row">' +
+             '<div class="demo-sec-title" style="margin:0;">我的登記（<span id="demoCount">' + pendingItems.length + '</span> 項）</div>' +
+             (locked ? '' : '<span class="demo-status demo-st-saved" id="demoStatus"><span class="demo-dot"></span>儲存成功</span>') +
+             '</div>';
 
         if (!pendingItems.length) {
             h += '<div class="demo-card"><div class="demo-empty">還沒有登記任何品項。' +
@@ -760,30 +761,26 @@
             } else {
                 h += '<div class="demo-item-fields">' +
                      '<div><label>單價（NT$）</label><input class="demo-input" type="number" min="0" value="' + toNum(it.price) +
-                     '" onchange="DemocracyModule.editItem(' + i + ',\'price\',this.value)"></div>' +
+                     '" oninput="DemocracyModule.editItem(' + i + ',\'price\',this.value)" onblur="DemocracyModule.fieldBlur()"></div>' +
                      '<div><label>數量' + (it.unit ? '（' + esc(it.unit) + '）' : '') + '</label>' +
-                     '<select class="demo-select" onchange="DemocracyModule.editItem(' + i + ',\'qty\',this.value)">' +
+                     '<select class="demo-select" onchange="DemocracyModule.editItem(' + i + ',\'qty\',this.value,true)">' +
                      qtyOptions(toNum(it.qty)) + '</select></div>' +
-                     '<div><label>小計</label><div class="demo-item-sub">' + sub + '</div></div>' +
+                     '<div><label>小計</label><div class="demo-item-sub" id="demoSub_' + i + '">' + sub + '</div></div>' +
                      '<div class="demo-f-note"><label>備註（顏色、規格等）</label><input class="demo-input" value="' + esc(it.note || '') +
-                     '" onchange="DemocracyModule.editItem(' + i + ',\'note\',this.value)"></div>' +
+                     '" oninput="DemocracyModule.editItem(' + i + ',\'note\',this.value)" onblur="DemocracyModule.fieldBlur()"></div>' +
                      '</div>';
             }
             h += '</div>';
         }
 
-        h += '<div class="demo-total"><span>合計</span><span>' + money(itemsTotal(pendingItems)) + '</span></div>';
+        h += '<div class="demo-total"><span>合計</span><span id="demoTotal">' + money(itemsTotal(pendingItems)) + '</span></div>';
 
         if (!locked) {
             h += '<div class="demo-row" style="margin-bottom:12px;">' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openPicker()">📋 從常用品項挑選</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openCustomItem()">✏️ 自行填寫品項</button>' +
                  '</div>';
-            h += '<div class="demo-save-bar">' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.resetEntry()">還原</button>' +
-                 '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.saveEntry()">儲存我的登記</button>' +
-                 '</div>';
-            h += '<div class="demo-muted" style="margin-top:8px;">改完要按「儲存我的登記」才會送出。結單前都可以再回來修改。</div>';
+            h += '<div class="demo-muted" style="margin-top:8px;">填寫的內容會自動儲存，右上角燈號顯示綠色就是存好了，不需要按儲存。</div>';
         }
         return h;
     }
@@ -817,6 +814,7 @@
             }
             if (!added) { alert('請至少勾選一個品項'); return false; }
             render();
+            flushSave();
         });
     }
 
@@ -840,10 +838,12 @@
                 note: document.getElementById('dmItNote').value.trim()
             });
             render();
+            flushSave();
         });
     }
 
-    function editItem(idx, field, value) {
+    // 編輯欄位：只更新小計與合計，不重繪整頁（重繪會讓輸入框失去焦點）
+    function editItem(idx, field, value, immediate) {
         if (!pendingItems[idx]) return;
         if (field === 'note') pendingItems[idx].note = value;
         else {
@@ -852,66 +852,63 @@
             if (n < 0) n = 0;
             pendingItems[idx][field] = n;
         }
-        render();
+        var it = pendingItems[idx];
+        var subEl = document.getElementById('demoSub_' + idx);
+        if (subEl) subEl.textContent = money(toNum(it.price) * toNum(it.qty));
+        var totalEl = document.getElementById('demoTotal');
+        if (totalEl) totalEl.textContent = money(itemsTotal(pendingItems));
+
+        if (immediate) { flushSave(); refreshStatus(); }
+        else scheduleSave();
     }
 
     function removeItem(idx) {
         pendingItems.splice(idx, 1);
         render();
+        flushSave();
     }
 
-    function resetEntry() {
-        pendingLoadedFor = null;
-        render();
+    /* ---------- 自動儲存 ---------- */
+    // 狀態：'saved' 綠燈已存 / 'edit' 黃燈修改中 / 'err' 紅燈失敗
+    function setStatus(state, text) {
+        var el = document.getElementById('demoStatus');
+        if (!el) return;
+        var cls = state === 'edit' ? 'demo-st-edit' : (state === 'err' ? 'demo-st-err' : 'demo-st-saved');
+        el.className = 'demo-status ' + cls;
+        el.innerHTML = '<span class="demo-dot"></span>' + text;
     }
 
-    // 判斷畫面上的內容跟資料庫已存的是否不同
-    function normalizeItems(items) {
-        return (items || []).map(function (it) {
-            return [it.code || '', it.name || '', toNum(it.price), toNum(it.qty), it.unit || '', it.note || ''].join('|');
-        }).join('\n');
+    // 依目前是否有待存內容、是否有欄位在編輯，決定燈號
+    function refreshStatus() {
+        if (saveTimer || saving) { setStatus('edit', '修改中'); return; }
+        if (saveFailed) { setStatus('err', '儲存失敗'); return; }
+        var ae = document.activeElement;
+        var editing = ae && ae.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) &&
+                      ae.closest && ae.closest('#democracyView');
+        setStatus(editing ? 'edit' : 'saved', editing ? '修改中' : '儲存成功');
     }
 
-    function isDirty() {
+    // 使用者還在打字時延遲儲存，離開欄位或改下拉選單則立即儲存
+    function scheduleSave() {
+        saveFailed = false;
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () { saveTimer = null; autoSave(); }, 700);
+        refreshStatus();
+    }
+
+    function flushSave() {
+        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+        autoSave();
+    }
+
+    function fieldBlur() {
+        if (saveTimer) flushSave();
+        else refreshStatus();
+    }
+
+    function autoSave() {
         var order = latestOrder();
-        if (!order || isLocked(order)) return false;
-        var e = myEntry();
-        return normalizeItems(e ? e.items : []) !== normalizeItems(pendingItems);
-    }
-
-    // 文具登記畫面的「返回首頁」：有未儲存的修改就先問
-    function leaveStationery() {
-        if (!isDirty()) { showScreen('home'); return; }
-        openModalCustom('尚未儲存',
-            '<div style="font-size:0.95rem; line-height:1.7; color:var(--text-main);">' +
-            '您的修改尚未儲存，請確認是否要儲存。</div>',
-            '<button class="dm-btn dm-btn-cancel" onclick="DemocracyModule.leaveWithoutSaving()">我就是不要儲存啦</button>' +
-            '<button class="dm-btn dm-btn-ok" onclick="DemocracyModule.saveAndLeave()">請幫我儲存</button>');
-    }
-
-    function leaveWithoutSaving() {
-        closeModal();
-        pendingLoadedFor = null;      // 丟掉未儲存的修改
-        showScreen('home');
-    }
-
-    function saveAndLeave() {
-        closeModal();
-        saveEntry(3000);              // 儲存成功後顯示通知，3 秒返回首頁
-    }
-
-    function saveEntry(delayMs) {
-        var order = latestOrder();
-        if (!order) return;
-        if (isLocked(order)) { alert('這張單已結單，無法儲存。'); return; }
-
-        var backMs = toNum(delayMs);
-        function goHomeLater(msg) {
-            showToast(msg, backMs > 0 ? backMs + 500 : 2500);
-            pendingLoadedFor = null;
-            if (backMs > 0) setTimeout(function () { showScreen('home'); }, backMs);
-            else showScreen('home');
-        }
+        if (!order || isLocked(order)) { refreshStatus(); return; }
 
         var clean = [];
         for (var i = 0; i < pendingItems.length; i++) {
@@ -925,25 +922,34 @@
 
         var uid = safeId(myName());
         var existing = myEntry();
-        var ref = db.collection('stationeryOrders').doc(order.id).collection('entries').doc(uid);
 
+        // 沒有品項：已存過就刪掉整筆登記，沒存過就什麼都不用做
         if (!clean.length) {
-            if (!existing) { alert('沒有品項可以儲存。'); return; }
-            if (!confirm('品項全部移除了，這會刪掉你在這張單的登記，確定嗎？')) return;
-            ref.delete().then(function () {
-                goHomeLater(backMs > 0 ? '已刪除登記，' + Math.round(backMs / 1000) + ' 秒後返回首頁' : '已刪除你的登記');
-            }).catch(dbErr);
+            if (!existing) { saving = false; refreshStatus(); return; }
+            saving = true; refreshStatus();
+            db.collection('stationeryOrders').doc(order.id).collection('entries').doc(uid).delete()
+                .then(function () { saving = false; refreshStatus(); })
+                .catch(function (e) { saving = false; saveFailed = true; refreshStatus(); console.error('[democracy]', e); });
             return;
         }
 
-        ref.set({
+        saving = true;
+        refreshStatus();
+        db.collection('stationeryOrders').doc(order.id).collection('entries').doc(uid).set({
             username: myName(),
             items: clean,
             updatedAt: nowStr(),
-            logs: (existing && existing.logs ? existing.logs : []).concat([logLine(existing ? '修改登記（' + clean.length + ' 項）' : '建立登記（' + clean.length + ' 項）')])
+            logs: (existing && existing.logs ? existing.logs : []).concat([logLine(existing ? '自動儲存修改（' + clean.length + ' 項）' : '自動儲存建立登記（' + clean.length + ' 項）')])
         }).then(function () {
-            goHomeLater(backMs > 0 ? '已儲存登記，' + Math.round(backMs / 1000) + ' 秒後返回首頁' : '已儲存登記');
-        }).catch(dbErr);
+            saving = false;
+            saveFailed = false;
+            refreshStatus();
+        }).catch(function (e) {
+            saving = false;
+            saveFailed = true;
+            refreshStatus();
+            console.error('[democracy]', e);
+        });
     }
 
     /* =================================================================
@@ -958,8 +964,7 @@
     }
 
     function htmlStationeryAdmin() {
-        var h = '<button class="demo-back" onclick="DemocracyModule.go(\'home\')">← 返回首頁</button>';
-        h += '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
+        var h = '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
              '<div class="demo-sec-title" style="margin:0;">文具登記設定</div>' +
              '<div class="demo-row">' +
              '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'catalogAdmin\')">📋 常用品項</button>' +
@@ -1357,7 +1362,11 @@
                 entries = docsToArray(snap).sort(function (a, b) {
                     return String(a.username || '').localeCompare(String(b.username || ''));
                 });
-                if (pendingLoadedFor !== id) pendingLoadedFor = null;   // 讓一般人畫面重新載入自己的登記
+                // 自己正在編輯時不重繪：重繪會讓輸入框失去焦點、選單跳掉
+                var ae = document.activeElement;
+                var editing = saveTimer || saving ||
+                    (ae && ae.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.closest && ae.closest('#democracyView'));
+                if (currentScreen === 'stationery' && editing) { refreshStatus(); return; }
                 render();
             }, dbErr);
     }
@@ -1386,6 +1395,11 @@
             core.mountView(VIEW_HTML);
             core.mountModal(MODAL_HTML);
             core.on('users:changed', function () { render(); });
+            // 關閉分頁、重新整理、切到背景時，把還沒寫出的內容搶存一次
+            window.addEventListener('pagehide', function () { if (saveTimer) flushSave(); });
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'hidden' && saveTimer) flushSave();
+            });
         },
 
         activate: function () {
@@ -1412,11 +1426,7 @@
         openCustomItem: openCustomItem,
         editItem: editItem,
         removeItem: removeItem,
-        saveEntry: saveEntry,
-        resetEntry: resetEntry,
-        leaveStationery: leaveStationery,
-        leaveWithoutSaving: leaveWithoutSaving,
-        saveAndLeave: saveAndLeave,
+        fieldBlur: fieldBlur,
 
         pickOrder: pickOrder,
         openNewOrder: openNewOrder,
