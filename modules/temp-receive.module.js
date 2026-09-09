@@ -727,16 +727,8 @@
             core.mountView(VIEW_HTML);
             core.mountModal(MODAL_HTML);
 
-            // 自行注入側邊欄按鈕，index.html 無須改動
-            var anchor = document.getElementById('purchaseBtn') || document.getElementById('memberSettingsBtn');
-            if (anchor && !document.getElementById('tempTasksBtn')) {
-                var btn = document.createElement('div');
-                btn.className = 'admin-btn btn-temp-receive';
-                btn.id = 'tempTasksBtn';
-                btn.innerText = '🚨 臨時收件系統';
-                btn.onclick = function () { core.switchTab('tempTasks'); };
-                anchor.parentNode.insertBefore(btn, anchor.nextSibling);
-            }
+            // v96：側邊欄按鈕改由 index.html 靜態宣告（放在任務看板下方），
+            //      此處不再動態插入，避免位置受模組載入順序影響。
 
             var dateEl = document.getElementById('tempDateInput');
             if (dateEl) dateEl.value = currentDate;
