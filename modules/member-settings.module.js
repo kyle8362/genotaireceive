@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v85
+ * 模組：成員設定管理 (memberSettings)  ─ v96
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -21,8 +21,12 @@
     var TABS = [
         { key: 'perm',   label: '👥 成員權限', roles: ['creator', 'senior', 'admin'] },
         { key: 'sales',  label: '⚙️ 標籤選單', roles: ['creator', 'senior'] },
-        { key: 'assign', label: '👤 指派帳號', roles: ['creator', 'senior'] }
+        { key: 'assign', label: '👤 指派帳號', roles: ['creator', 'senior'] },
+        { key: 'stats',  label: '📊 任務完成統整', roles: ['creator', 'senior'] }
     ];
+
+    // v96：統整區間超過此天數會先提示（原在 index.html）
+    var STATS_WARN_DAYS = 92;
 
     /* ---------- CSS（全部收斂在 #memberSettingsView 內） ---------- */
     var CSS = `
@@ -81,6 +85,17 @@
     #memberSettingsView .ms-add-row { display: flex; gap: 10px; margin-bottom: 15px; max-width: 900px; }
     #memberSettingsView .ms-add-row input { flex-grow: 1; padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
 
+    /* ④ 任務完成統整（v96：由 index.html 的浮動彈窗改為此分頁）*/
+    #memberSettingsView .stats-filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 15px 0; max-width: 900px; }
+    #memberSettingsView .stats-filter-row label { display: block; font-size: 0.8rem; color: var(--text-light); margin-bottom: 3px; }
+    #memberSettingsView .stats-filter-row input, #memberSettingsView .stats-filter-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.9rem; }
+    #memberSettingsView .stats-result-area { max-width: 900px; }
+    #memberSettingsView .stat-card { background: #f9fafb; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    #memberSettingsView .stat-header { display: flex; justify-content: space-between; font-weight: 700; }
+    #memberSettingsView .stat-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: #6b7280; margin-bottom: 4px; }
+    #memberSettingsView .stat-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+    #memberSettingsView .stat-fill { height: 100%; background: var(--primary); }
+
     /* ③ 指派帳號 */
     #memberSettingsView .assign-section { border: 1px solid #eee; padding: 12px; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
     #memberSettingsView .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
@@ -99,6 +114,9 @@
         #memberSettingsView .user-edit-row input,
         #memberSettingsView .user-edit-row select { width: 100% !important; }
         #memberSettingsView .ms-add-row { flex-direction: column; }
+        #memberSettingsView .stats-filter-row { flex-direction: column; max-width: 100%; }
+        #memberSettingsView .stats-filter-row input, #memberSettingsView .stats-filter-row select { width: 100%; box-sizing: border-box; }
+        #memberSettingsView .stats-result-area { max-width: 100%; }
     }
     `;
 
@@ -135,6 +153,29 @@
                 <button class="btn btn-save" onclick="MemberSettingsModule.addSales()">新增</button>
             </div>
             <div class="ms-body"><ul class="settings-list" id="msSalesList"></ul></div>
+        </div>
+
+        <!-- ④ 任務完成統整 -->
+        <div class="ms-panel" id="msPanel-stats">
+            <div class="ms-panel-desc">依日期區間與帳號統計任務完成狀況。查詢會一次讀取該區間內所有任務，區間越大消耗的讀取額度越多，建議一次查詢一個月。</div>
+            <div class="stats-filter-row">
+                <div>
+                    <label>開始日期</label>
+                    <input type="date" id="statsDateStart">
+                </div>
+                <div>
+                    <label>結束日期</label>
+                    <input type="date" id="statsDateEnd">
+                </div>
+                <div>
+                    <label>檢索帳號</label>
+                    <select id="statsUserSelect"><option value="all">-- 所有帳號 (總覽) --</option></select>
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <button class="btn btn-save" onclick="MemberSettingsModule.updateStats()">查詢</button>
+                </div>
+            </div>
+            <div class="ms-body stats-result-area" id="statsResultDisplay"></div>
         </div>
 
         <!-- ③ 指派帳號 -->
@@ -178,6 +219,7 @@
         if (key === 'perm') renderUsers();
         else if (key === 'sales') renderSales();
         else if (key === 'assign') renderAssignRules();
+        else if (key === 'stats') initStats();
     }
 
     /* =================================================================
@@ -431,6 +473,149 @@
     }
 
     /* =================================================================
+     * ④ 任務完成統整
+     * -----------------------------------------------------------------
+     * v96：由 index.html 的浮動彈窗（statsModal）整段搬入本模組，
+     *      改以分頁形式顯示。讀取的是主資料庫 core.db 的 tasks 集合。
+     * ================================================================= */
+
+    // AppCore 未導出 daysBetween，模組內自備一份（以本地時間解析，避免 UTC 時區偏移）
+    function daysBetween(a, b) {
+        return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+    }
+
+    // 切到此分頁時：填入帳號清單與預設日期區間
+    function initStats() {
+        var userSelect = document.getElementById('statsUserSelect');
+        var startInput = document.getElementById('statsDateStart');
+        var endInput = document.getElementById('statsDateEnd');
+        if (!userSelect || !startInput || !endInput) return;
+
+        // 帳號清單由記憶體中的 users 產生，不額外讀取 tasks
+        userSelect.innerHTML = '<option value="all">-- 所有帳號 (總覽) --</option>';
+        core.state.users.filter(function (u) { return u.isApproved; })
+            .sort(function (a, b) { return a.username.localeCompare(b.username); })
+            .forEach(function (u) {
+                var opt = document.createElement('option');
+                opt.value = u.username;
+                opt.innerText = u.nickname ? (u.nickname + '（' + u.username + '）') : u.username;
+                userSelect.appendChild(opt);
+            });
+
+        // 預設本月 1 日 ~ 今天
+        var today = core.getTodayStr();
+        startInput.value = today.substring(0, 8) + '01';
+        endInput.value = today;
+
+        document.getElementById('statsResultDisplay').innerHTML =
+            '<div style="text-align:center; padding:24px; color:#9ca3af; line-height:1.8;">' +
+            '請選擇日期區間與帳號後，按下「查詢」。<br>' +
+            '<span style="font-size:0.85rem;">區間越大讀取的資料越多，建議一次查詢一個月。</span></div>';
+    }
+
+    function updateStats() {
+        var start = document.getElementById('statsDateStart').value;
+        var end = document.getElementById('statsDateEnd').value;
+        var selectedUser = document.getElementById('statsUserSelect').value;
+        var display = document.getElementById('statsResultDisplay');
+
+        if (!start || !end) return alert('請選擇開始與結束日期');
+        if (start > end) return alert('開始日期不能晚於結束日期');
+
+        var span = daysBetween(start, end) + 1;
+        if (span > STATS_WARN_DAYS) {
+            var ok = confirm('此區間共 ' + span + ' 天。\n\n查詢會一次讀取該區間內所有任務，區間越大消耗的 Firestore 讀取額度越多。\n\n確定要繼續嗎？');
+            if (!ok) return;
+        }
+
+        display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--primary);">⏳ 查詢中...</div>';
+
+        core.db.collection('tasks')
+            .where('date', '>=', start)
+            .where('date', '<=', end)
+            .get()
+            .then(function (snap) {
+                var tasks = snap.docs.map(function (d) {
+                    var data = d.data();
+                    data.id = d.id;
+                    return data;
+                });
+                renderStats(tasks, selectedUser, span);
+            })
+            .catch(function (e) {
+                console.error('[stats] 查詢失敗:', e);
+                display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">查詢失敗：' + (e.message || e.code) + '</div>';
+            });
+    }
+
+    function renderStats(tasks, selectedUser, span) {
+        var display = document.getElementById('statsResultDisplay');
+        display.innerHTML = '';
+        var footer = '<div style="text-align:right; font-size:0.75rem; color:#9ca3af; margin-top:10px;">查詢區間 ' +
+                     span + ' 天，讀取 ' + tasks.length + ' 筆</div>';
+
+        var validTasks = tasks.filter(function (t) {
+            return t.completed && !t.isDeleted && t.completedBy;
+        });
+
+        if (selectedUser === 'all') {
+            var userCounts = {}, total = 0;
+            validTasks.forEach(function (t) {
+                if (!userCounts[t.completedBy]) userCounts[t.completedBy] = 0;
+                userCounts[t.completedBy]++;
+                total++;
+            });
+            if (total === 0) {
+                display.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">此區間無完成資料</div>' + footer;
+                return;
+            }
+            Object.keys(userCounts)
+                .map(function (k) { return [k, userCounts[k]]; })
+                .sort(function (a, b) { return b[1] - a[1]; })
+                .forEach(function (pair) {
+                    var user = pair[0], count = pair[1];
+                    var pct = Math.round((count / total) * 100);
+                    var card = document.createElement('div');
+                    card.className = 'stat-card';
+                    card.innerHTML =
+                        '<div class="stat-header"><span>' + core.getUserDisplayName(user) + '</span> <span>' + count + ' 件</span></div>' +
+                        '<div class="stat-bar-container"><div class="stat-label"><span>佔比</span><span>' + pct + '%</span></div>' +
+                        '<div class="stat-track"><div class="stat-fill" style="width:' + pct + '%"></div></div></div>';
+                    display.appendChild(card);
+                });
+            display.insertAdjacentHTML('beforeend', footer);
+
+        } else {
+            var userTasks = validTasks.filter(function (t) { return t.completedBy === selectedUser; });
+            var uTotal = userTasks.length;
+            if (uTotal === 0) {
+                display.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">帳號 ' +
+                                    core.getUserDisplayName(selectedUser) + ' 在此區間無完成資料</div>' + footer;
+                return;
+            }
+            var catCounts = {};
+            core.ORDERED_CATEGORIES.forEach(function (c) { catCounts[c] = 0; });
+            userTasks.forEach(function (t) {
+                if (catCounts[t.category] !== undefined) catCounts[t.category]++;
+            });
+
+            var card = document.createElement('div');
+            card.className = 'stat-card';
+            card.innerHTML = '<div class="stat-header" style="border-bottom:1px solid #eee; padding-bottom:5px;">' +
+                             core.getUserDisplayName(selectedUser) + ' - 總計 ' + uTotal + ' 件</div>';
+            core.ORDERED_CATEGORIES.forEach(function (cat) {
+                var count = catCounts[cat];
+                var pct = uTotal === 0 ? 0 : Math.round((count / uTotal) * 100);
+                card.innerHTML += '<div style="margin-top:10px;"><div class="stat-label"><span>' + cat +
+                                  '</span><span>' + count + ' (' + pct + '%)</span></div>' +
+                                  '<div class="stat-track"><div class="stat-fill" style="width:' + pct + '%"></div></div></div>';
+            });
+            display.appendChild(card);
+            display.insertAdjacentHTML('beforeend', footer);
+        }
+    }
+
+    /* =================================================================
      * 分頁是否正在顯示（供事件即時刷新用）
      * ================================================================= */
     function isVisible() {
@@ -487,7 +672,8 @@
         addSales: addSales,
         editSales: editSales,
         deleteSales: deleteSales,
-        saveAssignRules: saveAssignRules
+        saveAssignRules: saveAssignRules,
+        updateStats: updateStats
     };
 
     window.MemberSettingsModule = MemberSettingsModule;
