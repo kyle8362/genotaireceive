@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v95 Modular · 資安升級)</title>
+    <title>中區收送件進度追蹤系統 (v96 Modular · 統整整合)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -221,14 +221,6 @@
         .log-item { padding: 10px; border-bottom: 1px solid #f3f4f6; font-size: 0.9rem; }
         .log-time { font-size: 0.75rem; color: #9ca3af; }
         .log-user { font-weight: 700; color: var(--primary); }
-        .stats-filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
-        .stats-filter-row input, .stats-filter-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; }
-        .stats-result-area { max-height: 45vh; overflow-y: auto; }
-        .stat-card { background: #f9fafb; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-        .stat-header { display: flex; justify-content: space-between; font-weight: 700; }
-        .stat-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: #6b7280; margin-bottom: 4px; }
-        .stat-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
-        .stat-fill { height: 100%; background: var(--primary); }
 
         /* ---------- 維護模式 / 強制更新畫面 ---------- */
         #maintenance-screen,
@@ -300,6 +292,8 @@
             </div>
 
             <button class="sidebar-btn btn-nav-active" id="btnTabTasks" onclick="window.switchTab('tasks')">📋 任務看板</button>
+            <!-- v96：由 temp-receive.module.js 動態插入改為此處靜態宣告，位置才穩定 -->
+            <div class="admin-btn btn-temp-receive" id="tempTasksBtn" onclick="window.switchTab('tempTasks')">🚨 臨時收件系統</div>
             <button class="sidebar-btn btn-client-search" id="btnTabCustomers" onclick="window.switchTab('customers')">🏢 客戶位置查詢</button>
             <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
         </div>
@@ -308,12 +302,11 @@
             <!-- 模組專屬入口按鈕：id 由各 module 宣告，權限由 AppCore 統一控制 -->
             <div class="admin-btn btn-purchase" id="purchaseBtn" onclick="window.switchTab('purchase')">📦 QIAGEN 採購進度</div>
             <div class="admin-btn btn-stock" id="stockBtn" onclick="window.switchTab('stock')">📊 QIAGEN 備庫存系統</div>
-            <div class="admin-btn btn-member-settings" id="memberSettingsBtn" onclick="window.switchTab('memberSettings')">👤 成員設定管理</div>
             <div class="admin-btn btn-democracy" id="democracyBtn" onclick="window.switchTab('democracy')">🗳️ 中區的民主聖地</div>
 
             <!-- 任務看板自有的管理功能 -->
             <div class="admin-btn btn-import" id="importBtn" onclick="window.openImportModal()">📥 批量匯入任務</div>
-            <div class="admin-btn btn-stats" id="statsPanelBtn" onclick="window.openStatsModal()">📊 任務完成統整</div>
+            <div class="admin-btn btn-member-settings" id="memberSettingsBtn" onclick="window.switchTab('memberSettings')">👤 成員設定管理</div>
 
             <div class="sidebar-section" style="margin-top:20px;">
                 <h3>🕒 最近檢視紀錄</h3>
@@ -414,7 +407,6 @@
 
 <div class="modal-overlay" id="historyModal"><div class="modal-card" style="width: 400px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📋 編輯/操作紀錄</h3><ul class="log-list" id="logList"></ul><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('historyModal').style.display='none'">關閉</button></div></div></div>
 
-<div class="modal-overlay" id="statsModal"><div class="modal-card" style="width: 700px;"><h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">📊 任務完成統整</h3><div class="stats-filter-row"><div><label style="font-size:0.8rem;">開始日期</label><input type="date" id="statsDateStart"></div><div><label style="font-size:0.8rem;">結束日期</label><input type="date" id="statsDateEnd"></div><div><label style="font-size:0.8rem;">檢索帳號</label><select id="statsUserSelect"><option value="all">-- 所有帳號 (總覽) --</option></select></div><div style="display:flex; align-items:flex-end;"><button class="btn btn-save" onclick="window.updateStats()">查詢</button></div></div><div class="stats-result-area" id="statsResultDisplay"></div><div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('statsModal').style.display='none'">關閉</button></div></div></div>
 
 <div class="modal-overlay" id="assignModal">
     <div class="modal-card" style="width: 350px;">
@@ -496,12 +488,11 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 95;
+    const APP_VERSION = 96;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
     const SEARCH_MAX_RANGE_DAYS = 30;   // 自訂搜尋區間上限（天）
-    const STATS_WARN_DAYS       = 92;   // 統計區間超過此天數會先提示
     const PURGE_AFTER_DAYS      = 365;  // 自動清除多久以前的任務（天）
     const PURGE_BATCH           = 300;  // 每批刪除筆數（Firestore batch 上限 500）
     const PURGE_MAX_ROUNDS      = 10;   // 單次執行最多幾批，避免一次跑太久
@@ -1350,100 +1341,6 @@
     //   原本：開啟即從 state.tasks（全量）統計，預設整年 → 開一次就讀上萬筆
     //   現在：預設本月、不自動查詢，按下「查詢」才讀該區間
     // ==========================================
-    function openStatsModal() {
-        const modal = document.getElementById('statsModal');
-        const userSelect = document.getElementById('statsUserSelect');
-        const startInput = document.getElementById('statsDateStart');
-        const endInput = document.getElementById('statsDateEnd');
-
-        // 檢索帳號清單改由 users 集合產生（已在記憶體中，不額外讀取 tasks）
-        userSelect.innerHTML = '<option value="all">-- 所有帳號 (總覽) --</option>';
-        state.users.filter(u => u.isApproved)
-            .sort((a, b) => a.username.localeCompare(b.username))
-            .forEach(u => {
-                const opt = document.createElement('option');
-                opt.value = u.username;
-                opt.innerText = u.nickname ? (u.nickname + '（' + u.username + '）') : u.username;
-                userSelect.appendChild(opt);
-            });
-
-        // 預設本月 1 日 ~ 今天
-        const today = getTodayStr();
-        startInput.value = today.substring(0, 8) + '01';
-        endInput.value = today;
-
-        document.getElementById('statsResultDisplay').innerHTML =
-            '<div style="text-align:center; padding:24px; color:#9ca3af; line-height:1.8;">' +
-            '請選擇日期區間與帳號後，按下「查詢」。<br>' +
-            '<span style="font-size:0.85rem;">區間越大讀取的資料越多，建議一次查詢一個月。</span></div>';
-        modal.style.display = 'flex';
-    }
-
-    async function updateStats() {
-        const start = document.getElementById('statsDateStart').value;
-        const end = document.getElementById('statsDateEnd').value;
-        const selectedUser = document.getElementById('statsUserSelect').value;
-        const display = document.getElementById('statsResultDisplay');
-
-        if (!start || !end) return alert('請選擇開始與結束日期');
-        if (start > end) return alert('開始日期不能晚於結束日期');
-
-        const span = daysBetween(start, end) + 1;
-        if (span > STATS_WARN_DAYS) {
-            const ok = confirm('此區間共 ' + span + ' 天。\n\n查詢會一次讀取該區間內所有任務，區間越大消耗的 Firestore 讀取額度越多。\n\n確定要繼續嗎？');
-            if (!ok) return;
-        }
-
-        display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--primary);">⏳ 查詢中...</div>';
-        let tasks;
-        try {
-            const snap = await db.collection('tasks')
-                .where('date', '>=', start)
-                .where('date', '<=', end)
-                .get();
-            tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch (e) {
-            console.error('[stats] 查詢失敗:', e);
-            display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">查詢失敗：' + (e.message || e.code) + '</div>';
-            return;
-        }
-        renderStats(tasks, selectedUser, span);
-    }
-
-    function renderStats(tasks, selectedUser, span) {
-        const display = document.getElementById('statsResultDisplay');
-        display.innerHTML = '';
-        const footer = '<div style="text-align:right; font-size:0.75rem; color:#9ca3af; margin-top:10px;">查詢區間 ' + span + ' 天，讀取 ' + tasks.length + ' 筆</div>';
-
-        const validTasks = tasks.filter(t => t.completed && !t.isDeleted && t.completedBy);
-
-        if (selectedUser === 'all') {
-            const userCounts = {}; let total = 0;
-            validTasks.forEach(t => { if(!userCounts[t.completedBy]) userCounts[t.completedBy]=0; userCounts[t.completedBy]++; total++; });
-            if(total === 0) { display.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">此區間無完成資料</div>' + footer; return; }
-            Object.entries(userCounts).sort((a,b)=>b[1]-a[1]).forEach(([user, count]) => {
-                const pct = Math.round((count/total)*100);
-                const card = document.createElement('div'); card.className = 'stat-card';
-                card.innerHTML = `<div class="stat-header"><span>${getUserDisplayName(user)}</span> <span>${count} 件</span></div><div class="stat-bar-container"><div class="stat-label"><span>佔比</span><span>${pct}%</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
-                display.appendChild(card);
-            });
-            display.insertAdjacentHTML('beforeend', footer);
-        } else {
-            const userTasks = validTasks.filter(t => t.completedBy === selectedUser); const total = userTasks.length;
-            if(total === 0) { display.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">帳號 ${getUserDisplayName(selectedUser)} 在此區間無完成資料</div>` + footer; return; }
-            const catCounts = {}; ORDERED_CATEGORIES.forEach(c => catCounts[c]=0);
-            userTasks.forEach(t => { if(catCounts[t.category]!==undefined) catCounts[t.category]++; });
-            const card = document.createElement('div'); card.className = 'stat-card';
-            card.innerHTML = `<div class="stat-header" style="border-bottom:1px solid #eee; padding-bottom:5px;">${getUserDisplayName(selectedUser)} - 總計 ${total} 件</div>`;
-            ORDERED_CATEGORIES.forEach(cat => {
-                const count = catCounts[cat]; const pct = total===0?0:Math.round((count/total)*100);
-                card.innerHTML += `<div style="margin-top:10px;"><div class="stat-label"><span>${cat}</span><span>${count} (${pct}%)</span></div><div class="stat-track"><div class="stat-fill" style="width:${pct}%"></div></div></div>`;
-            });
-            display.appendChild(card);
-            display.insertAdjacentHTML('beforeend', footer);
-        }
-    }
-
     // ==========================================
     // 7-3. 自動清除超過一年的任務
     //   軟刪除（isDeleted:true）的文件原本永遠留在 collection，
@@ -1578,7 +1475,6 @@
         const canManage = hasRole(['creator','senior','admin']);
         const canConfig = hasRole(['creator','senior']);
         document.getElementById('importBtn').style.display = (canManage && canTasks) ? 'block' : 'none';
-        document.getElementById('statsPanelBtn').style.display = (canConfig && canTasks) ? 'block' : 'none';
 
         // 搜尋任務 / 日期選擇：無任務看板權限則永久隱藏
         if (!canTasks) {
