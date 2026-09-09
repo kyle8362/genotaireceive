@@ -51,6 +51,7 @@
     var saveTimer = null;            // 自動儲存的延遲計時器
     var saving = false;              // 是否正在寫入
     var saveFailed = false;          // 上一次寫入是否失敗
+    var entriesReady = false;        // 目前這張單的登記資料是否已回來過
 
     /* =================================================================
      * 工具函式
@@ -698,6 +699,8 @@
     }
 
     function loadPending(order) {
+        // 資料還沒回來就先不標記已載入，等快照到齊會再重繪一次帶入
+        if (!entriesReady) { pendingItems = []; pendingLoadedFor = null; return; }
         // 只在切換到不同單、或首次載入時，從資料庫內容覆寫暫存
         if (pendingLoadedFor === (order ? order.id : null)) return;
         var e = myEntry();
@@ -718,6 +721,10 @@
         if (!order) {
             h += '<div class="demo-card"><div class="demo-empty">目前沒有進行中的文具採購單。<br>等管理員開單後就可以登記了。</div></div>';
             return h;
+        }
+
+        if (!entriesReady) {
+            return h + '<div class="demo-card"><div class="demo-empty">載入你的登記內容…</div></div>';
         }
 
         loadPending(order);
@@ -879,13 +886,15 @@
     }
 
     // 依目前是否有待存內容、是否有欄位在編輯，決定燈號
+    // 注意：只有「正在打字」的 input / textarea 才算修改中。
+    // select 選完後焦點仍留在選單上，但那是一個已完成的動作，不該讓燈號卡在黃色。
     function refreshStatus() {
         if (saveTimer || saving) { setStatus('edit', '修改中'); return; }
         if (saveFailed) { setStatus('err', '儲存失敗'); return; }
         var ae = document.activeElement;
-        var editing = ae && ae.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) &&
-                      ae.closest && ae.closest('#democracyView');
-        setStatus(editing ? 'edit' : 'saved', editing ? '修改中' : '儲存成功');
+        var typing = ae && ae.tagName && /^(INPUT|TEXTAREA)$/.test(ae.tagName) &&
+                     ae.closest && ae.closest('#democracyView');
+        setStatus(typing ? 'edit' : 'saved', typing ? '修改中' : '儲存成功');
     }
 
     // 使用者還在打字時延遲儲存，離開欄位或改下拉選單則立即儲存
@@ -1340,6 +1349,12 @@
                     if (og) og.innerHTML = htmlOngoing();
                     var tag = document.getElementById('demoStTag');
                     if (tag) tag.innerHTML = htmlStTag();
+                } else if (currentScreen === 'stationery') {
+                    // 正在填寫時不重繪，否則游標會被打斷
+                    var ae = document.activeElement;
+                    var typing = saveTimer || saving ||
+                        (ae && ae.tagName && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.closest && ae.closest('#democracyView'));
+                    if (!typing) render();
                 } else {
                     render();
                 }
@@ -1356,17 +1371,20 @@
         if (unsubEntries) { unsubEntries(); unsubEntries = null; }
         listeningOrderId = id;
         entries = [];
+        entriesReady = false;
         if (!id) { render(); return; }
         unsubEntries = db.collection('stationeryOrders').doc(id).collection('entries')
             .onSnapshot(function (snap) {
                 entries = docsToArray(snap).sort(function (a, b) {
                     return String(a.username || '').localeCompare(String(b.username || ''));
                 });
-                // 自己正在編輯時不重繪：重繪會讓輸入框失去焦點、選單跳掉
-                var ae = document.activeElement;
-                var editing = saveTimer || saving ||
-                    (ae && ae.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.closest && ae.closest('#democracyView'));
-                if (currentScreen === 'stationery' && editing) { refreshStatus(); return; }
+                entriesReady = true;
+                // 登記畫面一旦把自己的資料載進來過，就不再因快照重繪。
+                // 自己的編輯內容才是這個畫面的真相，重繪只會把輸入焦點與游標弄掉。
+                if (currentScreen === 'stationery' && pendingLoadedFor === id) {
+                    refreshStatus();
+                    return;
+                }
                 render();
             }, dbErr);
     }
