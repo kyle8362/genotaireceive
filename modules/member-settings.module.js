@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v96
+ * 模組：成員設定管理 (memberSettings)  ─ v97
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -85,6 +85,30 @@
     #memberSettingsView .ms-add-row { display: flex; gap: 10px; margin-bottom: 15px; max-width: 900px; }
     #memberSettingsView .ms-add-row input { flex-grow: 1; padding: 9px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
 
+    /* v97：快速開啟/關閉權限（浮動視窗）*/
+    #memberSettingsView .ms-quick-btn { padding: 8px 14px; border: 1px solid #c7d2fe; border-radius: 6px; background: #eef2ff; color: #4338ca; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    #memberSettingsView .ms-quick-btn:hover { background: #e0e7ff; }
+
+    #msQuickPermModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+    #msQuickPermModal.open { display: flex; }
+    #msQuickPermModal .qp-card { background: #fff; border-radius: 12px; padding: 22px; width: 560px; max-width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+    #msQuickPermModal h3 { margin: 0 0 6px 0; font-size: 1.15rem; color: #111827; }
+    #msQuickPermModal .qp-desc { font-size: 0.85rem; color: var(--text-light); line-height: 1.7; background: #f9fafb; border: 1px solid #eee; border-radius: 6px; padding: 10px; margin-bottom: 16px; }
+    #msQuickPermModal .qp-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    #msQuickPermModal .qp-item { display: flex; align-items: center; font-size: 0.9rem; background: #fff; padding: 7px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+    #msQuickPermModal .qp-item:hover { border-color: var(--primary); }
+    #msQuickPermModal .qp-item input { margin-right: 6px; }
+    #msQuickPermModal .qp-target { font-size: 0.82rem; color: var(--text-light); margin-bottom: 16px; }
+    #msQuickPermModal .qp-btns { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; border-top: 1px solid #eee; padding-top: 14px; }
+    #msQuickPermModal .qp-on { padding: 9px 18px; border: none; border-radius: 6px; background: var(--primary); color: #fff; font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+    #msQuickPermModal .qp-off { padding: 9px 18px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: var(--danger); font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+    #msQuickPermModal .qp-cancel { padding: 9px 18px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text-main); font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+
+    /* v97：指派分頁 — 說明文字與儲存按鈕同一行 */
+    #memberSettingsView .ms-assign-head { display: flex; align-items: stretch; gap: 12px; max-width: 900px; margin-bottom: 14px; }
+    #memberSettingsView .ms-assign-head .ms-panel-desc { flex: 1; margin-bottom: 0; min-width: 0; }
+    #memberSettingsView .ms-assign-head .ms-assign-save { flex-shrink: 0; display: flex; align-items: center; }
+
     /* ④ 任務完成統整（v96：由 index.html 的浮動彈窗改為此分頁）*/
     #memberSettingsView .stats-filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 15px 0; max-width: 900px; }
     #memberSettingsView .stats-filter-row label { display: block; font-size: 0.8rem; color: var(--text-light); margin-bottom: 3px; }
@@ -103,17 +127,18 @@
     #memberSettingsView .assign-check-item { display: flex; align-items: center; font-size: 0.9rem; background: white; padding: 5px 9px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
     #memberSettingsView .assign-check-item:hover { border-color: var(--primary); }
     #memberSettingsView .assign-check-item input { margin-right: 6px; }
-    #memberSettingsView .ms-save-row { text-align: right; margin-top: 15px; max-width: 900px; }
 
     @media (max-width: 768px) {
         #memberSettingsView .ms-body,
         #memberSettingsView .ms-panel-desc,
         #memberSettingsView .ms-add-row,
-        #memberSettingsView .ms-save-row { max-width: 100%; }
         #memberSettingsView .ms-tab { flex-grow: 1; text-align: center; padding: 10px 8px; font-size: 0.88rem; }
         #memberSettingsView .user-edit-row input,
         #memberSettingsView .user-edit-row select { width: 100% !important; }
         #memberSettingsView .ms-add-row { flex-direction: column; }
+        #memberSettingsView .ms-assign-head { flex-direction: column; max-width: 100%; }
+        #memberSettingsView .ms-assign-head .ms-assign-save button { width: 100%; }
+        #msQuickPermModal .qp-btns > * { flex: 1; }
         #memberSettingsView .stats-filter-row { flex-direction: column; max-width: 100%; }
         #memberSettingsView .stats-filter-row input, #memberSettingsView .stats-filter-row select { width: 100%; box-sizing: border-box; }
         #memberSettingsView .stats-result-area { max-width: 100%; }
@@ -132,7 +157,9 @@
 
         <!-- ① 成員權限 -->
         <div class="ms-panel" id="msPanel-perm">
-            <div class="user-edit-row" style="justify-content:flex-end; max-width:900px;">
+            <div class="user-edit-row" style="justify-content:space-between; max-width:900px;">
+                <button type="button" class="ms-quick-btn" id="msQuickPermBtn" style="display:none;"
+                        onclick="MemberSettingsModule.openQuickPerm()">⚡ 快速開啟/關閉權限</button>
                 <select id="msUserFilter" onchange="MemberSettingsModule.renderUsers()">
                     <option value="all">顯示全部</option>
                     <option value="creator">🟣 創世神</option>
@@ -180,10 +207,33 @@
 
         <!-- ③ 指派帳號 -->
         <div class="ms-panel" id="msPanel-assign">
-            <div class="ms-panel-desc">勾選各分類「可被指派」的帳號。若某分類完全未勾選，該分類會開放給所有已核准帳號。</div>
+            <!-- v97：說明文字與儲存按鈕同一行，總寬對齊下方區塊的 900px -->
+            <div class="ms-assign-head">
+                <div class="ms-panel-desc">勾選各分類「可被指派」的帳號。若某分類完全未勾選，該分類會開放給所有已核准帳號。</div>
+                <div class="ms-assign-save">
+                    <button class="btn btn-save" onclick="MemberSettingsModule.saveAssignRules()">儲存指派設定</button>
+                </div>
+            </div>
             <div class="ms-body" id="msAssignContainer"></div>
-            <div class="ms-save-row">
-                <button class="btn btn-save" onclick="MemberSettingsModule.saveAssignRules()">儲存指派設定</button>
+        </div>
+    </div>`;
+
+    /* ---------- 快速開啟/關閉權限（浮動視窗，v97） ---------- */
+    var QUICK_MODAL_HTML = `
+    <div id="msQuickPermModal">
+        <div class="qp-card">
+            <h3>⚡ 快速開啟/關閉權限</h3>
+            <div class="qp-desc">
+                勾選要調整的分頁，再按下方按鈕，即可一次為<b>所有已核准帳號</b>開啟或關閉該分頁權限。<br>
+                原本已是相同設定的帳號保持不變；設定相反的會被改為新設定。<br>
+                <b>創世神帳號不受影響</b>（權限固定全開）。未勾選的分頁完全不會被變更。
+            </div>
+            <div class="qp-list" id="qpPermList"></div>
+            <div class="qp-target" id="qpTargetInfo"></div>
+            <div class="qp-btns">
+                <button type="button" class="qp-cancel" onclick="MemberSettingsModule.closeQuickPerm()">取消</button>
+                <button type="button" class="qp-off" onclick="MemberSettingsModule.applyQuickPerm(false)">全部關閉</button>
+                <button type="button" class="qp-on" onclick="MemberSettingsModule.applyQuickPerm(true)">全部開啟</button>
             </div>
         </div>
     </div>`;
@@ -216,7 +266,7 @@
             if (p) p.classList.toggle('active', t.key === key);
         });
         renderTabBar();
-        if (key === 'perm') renderUsers();
+        if (key === 'perm') { refreshQuickPermBtn(); renderUsers(); }
         else if (key === 'sales') renderSales();
         else if (key === 'assign') renderAssignRules();
         else if (key === 'stats') initStats();
@@ -378,6 +428,101 @@
     function togglePassword(id) {
         var input = document.getElementById(id);
         if (input) input.type = (input.type === 'password') ? 'text' : 'password';
+    }
+
+    /* =================================================================
+     * v97：快速開啟/關閉權限
+     * -----------------------------------------------------------------
+     * 一次為所有已核准帳號批次調整指定分頁的權限。
+     * 採 Firestore dot notation（perms.<key>）更新，只寫入被勾選的分頁，
+     * 未勾選的分頁維持原狀（含「未設定、依角色預設」的狀態不被固化）。
+     * ================================================================= */
+
+    // 僅創世神／高級管理者可使用（此操作會一次變更所有帳號）
+    function canQuickPerm() {
+        return core.hasRole(['creator', 'senior']);
+    }
+
+    function refreshQuickPermBtn() {
+        var btn = document.getElementById('msQuickPermBtn');
+        if (btn) btn.style.display = canQuickPerm() ? 'block' : 'none';
+    }
+
+    // 套用對象：已核准且非創世神
+    function quickPermTargets() {
+        return core.state.users.filter(function (u) {
+            return u.isApproved && u.role !== 'creator';
+        });
+    }
+
+    function openQuickPerm() {
+        if (!canQuickPerm()) { alert('此功能僅限創世神／高級管理者使用。'); return; }
+
+        var list = document.getElementById('qpPermList');
+        list.innerHTML = '';
+        core.getPermissionItems().forEach(function (it) {
+            var label = document.createElement('label');
+            label.className = 'qp-item';
+            label.innerHTML = '<input type="checkbox" class="qp-cb" data-perm="' +
+                              core.escAttr(it.key) + '"> ' + it.label;
+            list.appendChild(label);
+        });
+
+        var targets = quickPermTargets();
+        document.getElementById('qpTargetInfo').innerText =
+            '套用對象：' + targets.length + ' 個已核准帳號（不含創世神）';
+
+        document.getElementById('msQuickPermModal').classList.add('open');
+    }
+
+    function closeQuickPerm() {
+        var m = document.getElementById('msQuickPermModal');
+        if (m) m.classList.remove('open');
+    }
+
+    function applyQuickPerm(enable) {
+        if (!canQuickPerm()) { alert('此功能僅限創世神／高級管理者使用。'); return; }
+
+        var boxes = document.querySelectorAll('#qpPermList .qp-cb');
+        var keys = [], labels = [];
+        var items = core.getPermissionItems();
+        [].slice.call(boxes).forEach(function (cb) {
+            if (!cb.checked) return;
+            var k = cb.getAttribute('data-perm');
+            keys.push(k);
+            var found = items.filter(function (it) { return it.key === k; })[0];
+            labels.push(found ? found.label : k);
+        });
+
+        if (!keys.length) return alert('請至少勾選一個分頁');
+
+        var targets = quickPermTargets();
+        if (!targets.length) return alert('目前沒有可套用的已核准帳號');
+
+        var action = enable ? '開啟' : '關閉';
+        var msg = '即將為 ' + targets.length + ' 個已核准帳號「' + action + '」以下分頁權限：\n\n' +
+                  labels.join('\n') + '\n\n創世神帳號不受影響。確定要繼續嗎？';
+        if (!confirm(msg)) return;
+
+        // dot notation：只更新被勾選的 key，不動其他權限設定
+        var payload = {};
+        keys.forEach(function (k) { payload['perms.' + k] = enable; });
+
+        var batch = core.db.batch();
+        targets.forEach(function (u) {
+            batch.update(core.db.collection('users').doc(u.docId), payload);
+        });
+
+        batch.commit()
+            .then(function () {
+                alert('已完成：' + targets.length + ' 個帳號的 ' + keys.length + ' 個分頁權限已' + action + '。');
+                closeQuickPerm();
+                renderUsers();
+            })
+            .catch(function (e) {
+                console.error('[quickPerm] 批次更新失敗:', e);
+                alert('設定失敗：' + (e.message || e.code));
+            });
     }
 
     /* =================================================================
@@ -637,6 +782,7 @@
             core = appCore;
             core.injectStyle(CSS);
             core.mountView(VIEW_HTML);
+            core.mountModal(QUICK_MODAL_HTML);
 
             core.on('users:changed', function () {
                 if (!isVisible()) return;
@@ -673,7 +819,10 @@
         editSales: editSales,
         deleteSales: deleteSales,
         saveAssignRules: saveAssignRules,
-        updateStats: updateStats
+        updateStats: updateStats,
+        openQuickPerm: openQuickPerm,
+        closeQuickPerm: closeQuickPerm,
+        applyQuickPerm: applyQuickPerm
     };
 
     window.MemberSettingsModule = MemberSettingsModule;
