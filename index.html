@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v96 Modular · 統整整合)</title>
+    <title>中區收送件進度追蹤系統 (v97 Modular · 權限批次)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -488,7 +488,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 96;
+    const APP_VERSION = 97;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -1629,7 +1629,7 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=96"></script>
+<script src="modules/member-settings.module.js?v=97"></script>
 <script src="modules/temp-receive.module.js?v=96"></script>
 <script src="modules/democracy.module.js?v=5"></script>
 
