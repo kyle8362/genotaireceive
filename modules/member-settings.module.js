@@ -133,8 +133,15 @@
         #memberSettingsView .ms-panel-desc,
         #memberSettingsView .ms-add-row,
         #memberSettingsView .ms-tab { flex-grow: 1; text-align: center; padding: 10px 8px; font-size: 0.88rem; }
-        #memberSettingsView .user-edit-row input,
+        /* v97 修正：原本 input 一律 width:100%，連權限勾選框的 checkbox 也被撐滿，
+           把 label 文字推出外框。改為排除 checkbox。 */
+        #memberSettingsView .user-edit-row input:not([type="checkbox"]),
         #memberSettingsView .user-edit-row select { width: 100% !important; }
+        /* 權限項目改為一行一個並允許換行，長標籤（如 QIAGEN 備庫存系統）才不會溢出 */
+        #memberSettingsView .ms-perm-item { width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.5; }
+        #memberSettingsView .ms-perm-item input[type="checkbox"] { flex-shrink: 0; }
+        #msQuickPermModal .qp-item { width: 100%; box-sizing: border-box; white-space: normal; }
+        #msQuickPermModal .qp-item input[type="checkbox"] { flex-shrink: 0; }
         #memberSettingsView .ms-add-row { flex-direction: column; }
         #memberSettingsView .ms-assign-head { flex-direction: column; max-width: 100%; }
         #memberSettingsView .ms-assign-head .ms-assign-save button { width: 100%; }
