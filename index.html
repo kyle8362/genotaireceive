@@ -79,7 +79,7 @@
         .search-range-hint.loading { color: var(--primary); }
 
         /* ===== v87：任務看板 header 日期列（日期文字 + 日曆按鈕整併） ===== */
-        .task-date-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0.7rem; }
+        .task-date-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0; }
         .task-date-display { display: inline-flex; align-items: center; gap: 2px; padding: 5px 6px 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; min-width: 0; max-width: 100%; }
         .task-date-display:hover { border-color: var(--primary); }
         .task-date-text { color: var(--text-main); font-weight: 600; font-size: 0.95rem; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -96,9 +96,8 @@
         .task-date-quick:hover { background: #f0fdfa; border-color: var(--primary); color: var(--primary); }
         .task-date-quick.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
-        /* ===== v87：標題列（標題在左、搜尋按鈕在右） ===== */
-        .task-title-row { display: flex; justify-content: flex-start; align-items: center; gap: 14px; flex-wrap: wrap; min-width: 0; max-width: 100%; }
-        .task-title-row h1 { margin: 0; min-width: 0; }
+        /* ===== 控制列：日期與搜尋按鈕同一行，位於標題下方 ===== */
+        .task-control-row { display: flex; justify-content: flex-start; align-items: center; gap: 18px; flex-wrap: wrap; min-width: 0; max-width: 100%; margin-top: 0.9rem; }
 
         /* ===== v86：搜尋任務（按鈕 + 浮動面板） ===== */
         .task-search-bar { position: relative; margin: 0; min-width: 0; }
@@ -258,7 +257,7 @@
             .task-date-quick { flex: 0 0 auto; text-align: center; padding: 9px 18px; }
             .task-date-text .date-full { display: none; }
             .task-date-text .date-short { display: inline; }
-            .task-title-row { flex-direction: column; align-items: stretch; gap: 10px; }
+            .task-control-row { flex-direction: column; align-items: stretch; gap: 10px; margin-top: 0.8rem; }
             .task-search-toggle { width: 100%; }
             .search-float-panel { width: 100%; left: 0; right: 0; }
         }
@@ -318,6 +317,10 @@
     <main>
         <div id="taskView" class="view-section active">
             <header>
+                <h1>中區收送件即時進度</h1>
+
+                <!-- 日期與搜尋同一列（標題已移至上方） -->
+                <div class="task-control-row">
                 <!-- 日期（v87：日期文字與日曆按鈕整併為同一控制項） -->
                 <div id="taskDateSection">
                     <div class="task-date-bar">
@@ -332,10 +335,7 @@
                     </div>
                 </div>
 
-                <!-- v87：標題與搜尋按鈕同一列，搜尋在右 -->
-                <div class="task-title-row">
-                    <h1>中區收送件即時進度</h1>
-                    <div id="taskSearchSection">
+                <div id="taskSearchSection">
                         <div class="task-search-bar">
                             <button type="button" class="task-search-toggle" id="taskSearchToggle" onclick="window.toggleSearchPanel()">🔍 搜尋任務</button>
                         <div class="search-float-panel" id="searchFloatPanel">
