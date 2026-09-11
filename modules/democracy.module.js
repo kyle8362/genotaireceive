@@ -1,11 +1,11 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ 階段一
+ * 模組：中區的民主聖地 (democracy)  ─ v10
  * ---------------------------------------------------------------------
- * 中區同仁的登記／投票／團購專區。階段一實作：
- *   1. 模組骨架與子畫面切換（首頁 → 各功能區）
- *   2. 公告區（多則、起訖日期自動上下架、進行中事項提醒）
- *   3. 文具購買登記（一般人登記／管理員開單、鎖單、統整輸出）
- * 投票區與團購區於階段二、三實作。
+ * 中區同仁的登記／投票／團購專區。已實作：
+ *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
+ *   2. 文具購買登記（常用品項、自動儲存、管理員開單鎖單與統整輸出）
+ *   3. 投票問卷區（單選／多選／自填／備註、記名投票、統計與 LINE 文字）
+ *   4. 團購 GOGO（多品項、我要 +1、管理員統整輸出）
  *
  * 連自己的 Firebase 專案（gbt-central-democracy），不動 AppCore.db。
  * 權限：permKey = 'democracy'，全員預設可進入（大家都要登記文具），
@@ -218,6 +218,8 @@
     var CSS = `
     #democracyView { min-width: 0; max-width: 100%; }
     #democracyView .demo-head { flex-shrink: 0; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    #democracyView .demo-head-left { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; min-width: 0; }
+    #democracyView .demo-head-title { flex-shrink: 0; }
     #democracyView .demo-head h1 { margin: 0; font-size: 1.5rem; color: var(--text-main); line-height: 1.3; }
     #democracyView .demo-head .sub { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
     #democracyView .demo-home-btn { flex-shrink: 0; background: var(--primary); color: #fff; border: none; border-radius: 8px;
@@ -285,9 +287,11 @@
     #democracyView .demo-entry-name { font-size: 1rem; font-weight: 700; color: var(--text-main); margin-top: 6px; }
     #democracyView .demo-entry-desc { font-size: 0.82rem; color: var(--text-light); margin-top: 4px; line-height: 1.5; }
     #democracyView .demo-entry-tag { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; margin-top: 8px; }
+    #democracyView .demo-home-entry { min-height: 128px; display: flex; flex-direction: column; justify-content: space-between; }
+    #democracyView .demo-home-entry .demo-entry-tag { font-size: 1.05rem; padding: 5px 14px; align-self: flex-start; }
     #democracyView .demo-tag-open { background: var(--primary-light); color: #115e59; }
     #democracyView .demo-tag-closed { background: var(--bg); color: var(--text-light); }
-    #democracyView .demo-admin-bar { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; }
+    #democracyView .demo-admin-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-bottom: 2px; }
 
     /* --- 表格 --- */
     #democracyView .demo-table-wrap { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
@@ -440,7 +444,11 @@
         #democracyView .demo-head h1 { font-size: 1.25rem; }
         #democracyView .demo-grid { grid-template-columns: 1fr; }
         #democracyView .demo-card { padding: 12px; }
+        #democracyView .demo-head-left { gap: 10px; }
+        #democracyView .demo-admin-bar { width: 100%; }
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
+        #democracyView .demo-home-entry { min-height: 104px; }
+        #democracyView .demo-home-entry .demo-entry-tag { font-size: 0.95rem; }
         #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         #democracyView .demo-f-note { grid-column: 1 / -1; }
         /* 手機版：數量標題一行、滾輪與按鈕一行、備註一行、小計一行 */
@@ -488,9 +496,12 @@
     var VIEW_HTML = `
     <div id="democracyView" class="view-section">
         <div class="demo-head">
-            <div>
-                <h1>🗳️ 中區的民主聖地</h1>
-                <div class="sub">中區同仁的登記、投票與團購專區</div>
+            <div class="demo-head-left">
+                <div class="demo-head-title">
+                    <h1>🗳️ 中區的民主聖地</h1>
+                    <div class="sub">中區同仁的登記、投票與團購專區</div>
+                </div>
+                <div class="demo-admin-bar" id="demoAdminBar"></div>
             </div>
             <div id="demoHomeBtn"></div>
         </div>
@@ -556,6 +567,8 @@
     }
 
     function render() {
+        var bar = document.getElementById('demoAdminBar');
+        if (bar) bar.innerHTML = htmlAdminBar();
         var btn = document.getElementById('demoHomeBtn');
         if (btn) {
             btn.innerHTML = (currentScreen === 'home') ? ''
@@ -677,29 +690,30 @@
     function htmlHome() {
         var h = htmlBoard();
         h += '<div class="demo-grid">';
-        h += '<div class="demo-entry" onclick="DemocracyModule.go(\'stationery\')">' +
+        h += '<div class="demo-entry demo-home-entry" onclick="DemocracyModule.go(\'stationery\')">' +
              '<div class="demo-entry-head"><span class="demo-entry-icon">🖊️</span>' +
              '<span class="demo-entry-name">文具購買登記</span></div>' +
              '<span id="demoStTag">' + htmlStTag() + '</span></div>';
-        h += '<div class="demo-entry" onclick="DemocracyModule.go(\'vote\')">' +
+        h += '<div class="demo-entry demo-home-entry" onclick="DemocracyModule.go(\'vote\')">' +
              '<div class="demo-entry-head"><span class="demo-entry-icon">🗳️</span>' +
-             '<span class="demo-entry-name">中區問卷投票統計區</span></div>' +
+             '<span class="demo-entry-name">投票問卷區</span></div>' +
              '<span id="demoVoteTag">' + htmlVoteTag() + '</span></div>';
-        h += '<div class="demo-entry" onclick="DemocracyModule.go(\'groupbuy\')">' +
+        h += '<div class="demo-entry demo-home-entry" onclick="DemocracyModule.go(\'groupbuy\')">' +
              '<div class="demo-entry-head"><span class="demo-entry-icon">🛒</span>' +
-             '<span class="demo-entry-name">中區團購區</span></div>' +
+             '<span class="demo-entry-name">團購 GOGO</span></div>' +
              '<span id="demoGbTag">' + htmlGbTag() + '</span></div>';
         h += '</div>';
 
-        if (isAdmin()) {
-            h += '<div class="demo-admin-bar">' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'gbAdmin\')">🛒 團購管理</button>' +
-                 '</div>';
-        }
         return h;
+    }
+
+    // 管理按鈕列：放在標題右側，只在首頁且為管理員時出現
+    function htmlAdminBar() {
+        if (!isAdmin() || currentScreen !== 'home') return '';
+        return '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
+               '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
+               '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
+               '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'gbAdmin\')">🛒 團購管理</button>';
     }
 
     /* =================================================================
@@ -1095,7 +1109,6 @@
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openPicker()">📋 從常用品項挑選</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openCustomItem()">✏️ 自行填寫品項</button>' +
                  '</div>';
-            h += '<div class="demo-muted" style="margin-top:8px;">填寫的內容會自動儲存，右上角燈號顯示綠色就是存好了，不需要按儲存。</div>';
         }
         return h;
     }
@@ -1831,7 +1844,6 @@
              (mine ? '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.withdrawBallot()">取消我的投票</button>' : '') +
              '</div>';
         h += '<div class="demo-total"><span>目前已投票</span><span>' + ballots.length + ' 人</span></div>';
-        h += '<div class="demo-muted">票數與投票內容會在截止後公布，截止前只看得到已投票人數。</div>';
         return h;
     }
 
@@ -2191,7 +2203,7 @@
         for (var i = 0; i < opts.length; i++) t += '  ' + (i + 1) + '. ' + opts[i].text + '\n';
         if (v.allowComment) t += '（可填寫備註意見）\n';
         t += '------------------------------\n';
-        t += '請進入公司系統的「中區的民主聖地 → 中區問卷投票統計區」投票，謝謝！';
+        t += '請進入公司系統的「中區的民主聖地 → 投票問卷區」投票，謝謝！';
         copyText(t);
     }
 
