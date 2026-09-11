@@ -1647,7 +1647,7 @@
                  (v.desc ? '<div class="demo-entry-desc">' + linkify(String(v.desc).replace(/\s*\n\s*/g, ' ')) + '</div>' : '') +
                  '<div class="demo-muted" style="margin-top:6px;">' +
                  (v.mode === 'multi' ? '可多選' : '單選') +
-                 '　截止 ' + esc(v.deadline || '未設定') + '</div>' +
+                 (v.status === 'locked' ? '　已結束投票' : '　截止 ' + esc(v.deadline || '未設定')) + '</div>' +
                  (locked ? '<span class="demo-entry-tag demo-tag-closed">已結束，可看結果</span>'
                          : '<span class="demo-entry-tag demo-tag-open">投票中 · ' + remainText(v.deadline) + '</span>') +
                  '</div>';
@@ -1664,7 +1664,9 @@
         h += '<div class="demo-order-bar">' +
              '<div class="demo-order-title">' + esc(v.title || '投票案') + '</div>' +
              (v.desc ? '<div class="demo-ann-body" style="color:var(--text-main);margin-top:6px;">' + linkify(v.desc) + '</div>' : '') +
-             '<div class="demo-deadline">截止時間：<b>' + esc(v.deadline || '未設定') + '</b>　' + remainText(v.deadline) + '</div>' +
+             (v.status === 'locked'
+                ? '<div class="demo-deadline"><b>已結束投票</b></div>'
+                : '<div class="demo-deadline">截止時間：<b>' + esc(v.deadline || '未設定') + '</b>　' + remainText(v.deadline) + '</div>') +
              '<div class="demo-muted" style="margin-top:4px;">' + (v.mode === 'multi' ? '可多選，不限選幾項' : '單選') + '</div></div>';
 
         if (!ballotsReady) return h + '<div class="demo-card"><div class="demo-empty">載入投票資料…</div></div>';
@@ -1750,12 +1752,10 @@
         }
         h += '</div>';
 
-        if (v.allowComment) {
-            var canSee = forAdmin || v.commentPublic;
+        // 備註未設定公開時，一般人的結果頁完全不顯示這一格
+        if (v.allowComment && (forAdmin || v.commentPublic)) {
             h += '<div class="demo-card"><div class="demo-sec-title">備註／意見（' + t.comments.length + ' 則）</div>';
-            if (!canSee) {
-                h += '<div class="demo-empty">這個案子的備註僅管理員看得到。</div>';
-            } else if (!t.comments.length) {
+            if (!t.comments.length) {
                 h += '<div class="demo-empty">沒有人留下備註。</div>';
             } else {
                 for (var m = 0; m < t.comments.length; m++) {
