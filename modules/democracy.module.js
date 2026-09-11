@@ -383,12 +383,41 @@
     #democracyView .demo-cmt-user { font-size: 0.82rem; font-weight: 700; color: var(--text-main); }
     #democracyView .demo-cmt-text { font-size: 0.88rem; color: var(--text-main); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
 
-    #democracyView .demo-gb-banner { font-size: 0.95rem; }
-    #democracyView .demo-gb-fields { grid-template-columns: 110px 120px 110px minmax(140px, 1fr); }
+    #democracyView .demo-gb-banner { font-size: 0.95rem; justify-content: flex-start; }
+    #democracyView .demo-gb-price { margin-left: 12px; font-size: 0.95rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+    /* 欄寬收窄並靠左排，不再把備註拉到整列寬 */
+    #democracyView .demo-gb-fields { grid-template-columns: 92px 132px 96px minmax(180px, 300px); justify-content: start; }
+    #democracyView .demo-gb-fields .demo-select { width: 100%; }
+
+    /* --- 我要 +1 按鈕 --- */
     #democracyView .demo-plus-wrap { position: relative; display: block; }
-    #democracyView .demo-plus-btn { width: 100%; white-space: nowrap; }
-    #democracyView .demo-plus-fx { position: absolute; left: 50%; top: 0; pointer-events: none;
-        font-size: 1.1rem; font-weight: 800; color: var(--primary); text-shadow: 0 1px 2px rgba(255,255,255,0.9);
+    /* 金色光暈，放在按鈕後方 */
+    #democracyView .demo-plus-wrap::before { content: ''; position: absolute; inset: -9px -11px; border-radius: 18px; z-index: 0;
+        background: radial-gradient(closest-side, rgba(255,186,73,0.55), rgba(255,140,60,0.16) 62%, rgba(255,140,60,0) 100%);
+        animation-name: demoHalo; animation-duration: 2.4s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+    /* 飛舞的小亮點 */
+    #democracyView .demo-plus-wrap::after { content: '✦'; position: absolute; right: -4px; top: -8px; z-index: 3;
+        color: #ffd76a; font-size: 0.82rem; pointer-events: none; text-shadow: 0 0 6px rgba(255,196,84,0.9);
+        animation-name: demoSparkle; animation-duration: 1.9s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+    #democracyView .demo-plus-btn { position: relative; z-index: 2; width: 100%; display: inline-flex; align-items: center;
+        justify-content: center; gap: 7px; white-space: nowrap; border: none; border-radius: 12px; cursor: pointer;
+        padding: 11px 12px; font-family: inherit; font-size: 0.95rem; font-weight: 800; letter-spacing: 0.4px; color: #fff;
+        background: linear-gradient(180deg, #ffb254 0%, #ff8a3d 46%, #f2542d 100%);
+        text-shadow: 0 1px 2px rgba(154,52,18,0.45); overflow: hidden;
+        box-shadow: 0 4px 0 #c8391b, 0 7px 16px rgba(242,84,45,0.42), inset 0 1px 0 rgba(255,255,255,0.6); }
+    /* 拋光高光 */
+    #democracyView .demo-plus-btn::before { content: ''; position: absolute; left: 6%; right: 6%; top: 3px; height: 42%;
+        border-radius: 999px; background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0)); pointer-events: none; }
+    #democracyView .demo-plus-btn::after { content: '✦'; position: absolute; left: 7px; bottom: 2px; font-size: 0.62rem;
+        color: rgba(255,236,179,0.95); pointer-events: none;
+        animation-name: demoSparkle; animation-duration: 2.6s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+    #democracyView .demo-plus-btn:hover { background: linear-gradient(180deg, #ffbd68 0%, #ff9550 46%, #f75f37 100%);
+        box-shadow: 0 4px 0 #c8391b, 0 9px 22px rgba(242,84,45,0.5), inset 0 1px 0 rgba(255,255,255,0.65); }
+    #democracyView .demo-plus-btn:active { transform: translateY(3px);
+        box-shadow: 0 1px 0 #c8391b, 0 2px 7px rgba(242,84,45,0.4), inset 0 1px 0 rgba(255,255,255,0.45); }
+    #democracyView .demo-plus-btn .demo-cart { flex-shrink: 0; }
+    #democracyView .demo-plus-fx { position: absolute; left: 50%; top: 0; z-index: 4; pointer-events: none;
+        font-size: 1.15rem; font-weight: 800; color: #f2542d; text-shadow: 0 1px 3px rgba(255,255,255,0.95);
         animation-name: demoPlusFloat; animation-duration: 1.2s; animation-timing-function: ease-out; animation-fill-mode: forwards; }
 
     /* --- 手機版 --- */
@@ -399,7 +428,7 @@
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
         #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         #democracyView .demo-f-note { grid-column: 1 / -1; }
-        #democracyView .demo-gb-fields { grid-template-columns: 1fr 1fr; }
+        #democracyView .demo-gb-fields { grid-template-columns: 92px 1fr; justify-content: stretch; }
         #democracyView .demo-gb-sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
         #democracyView table.demo-table { font-size: 0.8rem; }
         #democracyModal .dm-box { max-height: 92vh; }
@@ -409,12 +438,23 @@
     /* 跑馬燈動畫（@keyframes 無法以容器 id 收斂，故用專屬名稱避免衝突） */
     var KEYFRAMES_CSS = `
     @keyframes demoMqScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes demoHalo {
+        0%, 100% { opacity: 0.55; transform: scale(0.96); }
+        50%      { opacity: 1;    transform: scale(1.04); }
+    }
+    @keyframes demoSparkle {
+        0%, 100% { opacity: 0.25; transform: scale(0.8) rotate(0deg); }
+        45%      { opacity: 1;    transform: scale(1.15) rotate(18deg); }
+    }
     @keyframes demoPlusFloat {
         0%   { opacity: 1; transform: translate(-50%, 0) scale(1); }
         100% { opacity: 0; transform: translate(-50%, -48px) scale(1.3); }
     }
     @media (prefers-reduced-motion: reduce) {
         #democracyView .demo-mq-track { animation: none; }
+        #democracyView .demo-plus-wrap::before,
+        #democracyView .demo-plus-wrap::after,
+        #democracyView .demo-plus-btn::after { animation: none; }
     }
     `;
 
@@ -2256,7 +2296,7 @@
     }
 
     function htmlGbBanner(g) {
-        return '🎉 <b>目前已團購 ' + gbTotalUnits(g) + ' 組了，快加入一起湊團更划算！</b>';
+        return '<span>🎉 <b>此團已團購 ' + gbTotalUnits(g) + ' 組了，快加入一起湊團更划算！</b></span>';
     }
 
     /* ---------- 一般人：團購清單 ---------- */
@@ -2301,8 +2341,7 @@
         if (!locked) scheduleDeadlineRender(g.deadline);
 
         var items = gbItems(g);
-        h += '<div class="demo-ongoing demo-gb-banner" id="demoGbBanner" style="justify-content:center;">' +
-             htmlGbBanner(g) + '</div>';
+        h += '<div class="demo-ongoing demo-gb-banner" id="demoGbBanner">' + htmlGbBanner(g) + '</div>';
         h += '<div class="demo-sec-row">' +
              '<div class="demo-sec-title" style="margin:0;">選擇品項與數量</div>' +
              (locked ? '' : '<span class="demo-status demo-st-saved" id="demoStatus"><span class="demo-dot"></span>儲存成功</span>') +
@@ -2323,10 +2362,11 @@
             if (locked && !p.qty) continue;         // 已結束時只列出自己有買的
             h += '<div class="demo-item">' +
                  '<div class="demo-item-top"><div>' +
-                 '<div class="demo-item-name">' + esc(it.name) + '</div>' +
+                 '<div class="demo-item-name">' + esc(it.name) +
+                 '<span class="demo-gb-price">' + money(it.price) + '</span></div>' +
                  (it.desc ? '<div class="demo-item-code">' + esc(it.desc) + '</div>' : '') +
                  (it.note ? '<div class="demo-item-code">備註：' + esc(it.note) + '</div>' : '') +
-                 '</div><div class="demo-item-sub">' + money(it.price) + '</div></div>';
+                 '</div></div>';
             if (locked) {
                 h += '<div class="demo-item-fields">' +
                      '<div><label>數量</label><div class="demo-item-ro">' + toNum(p.qty) + '</div></div>' +
@@ -2340,7 +2380,8 @@
                      qtyOptions(toNum(p.qty), 0) + '</select></div>' +
                      '<div><label>&nbsp;</label><span class="demo-plus-wrap">' +
                      '<button class="demo-btn demo-btn-primary demo-plus-btn" ' +
-                     'onclick="DemocracyModule.gbPlusOne(\'' + it.id + '\', this)">我要 +1</button></span></div>' +
+                     'onclick="DemocracyModule.gbPlusOne(\'' + it.id + '\', this)">' +
+                     '<svg class="demo-cart" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2.5 3h2.2l2.1 10.2a1.6 1.6 0 0 0 1.6 1.3h8.4a1.6 1.6 0 0 0 1.6-1.3L20 7H6"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M13 8.6h4M15 6.6v4"/></svg><span>我要 +1</span></button></span></div>' +
                      '<div class="demo-gb-sub"><label>小計</label><div class="demo-item-sub" id="demoGbSub_' + it.id + '">' + money(sub) + '</div></div>' +
                      '<div class="demo-f-note"><label>我的備註（尺寸、口味等）</label>' +
                      '<input class="demo-input" value="' + esc(p.note || '') + '" ' +
