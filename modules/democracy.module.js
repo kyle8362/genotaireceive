@@ -243,7 +243,12 @@
     /* --- 彈窗 --- */
     #democracyModal { display: none; position: fixed; inset: 0; background: rgba(17,24,39,0.5); z-index: 1200; align-items: center; justify-content: center; padding: 16px; }
     #democracyModal .dm-box { background: #fff; border-radius: 12px; width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; }
-    #democracyModal .dm-head { padding: 16px 18px; border-bottom: 1px solid var(--border); font-size: 1.05rem; font-weight: 700; color: var(--text-main); }
+    #democracyModal .dm-head { padding: 16px 18px; border-bottom: 1px solid var(--border); font-size: 1.05rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    #democracyModal .dm-head .dm-title-text { flex-shrink: 0; }
+    #democracyModal .dm-search { flex: 1; min-width: 150px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 6px;
+        font-size: 0.85rem; font-family: inherit; font-weight: 400; color: var(--text-main); box-sizing: border-box; }
+    #democracyModal .dm-search:focus { outline: none; border-color: var(--primary); }
+    #democracyModal .dm-empty { padding: 20px 12px; text-align: center; color: var(--text-light); font-size: 0.88rem; }
     #democracyModal .dm-body { padding: 18px; overflow-y: auto; min-height: 0; }
     #democracyModal .dm-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
     #democracyModal .dm-btn { border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
@@ -315,8 +320,9 @@
     /* =================================================================
      * 彈窗
      * ================================================================= */
-    function openModal(title, bodyHtml, okText, onConfirm) {
-        document.getElementById('dmTitle').textContent = title;
+    function openModal(title, bodyHtml, okText, onConfirm, headExtraHtml) {
+        document.getElementById('dmTitle').innerHTML =
+            '<span class="dm-title-text">' + esc(title) + '</span>' + (headExtraHtml || '');
         document.getElementById('dmBody').innerHTML = bodyHtml;
         document.getElementById('dmFoot').innerHTML = DEFAULT_FOOT;
         document.getElementById('dmOk').textContent = okText || '確定';
@@ -792,6 +798,8 @@
         return h;
     }
 
+    var pickerKeys = [];          // 篩選用的比對字串，順序對應挑選清單
+
     function openPicker() {
         var active = catalog.filter(function (c) { return c.active !== false; });
         if (!active.length) {
@@ -799,15 +807,22 @@
             return;
         }
         var body = '';
+        pickerKeys = [];
         for (var i = 0; i < active.length; i++) {
             var c = active[i];
-            body += '<div class="dm-pick">' +
+            pickerKeys.push(((c.code || '') + ' ' + (c.name || '') + ' ' + (c.unit || '')).toLowerCase());
+            body += '<div class="dm-pick" id="dmRow_' + i + '">' +
                     '<input type="checkbox" id="dmPick_' + i + '">' +
                     '<div class="dm-pick-info"><div class="dm-pick-name">' + esc(c.name) + '</div>' +
                     '<div class="dm-pick-meta">' + (c.code ? '編號 ' + esc(c.code) + ' · ' : '') + money(c.price) + (c.unit ? ' / ' + esc(c.unit) : '') + '</div></div>' +
                     '<select id="dmQty_' + i + '">' + qtyOptions(1) + '</select>' +
                     '</div>';
         }
+        body += '<div class="dm-empty" id="dmPickEmpty" style="display:none;">沒有符合的品項</div>';
+
+        var search = '<input class="dm-search" id="dmPickSearch" placeholder="輸入品名或編號篩選" ' +
+                     'oninput="DemocracyModule.filterPicker(this.value)">';
+
         openModal('從常用品項挑選', body, '加入登記', function () {
             var added = 0;
             for (var i = 0; i < active.length; i++) {
@@ -822,7 +837,22 @@
             if (!added) { alert('請至少勾選一個品項'); return false; }
             render();
             flushSave();
-        });
+        }, search);
+    }
+
+    // 關鍵字篩選：只隱藏不符合的列，不重建清單，以保留已勾選的項目與數量
+    function filterPicker(q) {
+        var key = String(q || '').trim().toLowerCase();
+        var shown = 0;
+        for (var i = 0; i < pickerKeys.length; i++) {
+            var row = document.getElementById('dmRow_' + i);
+            if (!row) continue;
+            var hit = !key || pickerKeys[i].indexOf(key) >= 0;
+            row.style.display = hit ? 'flex' : 'none';
+            if (hit) shown++;
+        }
+        var empty = document.getElementById('dmPickEmpty');
+        if (empty) empty.style.display = shown ? 'none' : 'block';
     }
 
     function openCustomItem() {
@@ -1441,6 +1471,7 @@
         deleteCatalog: deleteCatalog,
 
         openPicker: openPicker,
+        filterPicker: filterPicker,
         openCustomItem: openCustomItem,
         editItem: editItem,
         removeItem: removeItem,
