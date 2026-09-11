@@ -67,6 +67,19 @@
 
     function esc(s) { return core.escAttr(s); }
 
+    // 先轉義成純文字，再把 http/https 網址包成可點的連結。
+    // 順序很重要：先轉義才不會讓公告內容夾帶 HTML 進來。
+    function linkify(s) {
+        return esc(s).replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+            // 網址後面常黏著標點，要還原成純文字而不是連結的一部分
+            var tail = '';
+            var m = url.match(/[，。、；：！？）」\)\]\.,;:!?]+$/);
+            if (m) { tail = m[0]; url = url.slice(0, url.length - tail.length); }
+            if (!url) return tail;
+            return '<a class="demo-link" href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>' + tail;
+        });
+    }
+
     function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
     // 'YYYY-MM-DD HH:mm'（本地時區，不用 toISOString）
@@ -201,9 +214,12 @@
     #democracyView .demo-mq-item .sep { color: #d97706; margin: 0 8px; }
     #democracyView .demo-ongoing { background: var(--primary-light); border: 1px solid #99f6e4; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.88rem; color: #115e59; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
     #democracyView .demo-ongoing b { font-weight: 700; }
+    #democracyView .demo-link { color: inherit; text-decoration: underline; font-weight: 600; word-break: break-all; }
+    #democracyView .demo-link:hover { opacity: 0.75; }
     /* VIP 框：紅色系，與跑馬燈（琥珀）和文具提醒（青綠）拉開差異 */
     #democracyView .demo-ongoing.demo-vip { background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid var(--danger); color: #991b1b; }
     #democracyView .demo-ongoing.demo-vip b { color: #7f1d1d; }
+    #democracyView .demo-ongoing.demo-vip span { min-width: 0; word-break: break-word; }
 
     /* --- 首頁功能卡 --- */
     #democracyView .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
@@ -423,7 +439,7 @@
         for (var i = 0; i < list.length; i++) {
             var a = list[i];
             text += '<span class="demo-mq-item">📢 <b>' + esc(a.title) + '</b>' +
-                    (a.body ? '<span class="sep">｜</span>' + esc(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
+                    (a.body ? '<span class="sep">｜</span>' + linkify(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
                     '</span>';
         }
         // 依內容長度估算一圈的秒數，太快會看不完、太慢會像沒動
@@ -441,8 +457,8 @@
         for (var i = 0; i < list.length; i++) {
             var a = list[i];
             h += '<div class="demo-ongoing demo-vip">' +
-                 '<span>🚨 <b>重要公告</b> 🚨：' + esc(a.title) +
-                 (a.body ? '　' + esc(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
+                 '<span>🚨 <b>重要公告</b> 🚨：' + linkify(a.title) +
+                 (a.body ? '　' + linkify(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
                  '</span></div>';
         }
         return h;
