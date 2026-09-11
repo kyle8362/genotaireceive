@@ -127,14 +127,23 @@
         return h;
     }
 
-    // 把 'YYYY-MM-DD HH:mm' 轉成剩餘時間文字
+    // 把 'YYYY-MM-DD HH:mm' 轉成毫秒時間戳（本地時區）
+    function deadlineMs(deadline) {
+        if (!deadline) return 0;
+        return new Date(String(deadline).replace(' ', 'T') + ':00').getTime();
+    }
+
+    // 剩餘時間文字。用毫秒比對，不要用分鐘字串，
+    // 否則 20:59:30 距離 21:00 會被算成 0 分鐘而誤判成已截止。
     function remainText(deadline) {
         if (!deadline) return '';
-        var diff = Math.floor((new Date(deadline.replace(' ', 'T') + ':00') - new Date()) / 60000);
-        if (diff <= 0) return '已截止';
-        if (diff < 60) return '剩 ' + diff + ' 分鐘';
-        if (diff < 1440) return '剩 ' + Math.floor(diff / 60) + ' 小時';
-        return '剩 ' + Math.floor(diff / 1440) + ' 天';
+        var ms = deadlineMs(deadline) - Date.now();
+        if (ms <= 0) return '已截止';
+        var mins = Math.floor(ms / 60000);
+        if (mins < 1) return '剩不到 1 分鐘';
+        if (mins < 60) return '剩 ' + mins + ' 分鐘';
+        if (mins < 1440) return '剩 ' + Math.floor(mins / 60) + ' 小時';
+        return '剩 ' + Math.floor(mins / 1440) + ' 天';
     }
 
     // 倒數是每分鐘更新一次，所以截止當下最多會有一分鐘的空窗，
@@ -143,16 +152,20 @@
     function scheduleDeadlineRender(deadline) {
         if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; }
         if (!deadline) return;
-        var ms = new Date(deadline.replace(' ', 'T') + ':00') - new Date();
+        var ms = deadlineMs(deadline) - Date.now();
         if (ms > 0 && ms < 21600000) {          // 只處理 6 小時內的截止
             deadlineTimer = setTimeout(function () { deadlineTimer = null; render(); }, ms + 1000);
         }
     }
 
+    // 截止判斷一律用毫秒比對到「秒」。
+    // 原本比對 'YYYY-MM-DD HH:mm' 字串，21:00:30 的當下 nowStr() 還是 '21:00'，
+    // 不大於截止字串，會拖到 21:01 才鎖住，晚了整整一分鐘。
     function isLocked(order) {
         if (!order) return true;
         if (order.status === 'locked') return true;
-        return !!order.deadline && nowStr() > order.deadline;
+        if (!order.deadline) return false;
+        return Date.now() >= deadlineMs(order.deadline);
     }
 
     function copyText(text) {
