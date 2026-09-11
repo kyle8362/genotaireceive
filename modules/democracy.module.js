@@ -61,6 +61,15 @@
     var unsubBallots = null;         // 選票監聽的取消函式
     var voteEditMode = 'single';     // 建立／編輯投票時選的方式
     var voteOptSeq = 0;              // 選項列的流水號
+    var groupbuys = [];              // 團購案（新→舊）
+    var gbOrders = [];               // 目前檢視團購案的所有登記
+    var gbOrdersReady = false;       // 團購登記資料是否已回來過
+    var currentGbId = null;          // 一般人正在看的團購案
+    var adminGbId = null;            // 管理員正在檢視的團購案
+    var unsubGbOrders = null;        // 團購登記監聽的取消函式
+    var gbPending = {};              // 我的團購登記暫存 { 品項id: {qty, note} }
+    var gbPendingLoadedFor = null;   // gbPending 是從哪一團載入的
+    var gbOptSeq = 0;                // 品項列的流水號
 
     /* =================================================================
      * 工具函式
@@ -114,13 +123,15 @@
 
     function toNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
 
-    // 數量下拉選單 1~20。若既有資料超出範圍，把該數字補進選單避免被吃掉。
-    function qtyOptions(current) {
+    // 數量下拉選單，預設 1~20。min 傳 0 時用於團購（0 代表不參加）。
+    // 若既有資料超出範圍，把該數字補進選單避免被吃掉。
+    function qtyOptions(current, min) {
+        var lo = (min === 0) ? 0 : 1;
         var cur = toNum(current);
-        if (cur < 1) cur = 1;
+        if (cur < lo) cur = lo;
         var h = '';
         var extra = (cur > 20);
-        for (var i = 1; i <= 20; i++) {
+        for (var i = lo; i <= 20; i++) {
             h += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + i + '</option>';
         }
         if (extra) h += '<option value="' + cur + '" selected>' + cur + '</option>';
@@ -323,6 +334,12 @@
     #democracyModal .dm-field label input[type=checkbox] { width: 17px; height: 17px; margin-right: 7px; vertical-align: -3px; }
     #democracyModal .dm-field > label { line-height: 1.6; }
 
+    #democracyModal .dm-gb-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-start; }
+    #democracyModal .dm-gb-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 100px; gap: 6px; }
+    #democracyModal .dm-gb-grid input { padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px;
+        font-size: 0.88rem; font-family: inherit; box-sizing: border-box; min-width: 0; }
+    #democracyModal .dm-gb-grid .dm-gb-desc, #democracyModal .dm-gb-grid .dm-gb-note { grid-column: 1 / -1; }
+
     /* --- 公告類型切換 --- */
     #democracyModal .dm-seg { display: flex; gap: 8px; margin-bottom: 18px; }
     #democracyModal .dm-seg-btn { flex: 1; padding: 11px 8px; border: 1px solid var(--border); border-radius: 8px;
@@ -453,6 +470,8 @@
         if (name === 'stationery') pendingLoadedFor = null;
         currentScreen = name;
         if (name === 'voteDetail' || name === 'voteAdmin') attachBallotsListener();
+        if (name === 'gbDetail') gbPendingLoadedFor = null;
+        if (name === 'gbDetail' || name === 'gbAdmin') attachGbListener();
         render();
         var body = document.getElementById('demoBody');
         if (body) body.scrollTop = 0;
@@ -471,6 +490,9 @@
         else if (currentScreen === 'vote') el.innerHTML = htmlVoteList();
         else if (currentScreen === 'voteDetail') el.innerHTML = htmlVoteDetail();
         else if (currentScreen === 'voteAdmin') el.innerHTML = htmlVoteAdmin();
+        else if (currentScreen === 'groupbuy') el.innerHTML = htmlGbList();
+        else if (currentScreen === 'gbDetail') el.innerHTML = htmlGbDetail();
+        else if (currentScreen === 'gbAdmin') el.innerHTML = htmlGbAdmin();
         else if (currentScreen === 'annAdmin') el.innerHTML = htmlAnnouncementAdmin();
         else if (currentScreen === 'catalogAdmin') el.innerHTML = htmlCatalogAdmin();
         else el.innerHTML = htmlHome();
@@ -549,6 +571,16 @@
                      '</div>';
             }
         }
+        if (homeSettings.showGroupbuy !== false) {
+            var og = openGroupbuys();
+            for (var k = 0; k < og.length; k++) {
+                h += '<div class="demo-ongoing">' +
+                     '<span>🛒 <b>團購進行中</b>：' + esc(og[k].title || '團購案') +
+                     '，截止 ' + esc(og[k].deadline || '未設定') + '（' + remainText(og[k].deadline) + '）</span>' +
+                     '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.openGb(\'' + og[k].id + '\')">前往登記</button>' +
+                     '</div>';
+            }
+        }
         return h + htmlVip();
     }
 
@@ -577,11 +609,11 @@
              '<div class="demo-entry-name">中區問卷投票統計區</div>' +
              '<div class="demo-entry-desc">記名投票、備註留言與統計輸出。</div>' +
              '<span id="demoVoteTag">' + htmlVoteTag() + '</span></div>';
-        h += '<div class="demo-entry disabled">' +
+        h += '<div class="demo-entry" onclick="DemocracyModule.go(\'groupbuy\')">' +
              '<div class="demo-entry-icon">🛒</div>' +
              '<div class="demo-entry-name">中區團購區</div>' +
-             '<div class="demo-entry-desc">單一團購案登記，管理員統整輸出。</div>' +
-             '<span class="demo-entry-tag demo-tag-closed">階段三開放</span></div>';
+             '<div class="demo-entry-desc">揪團一起買，管理員統整下單。</div>' +
+             '<span id="demoGbTag">' + htmlGbTag() + '</span></div>';
         h += '</div>';
 
         if (isAdmin()) {
@@ -589,6 +621,7 @@
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'gbAdmin\')">🛒 團購管理</button>' +
                  '</div>';
         }
         return h;
@@ -613,7 +646,11 @@
              '<label class="demo-row" style="cursor:pointer;margin-top:8px;">' +
              '<input type="checkbox" id="demoShowVote" ' + (homeSettings.showVote !== false ? 'checked' : '') +
              ' onchange="DemocracyModule.toggleOngoing()" style="width:18px;height:18px;">' +
-             '<span style="font-size:0.9rem;">在首頁顯示「投票進行中」提醒</span></label></div>';
+             '<span style="font-size:0.9rem;">在首頁顯示「投票進行中」提醒</span></label>' +
+             '<label class="demo-row" style="cursor:pointer;margin-top:8px;">' +
+             '<input type="checkbox" id="demoShowGb" ' + (homeSettings.showGroupbuy !== false ? 'checked' : '') +
+             ' onchange="DemocracyModule.toggleOngoing()" style="width:18px;height:18px;">' +
+             '<span style="font-size:0.9rem;">在首頁顯示「團購進行中」提醒</span></label></div>';
 
         h += '<div class="demo-card"><div class="demo-sec-title">全部公告（' + announcements.length + '）</div>';
         if (!announcements.length) {
@@ -740,9 +777,11 @@
     function toggleOngoing() {
         var st = document.getElementById('demoShowSt');
         var vt = document.getElementById('demoShowVote');
+        var gb = document.getElementById('demoShowGb');
         db.collection('settings').doc('home').set({
             showStationery: st ? st.checked : true,
-            showVote: vt ? vt.checked : true
+            showVote: vt ? vt.checked : true,
+            showGroupbuy: gb ? gb.checked : true
         }, { merge: true }).catch(dbErr);
     }
 
@@ -1202,6 +1241,7 @@
     }
 
     function autoSave() {
+        if (currentScreen === 'gbDetail') { autoSaveGroupbuy(); return; }
         var order = latestOrder();
         if (!order || isLocked(order)) { refreshStatus(); return; }
 
@@ -2111,6 +2151,602 @@
     }
 
     /* =================================================================
+     * 中區團購區
+     * ================================================================= */
+    function openGroupbuys() {
+        return groupbuys.filter(function (g) { return !isLocked(g); });
+    }
+
+    function htmlGbTag() {
+        var n = openGroupbuys().length;
+        if (n) return '<span class="demo-entry-tag demo-tag-open">進行中 ' + n + ' 案</span>';
+        if (groupbuys.length) return '<span class="demo-entry-tag demo-tag-closed">目前沒有進行中的團購</span>';
+        return '<span class="demo-entry-tag demo-tag-closed">尚未開團</span>';
+    }
+
+    function gbItems(g) {
+        var arr = (g && g.items) || [];
+        var out = [];
+        for (var i = 0; i < arr.length; i++) {
+            out.push({
+                id: arr[i].id || ('i' + i),
+                name: arr[i].name || '',
+                desc: arr[i].desc || '',
+                price: toNum(arr[i].price),
+                note: arr[i].note || ''
+            });
+        }
+        return out;
+    }
+
+    function myGbOrder() {
+        var uid = safeId(myName());
+        for (var i = 0; i < gbOrders.length; i++) if (gbOrders[i].id === uid) return gbOrders[i];
+        return null;
+    }
+
+    function viewingGb() {
+        if (currentScreen === 'gbAdmin') {
+            if (adminGbId) {
+                var a = findById(groupbuys, adminGbId);
+                if (a) return a;
+            }
+            return groupbuys.length ? groupbuys[0] : null;
+        }
+        return findById(groupbuys, currentGbId);
+    }
+
+    // 把我的登記載進暫存（gbPending: { 品項id: {qty, note} }）
+    function loadGbPending(g) {
+        if (!gbOrdersReady) { gbPending = {}; gbPendingLoadedFor = null; return; }
+        if (gbPendingLoadedFor === (g ? g.id : null)) return;
+        gbPending = {};
+        var mine = myGbOrder();
+        var lines = (mine && mine.lines) || [];
+        for (var i = 0; i < lines.length; i++) {
+            gbPending[lines[i].itemId] = { qty: toNum(lines[i].qty), note: lines[i].note || '' };
+        }
+        gbPendingLoadedFor = g ? g.id : null;
+    }
+
+    function gbMyTotal(g) {
+        var items = gbItems(g);
+        var t = 0;
+        for (var i = 0; i < items.length; i++) {
+            var p = gbPending[items[i].id];
+            if (p && p.qty > 0) t += items[i].price * p.qty;
+        }
+        return t;
+    }
+
+    function gbJoinedCount() {
+        return gbOrders.length;
+    }
+
+    /* ---------- 一般人：團購清單 ---------- */
+    function htmlGbList() {
+        if (!groupbuys.length) {
+            return '<div class="demo-card"><div class="demo-empty">目前沒有任何團購案。<br>等管理員開團後就可以登記了。</div></div>';
+        }
+        var h = '';
+        for (var i = 0; i < groupbuys.length; i++) {
+            var g = groupbuys[i];
+            var locked = isLocked(g);
+            h += '<div class="demo-entry" onclick="DemocracyModule.openGb(\'' + g.id + '\')" style="margin-bottom:10px;">' +
+                 '<div class="demo-entry-name">' + esc(g.title || '團購案') + '</div>' +
+                 (g.desc ? '<div class="demo-entry-desc">' + linkify(String(g.desc).replace(/\s*\n\s*/g, ' ')) + '</div>' : '') +
+                 '<div class="demo-muted" style="margin-top:6px;">' + gbItems(g).length + ' 個品項' +
+                 (g.status === 'locked' ? '　已結束團購' : '　截止 ' + esc(g.deadline || '未設定')) + '</div>' +
+                 (locked ? '<span class="demo-entry-tag demo-tag-closed">已結束</span>'
+                         : '<span class="demo-entry-tag demo-tag-open">開團中 · ' + remainText(g.deadline) + '</span>') +
+                 '</div>';
+        }
+        return h;
+    }
+
+    /* ---------- 一般人：團購登記 ---------- */
+    function htmlGbDetail() {
+        var g = findById(groupbuys, currentGbId);
+        if (!g) return '<div class="demo-card"><div class="demo-empty">這個團購案已經不存在了。</div></div>';
+
+        var h = '<button class="demo-back" onclick="DemocracyModule.go(\'groupbuy\')">← 返回團購清單</button>';
+        h += '<div class="demo-order-bar">' +
+             '<div class="demo-order-title">' + esc(g.title || '團購案') + '</div>' +
+             (g.desc ? '<div class="demo-ann-body" style="color:var(--text-main);margin-top:6px;">' + linkify(g.desc) + '</div>' : '') +
+             (g.status === 'locked'
+                ? '<div class="demo-deadline"><b>已結束團購</b></div>'
+                : '<div class="demo-deadline">截止時間：<b>' + esc(g.deadline || '未設定') + '</b>　' + remainText(g.deadline) + '</div>') +
+             '</div>';
+
+        if (!gbOrdersReady) return h + '<div class="demo-card"><div class="demo-empty">載入團購資料…</div></div>';
+
+        loadGbPending(g);
+        var locked = isLocked(g);
+        if (!locked) scheduleDeadlineRender(g.deadline);
+
+        var items = gbItems(g);
+        h += '<div class="demo-sec-row">' +
+             '<div class="demo-sec-title" style="margin:0;">選擇品項與數量</div>' +
+             (locked ? '' : '<span class="demo-status demo-st-saved" id="demoStatus"><span class="demo-dot"></span>儲存成功</span>') +
+             '</div>';
+
+        if (locked) {
+            h += '<div class="demo-lockmsg">這個團購案已結束，無法再修改。下面是你的登記內容。</div>';
+        }
+
+        if (!items.length) {
+            h += '<div class="demo-card"><div class="demo-empty">管理員還沒設定品項。</div></div>';
+        }
+
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var p = gbPending[it.id] || { qty: 0, note: '' };
+            var sub = it.price * toNum(p.qty);
+            if (locked && !p.qty) continue;         // 已結束時只列出自己有買的
+            h += '<div class="demo-item">' +
+                 '<div class="demo-item-top"><div>' +
+                 '<div class="demo-item-name">' + esc(it.name) + '</div>' +
+                 (it.desc ? '<div class="demo-item-code">' + esc(it.desc) + '</div>' : '') +
+                 (it.note ? '<div class="demo-item-code">備註：' + esc(it.note) + '</div>' : '') +
+                 '</div><div class="demo-item-sub">' + money(it.price) + '</div></div>';
+            if (locked) {
+                h += '<div class="demo-item-fields">' +
+                     '<div><label>數量</label><div class="demo-item-ro">' + toNum(p.qty) + '</div></div>' +
+                     '<div><label>小計</label><div class="demo-item-sub">' + money(sub) + '</div></div>' +
+                     '<div class="demo-f-note"><label>我的備註</label><div class="demo-item-ro">' + (p.note ? esc(p.note) : '—') + '</div></div>' +
+                     '</div>';
+            } else {
+                h += '<div class="demo-item-fields">' +
+                     '<div><label>數量（0 為不參加）</label>' +
+                     '<select class="demo-select" onchange="DemocracyModule.gbSetQty(\'' + it.id + '\',this.value)">' +
+                     qtyOptions(toNum(p.qty), 0) + '</select></div>' +
+                     '<div><label>小計</label><div class="demo-item-sub" id="demoGbSub_' + it.id + '">' + money(sub) + '</div></div>' +
+                     '<div class="demo-f-note" style="grid-column:1/-1;"><label>我的備註（尺寸、口味等）</label>' +
+                     '<input class="demo-input" value="' + esc(p.note || '') + '" ' +
+                     'oninput="DemocracyModule.gbSetNote(\'' + it.id + '\',this.value)" onblur="DemocracyModule.fieldBlur()"></div>' +
+                     '</div>';
+            }
+            h += '</div>';
+        }
+
+        h += '<div class="demo-total"><span>我的合計</span><span id="demoGbTotal">' + money(gbMyTotal(g)) + '</span></div>';
+        h += '<div class="demo-ongoing" style="justify-content:center;">🎉 <b>已有 ' + gbJoinedCount() + ' 位同仁加入這一團</b>　一起湊團更划算！</div>';
+        if (!locked) {
+            h += '<div class="demo-muted">數量改完會自動儲存，右上角燈號變綠就是存好了。其他人只看得到參加人數，看不到你買了什麼。</div>';
+        }
+        return h;
+    }
+
+    function openGb(id) {
+        currentGbId = id;
+        gbPendingLoadedFor = null;
+        attachGbListener();
+        showScreen('gbDetail');
+    }
+
+    function gbSetQty(itemId, value) {
+        var g = findById(groupbuys, currentGbId);
+        if (!g || isLocked(g)) return;
+        if (!gbPending[itemId]) gbPending[itemId] = { qty: 0, note: '' };
+        gbPending[itemId].qty = toNum(value);
+        var items = gbItems(g);
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].id !== itemId) continue;
+            var el = document.getElementById('demoGbSub_' + itemId);
+            if (el) el.textContent = money(items[i].price * gbPending[itemId].qty);
+        }
+        var tot = document.getElementById('demoGbTotal');
+        if (tot) tot.textContent = money(gbMyTotal(g));
+        flushSave();
+        refreshStatus();
+    }
+
+    function gbSetNote(itemId, value) {
+        var g = findById(groupbuys, currentGbId);
+        if (!g || isLocked(g)) return;
+        if (!gbPending[itemId]) gbPending[itemId] = { qty: 0, note: '' };
+        gbPending[itemId].note = value;
+        scheduleSave();
+    }
+
+    // 團購的自動儲存（由共用的 autoSave 依目前畫面分派過來）
+    function autoSaveGroupbuy() {
+        var g = findById(groupbuys, currentGbId);
+        if (!g || isLocked(g)) { refreshStatus(); return; }
+
+        var items = gbItems(g);
+        var lines = [];
+        for (var i = 0; i < items.length; i++) {
+            var p = gbPending[items[i].id];
+            if (!p || toNum(p.qty) < 1) continue;
+            lines.push({ itemId: items[i].id, name: items[i].name, price: items[i].price, qty: toNum(p.qty), note: p.note || '' });
+        }
+
+        var uid = safeId(myName());
+        var ref = db.collection('groupbuys').doc(g.id).collection('orders').doc(uid);
+        var mine = myGbOrder();
+
+        if (!lines.length) {
+            if (!mine) { saving = false; refreshStatus(); return; }
+            saving = true; refreshStatus();
+            ref.delete()
+                .then(function () { saving = false; refreshStatus(); })
+                .catch(function (e) { saving = false; saveFailed = true; refreshStatus(); console.error('[democracy]', e); });
+            return;
+        }
+
+        saving = true;
+        refreshStatus();
+        ref.set({
+            username: myName(),
+            lines: lines,
+            updatedAt: nowStr(),
+            logs: (mine && mine.logs ? mine.logs : []).concat([logLine((mine ? '修改團購登記（' : '建立團購登記（') + lines.length + ' 項）')])
+        }).then(function () {
+            saving = false; saveFailed = false; refreshStatus();
+        }).catch(function (e) {
+            saving = false; saveFailed = true; refreshStatus(); console.error('[democracy]', e);
+        });
+    }
+
+    /* ---------- 管理員：團購管理 ---------- */
+    function htmlGbAdmin() {
+        var h = '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
+                '<div class="demo-sec-title" style="margin:0;">團購管理</div>' +
+                '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openGbEditor()">＋ 開新團</button>' +
+                '</div><div class="demo-muted" style="margin-top:8px;">' +
+                '同仁只看得到參加人數，看不到誰買了什麼；你在這裡看得到完整明細。</div></div>';
+
+        var g = viewingGb();
+        if (!g) return h + '<div class="demo-card"><div class="demo-empty">還沒有任何團購案。按上方「開新團」建立第一團。</div></div>';
+
+        h += '<div class="demo-card"><div class="demo-row">' +
+             '<span class="demo-muted">檢視團購</span><select class="demo-select" onchange="DemocracyModule.pickGb(this.value)">';
+        for (var i = 0; i < groupbuys.length; i++) {
+            h += '<option value="' + groupbuys[i].id + '"' + (groupbuys[i].id === g.id ? ' selected' : '') + '>' +
+                 esc(groupbuys[i].title || '團購案') + (isLocked(groupbuys[i]) ? ' · 已結束' : ' · 開團中') + '</option>';
+        }
+        h += '</select></div>';
+
+        var locked = isLocked(g);
+        h += '<div class="demo-deadline" style="margin-top:10px;">截止時間：<b>' + esc(g.deadline || '未設定') + '</b>　' +
+             (locked ? '（已結束）' : '（' + remainText(g.deadline) + '）') + '</div>';
+        h += '<div class="demo-row" style="margin-top:12px;">';
+        if (locked) {
+            h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.reopenGb()">重新開啟並延長截止</button>';
+        } else {
+            h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.lockGb()">提前結束團購</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.changeGbDeadline()">修改截止時間</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openGbEditor(\'' + g.id + '\')">編輯內容</button>';
+        }
+        h += '<button class="demo-btn demo-btn-danger" onclick="DemocracyModule.deleteGb()">刪除這一團</button>';
+        h += '</div></div>';
+
+        if (!gbOrdersReady) return h + '<div class="demo-card"><div class="demo-empty">載入團購資料…</div></div>';
+
+        // 明細
+        h += '<div class="demo-card"><div class="demo-sec-title">登記明細（' + gbOrders.length + ' 人）</div>';
+        if (!gbOrders.length) {
+            h += '<div class="demo-empty">還沒有人參加。</div>';
+        } else {
+            h += '<div class="demo-table-wrap"><table class="demo-table"><thead><tr>' +
+                 '<th>登記人</th><th>品項</th><th class="num">單價</th><th class="num">數量</th><th class="num">小計</th><th>備註</th>' +
+                 '</tr></thead><tbody>';
+            for (var o = 0; o < gbOrders.length; o++) {
+                var ord = gbOrders[o];
+                var lines = ord.lines || [];
+                for (var k = 0; k < lines.length; k++) {
+                    var ln = lines[k];
+                    h += '<tr><td>' + (k === 0 ? esc(core.getUserDisplayName(ord.username)) : '') + '</td>' +
+                         '<td>' + esc(ln.name) + '</td>' +
+                         '<td class="num">' + money(ln.price) + '</td>' +
+                         '<td class="num">' + toNum(ln.qty) + '</td>' +
+                         '<td class="num">' + money(toNum(ln.price) * toNum(ln.qty)) + '</td>' +
+                         '<td>' + esc(ln.note || '') + '</td></tr>';
+                }
+            }
+            h += '</tbody></table></div>';
+        }
+        h += '</div>';
+
+        // 合併統計
+        var merged = mergeGb(g);
+        h += '<div class="demo-card"><div class="demo-sec-title">品項合併統計（' + merged.length + ' 項）</div>';
+        if (!merged.length) {
+            h += '<div class="demo-empty">沒有資料可統計。</div>';
+        } else {
+            h += '<div class="demo-table-wrap"><table class="demo-table"><thead><tr>' +
+                 '<th>品項</th><th class="num">單價</th><th class="num">總數量</th><th class="num">小計</th><th>登記人</th>' +
+                 '</tr></thead><tbody>';
+            var total = 0;
+            for (var m = 0; m < merged.length; m++) {
+                var mi = merged[m];
+                total += mi.subtotal;
+                h += '<tr><td>' + esc(mi.name) + '</td>' +
+                     '<td class="num">' + money(mi.price) + '</td>' +
+                     '<td class="num">' + mi.qty + '</td>' +
+                     '<td class="num">' + money(mi.subtotal) + '</td>' +
+                     '<td class="demo-muted">' + esc(mi.users.join('、')) + '</td></tr>';
+            }
+            h += '</tbody></table></div>';
+            h += '<div class="demo-total"><span>總金額</span><span>' + money(total) + '</span></div>';
+            h += '<div class="demo-row">' +
+                 '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyGbMerged()">複製合併清單</button>' +
+                 '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyGbDetail()">複製明細清單</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.csvGbMerged()">下載合併 CSV</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.csvGbDetail()">下載明細 CSV</button>' +
+                 '</div>';
+        }
+        h += '</div>';
+        return h;
+    }
+
+    function pickGb(id) {
+        adminGbId = id;
+        attachGbListener();
+        render();
+    }
+
+    function mergeGb(g) {
+        var map = {};
+        var keys = [];
+        for (var o = 0; o < gbOrders.length; o++) {
+            var ord = gbOrders[o];
+            var who = core.getUserDisplayName(ord.username);
+            var lines = ord.lines || [];
+            for (var k = 0; k < lines.length; k++) {
+                var ln = lines[k];
+                var key = ln.itemId || ln.name;
+                if (!map[key]) {
+                    map[key] = { name: ln.name, price: toNum(ln.price), qty: 0, subtotal: 0, users: [], notes: [] };
+                    keys.push(key);
+                }
+                map[key].qty += toNum(ln.qty);
+                map[key].subtotal += toNum(ln.price) * toNum(ln.qty);
+                if (map[key].users.indexOf(who) < 0) map[key].users.push(who);
+                if (ln.note) map[key].notes.push(who + '：' + ln.note);
+            }
+        }
+        return keys.map(function (k) { return map[k]; });
+    }
+
+    /* ---------- 建立／編輯團購 ---------- */
+    function gbItemRow(seq, it) {
+        it = it || {};
+        return '<div class="dm-gb-row" id="dmGbRow_' + seq + '">' +
+               '<div class="dm-gb-grid">' +
+               '<input class="dm-gb-name" placeholder="品名" value="' + esc(it.name || '') + '">' +
+               '<input class="dm-gb-price" type="number" min="0" placeholder="單價" value="' + (it.price != null ? toNum(it.price) : '') + '">' +
+               '<input class="dm-gb-desc" placeholder="文字敘述（可留空）" value="' + esc(it.desc || '') + '">' +
+               '<input class="dm-gb-note" placeholder="備註（可留空）" value="' + esc(it.note || '') + '">' +
+               '</div>' +
+               '<button type="button" class="dm-opt-del" onclick="DemocracyModule.removeGbItem(' + seq + ')">✕</button>' +
+               '</div>';
+    }
+
+    function addGbItem() {
+        var box = document.getElementById('dmGbItems');
+        if (box) box.insertAdjacentHTML('beforeend', gbItemRow(gbOptSeq++, null));
+    }
+
+    function removeGbItem(seq) {
+        var row = document.getElementById('dmGbRow_' + seq);
+        if (row && row.parentNode) row.parentNode.removeChild(row);
+    }
+
+    function openGbEditor(id) {
+        var g = id ? findById(groupbuys, id) : null;
+        gbOptSeq = 0;
+        var today = core.getTodayStr();
+        var items = g ? gbItems(g) : [];
+        var rows = '';
+        if (items.length) {
+            for (var i = 0; i < items.length; i++) rows += gbItemRow(gbOptSeq++, items[i]);
+        } else {
+            rows += gbItemRow(gbOptSeq++, null) + gbItemRow(gbOptSeq++, null);
+        }
+        var dl = (g && g.deadline ? g.deadline : '').split(' ');
+
+        var body =
+            '<div class="dm-field"><label>團購主題</label><input id="dmGbTitle" value="' + esc(g ? g.title : '') + '"></div>' +
+            '<div class="dm-field"><label>說明（可留空，可放網址）</label><textarea id="dmGbDesc">' + esc(g ? (g.desc || '') : '') + '</textarea></div>' +
+            '<div class="dm-field"><label>品項（品名與單價必填）</label><div id="dmGbItems">' + rows + '</div>' +
+            '<button type="button" class="dm-btn dm-btn-cancel" style="margin-top:8px;" onclick="DemocracyModule.addGbItem()">＋ 新增品項</button></div>' +
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGbDate" value="' + esc(dl[0] || today) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGbTime" value="' + esc(dl[1] || '17:00') + '"></div>';
+
+        openModal(g ? '編輯團購' : '開新團', body, g ? '儲存' : '建立', function () {
+            var title = document.getElementById('dmGbTitle').value.trim();
+            if (!title) { alert('請填團購主題'); return false; }
+
+            var rowsEl = document.querySelectorAll('#dmGbItems .dm-gb-row');
+            var items2 = [];
+            for (var k = 0; k < rowsEl.length; k++) {
+                var nm = rowsEl[k].querySelector('.dm-gb-name').value.trim();
+                if (!nm) continue;
+                items2.push({
+                    id: 'i' + k,
+                    name: nm,
+                    price: toNum(rowsEl[k].querySelector('.dm-gb-price').value),
+                    desc: rowsEl[k].querySelector('.dm-gb-desc').value.trim(),
+                    note: rowsEl[k].querySelector('.dm-gb-note').value.trim()
+                });
+            }
+            if (!items2.length) { alert('至少要有一個有品名的品項'); return false; }
+
+            var date = document.getElementById('dmGbDate').value;
+            var time = document.getElementById('dmGbTime').value;
+            if (!date || !time) { alert('請填截止日期與時間'); return false; }
+            var deadline = date + ' ' + time;
+            if (!g && deadline <= nowStr()) { alert('截止時間必須晚於現在'); return false; }
+
+            var data = {
+                title: title,
+                desc: document.getElementById('dmGbDesc').value,
+                items: items2,
+                deadline: deadline
+            };
+            if (g) {
+                if (gbOrders.length && listeningGbId === g.id &&
+                    !confirm('已經有 ' + gbOrders.length + ' 人登記了。刪除或調整品項順序可能讓已登記的內容對不上，確定要改嗎？')) {
+                    return false;
+                }
+                data.logs = (g.logs || []).concat([logLine('修改團購設定')]);
+                db.collection('groupbuys').doc(g.id).update(data).catch(dbErr);
+            } else {
+                data.status = 'open';
+                data.createdBy = myName();
+                data.createdAt = nowStr();
+                data.logs = [logLine('開團，截止 ' + deadline)];
+                db.collection('groupbuys').add(data).then(function (ref) { adminGbId = ref.id; }).catch(dbErr);
+            }
+        });
+    }
+
+    function lockGb() {
+        var g = viewingGb();
+        if (!g) return;
+        if (!confirm('提前結束「' + (g.title || '團購案') + '」？結束後同仁就不能再修改了。')) return;
+        db.collection('groupbuys').doc(g.id).update({
+            status: 'locked', lockedAt: nowStr(),
+            logs: (g.logs || []).concat([logLine('提前結束團購')])
+        }).catch(dbErr);
+    }
+
+    function reopenGb() {
+        var g = viewingGb();
+        if (!g) return;
+        var body =
+            '<div class="dm-field"><label>新的截止日期</label><input type="date" id="dmGReDate" value="' + core.getTodayStr() + '"></div>' +
+            '<div class="dm-field"><label>新的截止時間</label><input type="time" id="dmGReTime" value="17:00"></div>';
+        openModal('重新開啟團購', body, '開啟', function () {
+            var date = document.getElementById('dmGReDate').value;
+            var time = document.getElementById('dmGReTime').value;
+            if (!date || !time) { alert('請填新的截止日期與時間'); return false; }
+            var deadline = date + ' ' + time;
+            if (deadline <= nowStr()) { alert('截止時間必須晚於現在'); return false; }
+            db.collection('groupbuys').doc(g.id).update({
+                status: 'open', deadline: deadline,
+                logs: (g.logs || []).concat([logLine('重新開啟團購，截止改為 ' + deadline)])
+            }).catch(dbErr);
+        });
+    }
+
+    function changeGbDeadline() {
+        var g = viewingGb();
+        if (!g) return;
+        var parts = (g.deadline || '').split(' ');
+        var body =
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGDlDate" value="' + esc(parts[0] || core.getTodayStr()) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGDlTime" value="' + esc(parts[1] || '17:00') + '"></div>';
+        openModal('修改截止時間', body, '儲存', function () {
+            var date = document.getElementById('dmGDlDate').value;
+            var time = document.getElementById('dmGDlTime').value;
+            if (!date || !time) { alert('請填截止日期與時間'); return false; }
+            db.collection('groupbuys').doc(g.id).update({
+                deadline: date + ' ' + time,
+                logs: (g.logs || []).concat([logLine('修改截止時間為 ' + date + ' ' + time)])
+            }).catch(dbErr);
+        });
+    }
+
+    function deleteGb() {
+        var g = viewingGb();
+        if (!g) return;
+        if (!confirm('確定刪除「' + (g.title || '團購案') + '」？所有人的登記內容會一起刪掉，無法復原。')) return;
+        var gref = db.collection('groupbuys').doc(g.id);
+        gref.collection('orders').get().then(function (snap) {
+            var jobs = [];
+            snap.forEach(function (d) { jobs.push(d.ref.delete()); });
+            return Promise.all(jobs);
+        }).then(function () { return gref.delete(); }).catch(dbErr);
+        adminGbId = null;
+    }
+
+    /* ---------- 團購輸出 ---------- */
+    function gbHeader(g) {
+        return '【' + (g.title || '團購案') + '】\n' +
+               '截止時間：' + (g.deadline || '未設定') + (isLocked(g) ? '（已結束）' : '（開團中）') + '\n' +
+               '參加人數：' + gbOrders.length + ' 人\n' +
+               '------------------------------\n';
+    }
+
+    function copyGbMerged() {
+        var g = viewingGb();
+        if (!g) return;
+        var merged = mergeGb(g);
+        var t = gbHeader(g);
+        var total = 0;
+        for (var i = 0; i < merged.length; i++) {
+            var m = merged[i];
+            total += m.subtotal;
+            t += (i + 1) + '. ' + m.name + '\n   ' + money(m.price) + ' × ' + m.qty + ' = ' + money(m.subtotal) + '\n';
+            if (m.notes.length) t += '   備註：' + m.notes.join('；') + '\n';
+        }
+        t += '------------------------------\n品項數：' + merged.length + '　總金額：' + money(total);
+        copyText(t);
+    }
+
+    function copyGbDetail() {
+        var g = viewingGb();
+        if (!g) return;
+        var t = gbHeader(g);
+        var total = 0;
+        for (var o = 0; o < gbOrders.length; o++) {
+            var ord = gbOrders[o];
+            var lines = ord.lines || [];
+            var sub = 0;
+            t += core.getUserDisplayName(ord.username) + '\n';
+            for (var k = 0; k < lines.length; k++) {
+                var ln = lines[k];
+                var s = toNum(ln.price) * toNum(ln.qty);
+                sub += s;
+                t += '   ' + ln.name + ' × ' + toNum(ln.qty) + ' = ' + money(s) + (ln.note ? '（' + ln.note + '）' : '') + '\n';
+            }
+            total += sub;
+            t += '   小計 ' + money(sub) + '\n\n';
+        }
+        t += '------------------------------\n總金額：' + money(total);
+        copyText(t);
+    }
+
+    function csvGbMerged() {
+        var g = viewingGb();
+        if (!g) return;
+        var merged = mergeGb(g);
+        var rows = [['品項', '單價', '總數量', '小計', '登記人', '備註']];
+        var total = 0;
+        for (var i = 0; i < merged.length; i++) {
+            var m = merged[i];
+            total += m.subtotal;
+            rows.push([m.name, m.price, m.qty, m.subtotal, m.users.join('、'), m.notes.join('；')]);
+        }
+        rows.push([]);
+        rows.push(['總金額', '', '', total, '', '']);
+        downloadCsv('團購_合併_' + (g.deadline || core.getTodayStr()).split(' ')[0] + '.csv', rows);
+    }
+
+    function csvGbDetail() {
+        var g = viewingGb();
+        if (!g) return;
+        var rows = [['登記人', '品項', '單價', '數量', '小計', '備註']];
+        var total = 0;
+        for (var o = 0; o < gbOrders.length; o++) {
+            var ord = gbOrders[o];
+            var lines = ord.lines || [];
+            for (var k = 0; k < lines.length; k++) {
+                var ln = lines[k];
+                var s = toNum(ln.price) * toNum(ln.qty);
+                total += s;
+                rows.push([core.getUserDisplayName(ord.username), ln.name, toNum(ln.price), toNum(ln.qty), s, ln.note]);
+            }
+        }
+        rows.push([]);
+        rows.push(['總金額', '', '', '', total, '']);
+        downloadCsv('團購_明細_' + (g.deadline || core.getTodayStr()).split(' ')[0] + '.csv', rows);
+    }
+
+    /* =================================================================
      * 資料監聽
      * ================================================================= */
     function findById(arr, id) {
@@ -2172,6 +2808,14 @@
             render();
         }, dbErr);
 
+        db.collection('groupbuys').onSnapshot(function (snap) {
+            groupbuys = docsToArray(snap).sort(function (a, b) {
+                return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+            });
+            attachGbListener();
+            render();
+        }, dbErr);
+
         // 每分鐘更新倒數與自動鎖單狀態（僅在本分頁顯示時處理）
         if (!tickTimer) {
             tickTimer = setInterval(function () {
@@ -2185,6 +2829,8 @@
                     if (tag) tag.innerHTML = htmlStTag();
                     var vtag = document.getElementById('demoVoteTag');
                     if (vtag) vtag.innerHTML = htmlVoteTag();
+                    var gtag = document.getElementById('demoGbTag');
+                    if (gtag) gtag.innerHTML = htmlGbTag();
                 } else if (currentScreen === 'stationery') {
                     if (!isBusyEditing()) render();   // 正在填寫時不重繪，否則游標會被打斷
                 } else {
@@ -2242,6 +2888,31 @@
                 ballotsReady = true;
                 // 正在填備註時不重繪，否則游標會被打斷
                 if (currentScreen === 'voteDetail' && isBusyEditing()) return;
+                render();
+            }, dbErr);
+    }
+
+    // 只監聽「目前檢視的那一個團購案」的登記
+    var listeningGbId = null;
+    function attachGbListener() {
+        var g = viewingGb();
+        var id = g ? g.id : null;
+        if (id === listeningGbId) return;
+        if (unsubGbOrders) { unsubGbOrders(); unsubGbOrders = null; }
+        listeningGbId = id;
+        gbOrders = [];
+        gbOrdersReady = false;
+        if (!id) { render(); return; }
+        unsubGbOrders = db.collection('groupbuys').doc(id).collection('orders')
+            .onSnapshot(function (snap) {
+                gbOrders = docsToArray(snap).sort(function (a, b) {
+                    return String(a.username || '').localeCompare(String(b.username || ''));
+                });
+                gbOrdersReady = true;
+                if (currentScreen === 'gbDetail') {
+                    if (isBusyEditing()) { refreshStatus(); return; }
+                    gbPendingLoadedFor = null;       // 沒在編輯就接受最新內容
+                }
                 render();
             }, dbErr);
     }
@@ -2325,6 +2996,22 @@
         deleteVote: deleteVote,
         copyVoteNotice: copyVoteNotice,
         copyVoteResult: copyVoteResult,
+
+        openGb: openGb,
+        gbSetQty: gbSetQty,
+        gbSetNote: gbSetNote,
+        pickGb: pickGb,
+        openGbEditor: openGbEditor,
+        addGbItem: addGbItem,
+        removeGbItem: removeGbItem,
+        lockGb: lockGb,
+        reopenGb: reopenGb,
+        changeGbDeadline: changeGbDeadline,
+        deleteGb: deleteGb,
+        copyGbMerged: copyGbMerged,
+        copyGbDetail: copyGbDetail,
+        csvGbMerged: csvGbMerged,
+        csvGbDetail: csvGbDetail,
 
         pickOrder: pickOrder,
         openNewOrder: openNewOrder,
