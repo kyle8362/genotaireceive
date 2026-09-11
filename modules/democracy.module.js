@@ -383,6 +383,14 @@
     #democracyView .demo-cmt-user { font-size: 0.82rem; font-weight: 700; color: var(--text-main); }
     #democracyView .demo-cmt-text { font-size: 0.88rem; color: var(--text-main); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
 
+    #democracyView .demo-gb-banner { font-size: 0.95rem; }
+    #democracyView .demo-gb-fields { grid-template-columns: 110px 120px 110px minmax(140px, 1fr); }
+    #democracyView .demo-plus-wrap { position: relative; display: block; }
+    #democracyView .demo-plus-btn { width: 100%; white-space: nowrap; }
+    #democracyView .demo-plus-fx { position: absolute; left: 50%; top: 0; pointer-events: none;
+        font-size: 1.1rem; font-weight: 800; color: var(--primary); text-shadow: 0 1px 2px rgba(255,255,255,0.9);
+        animation-name: demoPlusFloat; animation-duration: 1.2s; animation-timing-function: ease-out; animation-fill-mode: forwards; }
+
     /* --- 手機版 --- */
     @media (max-width: 768px) {
         #democracyView .demo-head h1 { font-size: 1.25rem; }
@@ -391,6 +399,8 @@
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
         #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         #democracyView .demo-f-note { grid-column: 1 / -1; }
+        #democracyView .demo-gb-fields { grid-template-columns: 1fr 1fr; }
+        #democracyView .demo-gb-sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
         #democracyView table.demo-table { font-size: 0.8rem; }
         #democracyModal .dm-box { max-height: 92vh; }
     }
@@ -399,6 +409,10 @@
     /* 跑馬燈動畫（@keyframes 無法以容器 id 收斂，故用專屬名稱避免衝突） */
     var KEYFRAMES_CSS = `
     @keyframes demoMqScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @keyframes demoPlusFloat {
+        0%   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+        100% { opacity: 0; transform: translate(-50%, -48px) scale(1.3); }
+    }
     @media (prefers-reduced-motion: reduce) {
         #democracyView .demo-mq-track { animation: none; }
     }
@@ -2223,6 +2237,28 @@
         return gbOrders.length;
     }
 
+    // 目前這一團的總組數。別人用已儲存的資料，自己用畫面上的暫存，
+    // 這樣數量一改數字就跟著動，不用等寫入完成。
+    function gbTotalUnits(g) {
+        var uid = safeId(myName());
+        var n = 0;
+        for (var o = 0; o < gbOrders.length; o++) {
+            if (gbOrders[o].id === uid) continue;
+            var lines = gbOrders[o].lines || [];
+            for (var k = 0; k < lines.length; k++) n += toNum(lines[k].qty);
+        }
+        var items = gbItems(g);
+        for (var i = 0; i < items.length; i++) {
+            var pend = gbPending[items[i].id];
+            if (pend) n += toNum(pend.qty);
+        }
+        return n;
+    }
+
+    function htmlGbBanner(g) {
+        return '🎉 <b>目前已團購 ' + gbTotalUnits(g) + ' 組了，快加入一起湊團更划算！</b>';
+    }
+
     /* ---------- 一般人：團購清單 ---------- */
     function htmlGbList() {
         if (!groupbuys.length) {
@@ -2265,6 +2301,8 @@
         if (!locked) scheduleDeadlineRender(g.deadline);
 
         var items = gbItems(g);
+        h += '<div class="demo-ongoing demo-gb-banner" id="demoGbBanner" style="justify-content:center;">' +
+             htmlGbBanner(g) + '</div>';
         h += '<div class="demo-sec-row">' +
              '<div class="demo-sec-title" style="margin:0;">選擇品項與數量</div>' +
              (locked ? '' : '<span class="demo-status demo-st-saved" id="demoStatus"><span class="demo-dot"></span>儲存成功</span>') +
@@ -2296,12 +2334,15 @@
                      '<div class="demo-f-note"><label>我的備註</label><div class="demo-item-ro">' + (p.note ? esc(p.note) : '—') + '</div></div>' +
                      '</div>';
             } else {
-                h += '<div class="demo-item-fields">' +
+                h += '<div class="demo-item-fields demo-gb-fields">' +
                      '<div><label>數量（0 為不參加）</label>' +
-                     '<select class="demo-select" onchange="DemocracyModule.gbSetQty(\'' + it.id + '\',this.value)">' +
+                     '<select class="demo-select" id="demoGbQty_' + it.id + '" onchange="DemocracyModule.gbSetQty(\'' + it.id + '\',this.value)">' +
                      qtyOptions(toNum(p.qty), 0) + '</select></div>' +
-                     '<div><label>小計</label><div class="demo-item-sub" id="demoGbSub_' + it.id + '">' + money(sub) + '</div></div>' +
-                     '<div class="demo-f-note" style="grid-column:1/-1;"><label>我的備註（尺寸、口味等）</label>' +
+                     '<div><label>&nbsp;</label><span class="demo-plus-wrap">' +
+                     '<button class="demo-btn demo-btn-primary demo-plus-btn" ' +
+                     'onclick="DemocracyModule.gbPlusOne(\'' + it.id + '\', this)">我要 +1</button></span></div>' +
+                     '<div class="demo-gb-sub"><label>小計</label><div class="demo-item-sub" id="demoGbSub_' + it.id + '">' + money(sub) + '</div></div>' +
+                     '<div class="demo-f-note"><label>我的備註（尺寸、口味等）</label>' +
                      '<input class="demo-input" value="' + esc(p.note || '') + '" ' +
                      'oninput="DemocracyModule.gbSetNote(\'' + it.id + '\',this.value)" onblur="DemocracyModule.fieldBlur()"></div>' +
                      '</div>';
@@ -2310,7 +2351,6 @@
         }
 
         h += '<div class="demo-total"><span>我的合計</span><span id="demoGbTotal">' + money(gbMyTotal(g)) + '</span></div>';
-        h += '<div class="demo-ongoing" style="justify-content:center;">🎉 <b>已有 ' + gbJoinedCount() + ' 位同仁加入這一團</b>　一起湊團更划算！</div>';
         if (!locked) {
             h += '<div class="demo-muted">數量改完會自動儲存，右上角燈號變綠就是存好了。其他人只看得到參加人數，看不到你買了什麼。</div>';
         }
@@ -2324,19 +2364,54 @@
         showScreen('gbDetail');
     }
 
+    // 更新畫面上的小計、合計與總組數（不重繪整頁）
+    function gbRefreshNumbers(g, itemId) {
+        var items = gbItems(g);
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].id !== itemId) continue;
+            var el = document.getElementById('demoGbSub_' + itemId);
+            if (el) el.textContent = money(items[i].price * toNum(gbPending[itemId].qty));
+        }
+        var tot = document.getElementById('demoGbTotal');
+        if (tot) tot.textContent = money(gbMyTotal(g));
+        var banner = document.getElementById('demoGbBanner');
+        if (banner) banner.innerHTML = htmlGbBanner(g);
+    }
+
     function gbSetQty(itemId, value) {
         var g = findById(groupbuys, currentGbId);
         if (!g || isLocked(g)) return;
         if (!gbPending[itemId]) gbPending[itemId] = { qty: 0, note: '' };
         gbPending[itemId].qty = toNum(value);
-        var items = gbItems(g);
-        for (var i = 0; i < items.length; i++) {
-            if (items[i].id !== itemId) continue;
-            var el = document.getElementById('demoGbSub_' + itemId);
-            if (el) el.textContent = money(items[i].price * gbPending[itemId].qty);
+        gbRefreshNumbers(g, itemId);
+        flushSave();
+        refreshStatus();
+    }
+
+    // 「我要 +1」：數量加一，並在按鈕上方飄一個 +1 特效
+    function gbPlusOne(itemId, btn) {
+        var g = findById(groupbuys, currentGbId);
+        if (!g || isLocked(g)) return;
+        if (!gbPending[itemId]) gbPending[itemId] = { qty: 0, note: '' };
+        var next = toNum(gbPending[itemId].qty) + 1;
+        if (next > 20) { alert('單一品項最多 20 組，需要更多請直接告訴主揪。'); return; }
+        gbPending[itemId].qty = next;
+
+        var sel = document.getElementById('demoGbQty_' + itemId);
+        if (sel) sel.value = String(next);
+        gbRefreshNumbers(g, itemId);
+
+        // 動態產生特效元素，動畫結束後自行移除，避免累積在 DOM 裡
+        if (btn && btn.parentNode) {
+            var fx = document.createElement('span');
+            fx.className = 'demo-plus-fx';
+            fx.textContent = '+1';
+            btn.parentNode.appendChild(fx);
+            setTimeout(function () {
+                if (fx.parentNode) fx.parentNode.removeChild(fx);
+            }, 1300);
         }
-        var tot = document.getElementById('demoGbTotal');
-        if (tot) tot.textContent = money(gbMyTotal(g));
+
         flushSave();
         refreshStatus();
     }
@@ -2524,9 +2599,44 @@
                '</div>';
     }
 
-    function addGbItem() {
+    function gbToggleBatch() {
+        var box = document.getElementById('dmGbBatchBox');
+        if (!box) return;
+        box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+    }
+
+    // 每行一筆：品名,單價,敘述,備註（逗號可半形或全形，也接受 Tab 分隔）
+    function gbApplyBatch() {
+        var ta = document.getElementById('dmGbBatch');
+        if (!ta) return;
+        var lines = String(ta.value || '').split('\n');
+        var added = 0;
+        var bad = [];
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            var parts = line.split(/[\t,，]/);
+            for (var k = 0; k < parts.length; k++) parts[k] = parts[k].trim();
+            var name = parts[0] || '';
+            if (!name) { bad.push('第 ' + (i + 1) + ' 行'); continue; }
+            addGbItem({
+                name: name,
+                price: toNum((parts[1] || '').replace(/[$＄,]/g, '')),
+                desc: parts[2] || '',
+                note: parts[3] || ''
+            });
+            added++;
+        }
+        if (!added) { alert('沒有可匯入的資料，每行至少要有品名。'); return; }
+        ta.value = '';
+        gbToggleBatch();
+        alert('已加入 ' + added + ' 個品項' + (bad.length ? '\n以下沒有品名，已跳過：\n' + bad.join('、') : '') +
+              '\n\n請確認內容後按下方的「建立」或「儲存」才會真的生效。');
+    }
+
+    function addGbItem(it) {
         var box = document.getElementById('dmGbItems');
-        if (box) box.insertAdjacentHTML('beforeend', gbItemRow(gbOptSeq++, null));
+        if (box) box.insertAdjacentHTML('beforeend', gbItemRow(gbOptSeq++, it || null));
     }
 
     function removeGbItem(seq) {
@@ -2551,7 +2661,18 @@
             '<div class="dm-field"><label>團購主題</label><input id="dmGbTitle" value="' + esc(g ? g.title : '') + '"></div>' +
             '<div class="dm-field"><label>說明（可留空，可放網址）</label><textarea id="dmGbDesc">' + esc(g ? (g.desc || '') : '') + '</textarea></div>' +
             '<div class="dm-field"><label>品項（品名與單價必填）</label><div id="dmGbItems">' + rows + '</div>' +
-            '<button type="button" class="dm-btn dm-btn-cancel" style="margin-top:8px;" onclick="DemocracyModule.addGbItem()">＋ 新增品項</button></div>' +
+            '<div class="demo-row" style="margin-top:8px;">' +
+            '<button type="button" class="dm-btn dm-btn-cancel" onclick="DemocracyModule.addGbItem()">＋ 新增品項</button>' +
+            '<button type="button" class="dm-btn dm-btn-cancel" onclick="DemocracyModule.gbToggleBatch()">📥 批次匯入</button>' +
+            '</div>' +
+            '<div id="dmGbBatchBox" style="display:none;margin-top:10px;">' +
+            '<textarea id="dmGbBatch" style="width:100%;min-height:130px;padding:9px 10px;border:1px solid var(--border);' +
+            'border-radius:6px;font-family:inherit;font-size:0.88rem;box-sizing:border-box;" ' +
+            'placeholder="每行一筆：品名,單價,敘述,備註&#10;麻辣鍋底,180,大辣中辣可選,需先冷凍&#10;酸菜白肉鍋,160"></textarea>' +
+            '<div class="demo-muted" style="font-size:0.8rem;margin:6px 0;">' +
+            '敘述與備註可留空。從 Excel 直接複製整塊貼上也可以，全形逗號一樣認得。</div>' +
+            '<button type="button" class="dm-btn dm-btn-ok" onclick="DemocracyModule.gbApplyBatch()">解析並加入清單</button>' +
+            '</div></div>' +
             '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGbDate" value="' + esc(dl[0] || today) + '"></div>' +
             '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGbTime" value="' + esc(dl[1] || '17:00') + '"></div>';
 
@@ -3003,6 +3124,9 @@
         pickGb: pickGb,
         openGbEditor: openGbEditor,
         addGbItem: addGbItem,
+        gbToggleBatch: gbToggleBatch,
+        gbApplyBatch: gbApplyBatch,
+        gbPlusOne: gbPlusOne,
         removeGbItem: removeGbItem,
         lockGb: lockGb,
         reopenGb: reopenGb,
