@@ -137,6 +137,18 @@
         return '剩 ' + Math.floor(diff / 1440) + ' 天';
     }
 
+    // 倒數是每分鐘更新一次，所以截止當下最多會有一分鐘的空窗，
+    // 畫面還停在可編輯狀態。這裡在截止的那一刻補一次重繪把表單關掉。
+    var deadlineTimer = null;
+    function scheduleDeadlineRender(deadline) {
+        if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; }
+        if (!deadline) return;
+        var ms = new Date(deadline.replace(' ', 'T') + ':00') - new Date();
+        if (ms > 0 && ms < 21600000) {          // 只處理 6 小時內的截止
+            deadlineTimer = setTimeout(function () { deadlineTimer = null; render(); }, ms + 1000);
+        }
+    }
+
     function isLocked(order) {
         if (!order) return true;
         if (order.status === 'locked') return true;
@@ -897,6 +909,7 @@
 
         loadPending(order);
         var locked = isLocked(order);
+        if (!locked) scheduleDeadlineRender(order.deadline);
 
         h += '<div class="demo-order-bar">' +
              '<div class="demo-order-title">' + esc(order.title || '文具採購單') + '</div>' +
@@ -1639,13 +1652,13 @@
              '<div class="demo-order-title">' + esc(v.title || '投票案') + '</div>' +
              (v.desc ? '<div class="demo-ann-body" style="color:var(--text-main);margin-top:6px;">' + linkify(v.desc) + '</div>' : '') +
              '<div class="demo-deadline">截止時間：<b>' + esc(v.deadline || '未設定') + '</b>　' + remainText(v.deadline) + '</div>' +
-             '<div class="demo-muted" style="margin-top:4px;">' + (v.mode === 'multi' ? '可多選，不限選幾項' : '單選') +
-             '　這是記名投票，結果會顯示投票人</div></div>';
+             '<div class="demo-muted" style="margin-top:4px;">' + (v.mode === 'multi' ? '可多選，不限選幾項' : '單選') + '</div></div>';
 
         if (!ballotsReady) return h + '<div class="demo-card"><div class="demo-empty">載入投票資料…</div></div>';
 
         var locked = isLocked(v);
         if (locked) return h + htmlVoteResult(v, false);
+        scheduleDeadlineRender(v.deadline);
 
         var mine = myBallot();
         var opts = voteOptions(v);
@@ -1761,7 +1774,7 @@
     function submitBallot() {
         var v = findById(votes, currentVoteId);
         if (!v) return;
-        if (isLocked(v)) { alert('這個投票案已經截止了。'); return; }
+        if (isLocked(v)) { alert('這個投票案已經截止了，投票內容無法再變更。'); render(); return; }
 
         var inputs = document.querySelectorAll('#democracyView .demo-opt-input');
         var choices = [];
@@ -1794,7 +1807,8 @@
 
     function withdrawBallot() {
         var v = findById(votes, currentVoteId);
-        if (!v || isLocked(v)) return;
+        if (!v) return;
+        if (isLocked(v)) { alert('這個投票案已經截止了，無法取消投票。'); render(); return; }
         if (!confirm('要取消你在「' + (v.title || '投票案') + '」的投票嗎？取消後這一案就等於你沒投。')) return;
         db.collection('votes').doc(v.id).collection('ballots').doc(safeId(myName())).delete()
             .then(function () { render(); }).catch(dbErr);
