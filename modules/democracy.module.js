@@ -249,6 +249,18 @@
         font-size: 0.85rem; font-family: inherit; font-weight: 400; color: var(--text-main); box-sizing: border-box; }
     #democracyModal .dm-search:focus { outline: none; border-color: var(--primary); }
     #democracyModal .dm-empty { padding: 20px 12px; text-align: center; color: var(--text-light); font-size: 0.88rem; }
+
+    /* --- 自行填寫品項的自動建議 --- */
+    #democracyModal .dm-sug-wrap { position: relative; }
+    #democracyModal .dm-sug { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 10;
+        background: #fff; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        max-height: 230px; overflow-y: auto; margin-top: 2px; }
+    #democracyModal .dm-sug-item { padding: 9px 11px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    #democracyModal .dm-sug-item:last-child { border-bottom: none; }
+    #democracyModal .dm-sug-item:hover { background: var(--primary-light); }
+    #democracyModal .dm-sug-name { font-size: 0.86rem; font-weight: 600; color: var(--text-main); word-break: break-all; }
+    #democracyModal .dm-sug-meta { font-size: 0.77rem; color: var(--text-light); margin-top: 2px; }
+    #democracyModal .dm-sug-hint { padding: 9px 11px; font-size: 0.8rem; color: var(--text-light); }
     #democracyModal .dm-body { padding: 18px; overflow-y: auto; min-height: 0; }
     #democracyModal .dm-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
     #democracyModal .dm-btn { border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
@@ -855,13 +867,24 @@
         if (empty) empty.style.display = shown ? 'none' : 'block';
     }
 
+    var sugCatalog = [];          // 建議清單的來源（開啟彈窗時的啟用品項）
+    var sugPickedUnit = '';       // 從建議挑選時帶入的單位
+
     function openCustomItem() {
+        sugCatalog = catalog.filter(function (c) { return c.active !== false; });
+        sugPickedUnit = '';
         var body =
-            '<div class="dm-field"><label>商品編號（可留空）</label><input id="dmItCode"></div>' +
-            '<div class="dm-field"><label>品名</label><input id="dmItName" placeholder="例：得力Deli經典原子筆／藍色／0.7mm"></div>' +
+            '<div class="dm-field dm-sug-wrap"><label>商品編號（可留空）</label>' +
+            '<input id="dmItCode" autocomplete="off" oninput="DemocracyModule.sug(\'code\',this.value)" onblur="DemocracyModule.hideSug()">' +
+            '<div class="dm-sug" id="dmSugcode"></div></div>' +
+            '<div class="dm-field dm-sug-wrap"><label>品名</label>' +
+            '<input id="dmItName" autocomplete="off" placeholder="例：得力Deli經典原子筆／藍色／0.7mm" ' +
+            'oninput="DemocracyModule.sug(\'name\',this.value)" onblur="DemocracyModule.hideSug()">' +
+            '<div class="dm-sug" id="dmSugname"></div></div>' +
             '<div class="dm-field"><label>單價（NT$，不確定可填 0）</label><input type="number" min="0" id="dmItPrice" value="0"></div>' +
             '<div class="dm-field"><label>數量</label><select id="dmItQty">' + qtyOptions(1) + '</select></div>' +
-            '<div class="dm-field"><label>備註</label><input id="dmItNote"></div>';
+            '<div class="dm-field"><label>備註</label><input id="dmItNote"></div>' +
+            '<div class="demo-muted" style="font-size:0.82rem;">編號或品名打到一半，若常用品項裡有相同字樣會自動列出建議，點一下就會帶入。</div>';
         openModal('自行填寫品項', body, '加入登記', function () {
             var name = document.getElementById('dmItName').value.trim();
             if (!name) { alert('請填品名'); return false; }
@@ -870,13 +893,61 @@
                 code: document.getElementById('dmItCode').value.trim(),
                 name: name,
                 price: toNum(document.getElementById('dmItPrice').value),
-                unit: '',
+                unit: sugPickedUnit,
                 qty: qty < 1 ? 1 : qty,
                 note: document.getElementById('dmItNote').value.trim()
             });
             render();
             flushSave();
         });
+    }
+
+    // 依輸入的編號或品名列出常用品項建議（最多 8 筆）
+    function sug(which, q) {
+        var box = document.getElementById('dmSug' + which);
+        if (!box) return;
+        var key = String(q || '').trim().toLowerCase();
+        if (!key) { box.style.display = 'none'; return; }
+
+        var hits = [];
+        for (var i = 0; i < sugCatalog.length && hits.length < 8; i++) {
+            var c = sugCatalog[i];
+            var target = String((which === 'code' ? c.code : c.name) || '').toLowerCase();
+            if (target.indexOf(key) >= 0) hits.push(i);
+        }
+        if (!hits.length) { box.style.display = 'none'; return; }
+
+        var h = '';
+        for (var k = 0; k < hits.length; k++) {
+            var it = sugCatalog[hits[k]];
+            // 用 onmousedown 而非 onclick：onclick 會晚於輸入框的 blur，選單先被收起來就點不到了
+            h += '<div class="dm-sug-item" onmousedown="DemocracyModule.pickSug(' + hits[k] + ')">' +
+                 '<div class="dm-sug-name">' + esc(it.name) + '</div>' +
+                 '<div class="dm-sug-meta">' + (it.code ? '編號 ' + esc(it.code) + ' · ' : '') +
+                 money(it.price) + (it.unit ? ' / ' + esc(it.unit) : '') + '</div></div>';
+        }
+        box.innerHTML = h;
+        box.style.display = 'block';
+    }
+
+    function pickSug(idx) {
+        var c = sugCatalog[idx];
+        if (!c) return;
+        document.getElementById('dmItCode').value = c.code || '';
+        document.getElementById('dmItName').value = c.name || '';
+        document.getElementById('dmItPrice').value = toNum(c.price);
+        sugPickedUnit = c.unit || '';
+        hideSug();
+    }
+
+    function hideSug() {
+        // 延遲收起，避免點擊建議的瞬間先被 blur 收掉
+        setTimeout(function () {
+            var a = document.getElementById('dmSugcode');
+            var b = document.getElementById('dmSugname');
+            if (a) a.style.display = 'none';
+            if (b) b.style.display = 'none';
+        }, 120);
     }
 
     // 編輯欄位：只更新小計與合計，不重繪整頁（重繪會讓輸入框失去焦點）
@@ -1473,6 +1544,9 @@
         openPicker: openPicker,
         filterPicker: filterPicker,
         openCustomItem: openCustomItem,
+        sug: sug,
+        pickSug: pickSug,
+        hideSug: hideSug,
         editItem: editItem,
         removeItem: removeItem,
         fieldBlur: fieldBlur,
