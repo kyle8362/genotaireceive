@@ -360,6 +360,9 @@
      * ================================================================= */
     function showScreen(name) {
         if (saveTimer) flushSave();          // 離開前先把待存的內容寫出去
+        // 每次進入登記畫面都重新讀一次，否則會沿用記憶體裡的舊資料，
+        // 在別的裝置上新增的品項就不會出現
+        if (name === 'stationery') pendingLoadedFor = null;
         currentScreen = name;
         render();
         var body = document.getElementById('demoBody');
@@ -986,6 +989,15 @@
         el.innerHTML = '<span class="demo-dot"></span>' + text;
     }
 
+    // 是否正在編輯（有待存內容、正在寫入、或焦點停在某個欄位上）
+    // 在這些情況下重繪畫面會把游標與未寫出的內容弄掉
+    function isBusyEditing() {
+        if (saveTimer || saving) return true;
+        var ae = document.activeElement;
+        return !!(ae && ae.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) &&
+                  ae.closest && ae.closest('#democracyView'));
+    }
+
     // 依目前是否有待存內容、是否有欄位在編輯，決定燈號
     // 注意：只有「正在打字」的 input / textarea 才算修改中。
     // select 選完後焦點仍留在選單上，但那是一個已完成的動作，不該讓燈號卡在黃色。
@@ -1451,11 +1463,7 @@
                     var tag = document.getElementById('demoStTag');
                     if (tag) tag.innerHTML = htmlStTag();
                 } else if (currentScreen === 'stationery') {
-                    // 正在填寫時不重繪，否則游標會被打斷
-                    var ae = document.activeElement;
-                    var typing = saveTimer || saving ||
-                        (ae && ae.tagName && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.closest && ae.closest('#democracyView'));
-                    if (!typing) render();
+                    if (!isBusyEditing()) render();   // 正在填寫時不重繪，否則游標會被打斷
                 } else {
                     render();
                 }
@@ -1480,11 +1488,12 @@
                     return String(a.username || '').localeCompare(String(b.username || ''));
                 });
                 entriesReady = true;
-                // 登記畫面一旦把自己的資料載進來過，就不再因快照重繪。
-                // 自己的編輯內容才是這個畫面的真相，重繪只會把輸入焦點與游標弄掉。
-                if (currentScreen === 'stationery' && pendingLoadedFor === id) {
-                    refreshStatus();
-                    return;
+
+                // 登記畫面：只有「正在編輯」時才不動畫面，否則重繪會把游標與焦點弄掉。
+                // 沒在編輯就接受最新內容，這樣別的裝置改過的東西才會出現。
+                if (currentScreen === 'stationery') {
+                    if (isBusyEditing()) { refreshStatus(); return; }
+                    pendingLoadedFor = null;      // 允許重新從資料庫載入
                 }
                 render();
             }, dbErr);
@@ -1523,6 +1532,8 @@
 
         activate: function () {
             attachListener();
+            if (saveTimer) flushSave();
+            if (currentScreen === 'stationery') pendingLoadedFor = null;
             render();
         },
 
