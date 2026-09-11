@@ -112,6 +112,14 @@
         return pad2(d.getMonth() + 1) + '/' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     }
 
+    // 建案類彈窗的預設截止時間：隔日 00:00
+    function tomorrowStr() {
+        var d = new Date();
+        d.setDate(d.getDate() + 1);
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+    var DEFAULT_TIME = '00:00';
+
     function logLine(action) {
         return logTime() + ' - ' + core.getUserDisplayName(myName()) + ' - ' + action;
     }
@@ -271,7 +279,9 @@
     #democracyView .demo-entry:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(15,118,110,0.08); }
     #democracyView .demo-entry.disabled { cursor: default; opacity: 0.55; }
     #democracyView .demo-entry.disabled:hover { border-color: var(--border); box-shadow: none; }
-    #democracyView .demo-entry-icon { font-size: 1.6rem; }
+    #democracyView .demo-entry-icon { font-size: 1.5rem; line-height: 1; }
+    #democracyView .demo-entry-head { display: flex; align-items: center; gap: 10px; }
+    #democracyView .demo-entry-head .demo-entry-name { margin-top: 0; }
     #democracyView .demo-entry-name { font-size: 1rem; font-weight: 700; color: var(--text-main); margin-top: 6px; }
     #democracyView .demo-entry-desc { font-size: 0.82rem; color: var(--text-light); margin-top: 4px; line-height: 1.5; }
     #democracyView .demo-entry-tag { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; margin-top: 8px; }
@@ -621,7 +631,7 @@
 
     function htmlOngoing() {
         var o = latestOrder();
-        var h = '';
+        var h = htmlVip();          // VIP 框排在跑馬燈之後、各區塊通知之前
         if (!(homeSettings.showStationery === false || !o || isLocked(o))) {
             h += '<div class="demo-ongoing">' +
                  '<span>🖊️ <b>文具購買登記進行中</b>：' + esc(o.title || '文具採購單') +
@@ -649,7 +659,7 @@
                      '</div>';
             }
         }
-        return h + htmlVip();
+        return h;
     }
 
     function htmlBoard() {
@@ -668,19 +678,16 @@
         var h = htmlBoard();
         h += '<div class="demo-grid">';
         h += '<div class="demo-entry" onclick="DemocracyModule.go(\'stationery\')">' +
-             '<div class="demo-entry-icon">🖊️</div>' +
-             '<div class="demo-entry-name">文具購買登記</div>' +
-             '<div class="demo-entry-desc">登記你需要的文具用品，由採購同仁統整出單。</div>' +
+             '<div class="demo-entry-head"><span class="demo-entry-icon">🖊️</span>' +
+             '<span class="demo-entry-name">文具購買登記</span></div>' +
              '<span id="demoStTag">' + htmlStTag() + '</span></div>';
         h += '<div class="demo-entry" onclick="DemocracyModule.go(\'vote\')">' +
-             '<div class="demo-entry-icon">🗳️</div>' +
-             '<div class="demo-entry-name">中區問卷投票統計區</div>' +
-             '<div class="demo-entry-desc">記名投票、備註留言與統計輸出。</div>' +
+             '<div class="demo-entry-head"><span class="demo-entry-icon">🗳️</span>' +
+             '<span class="demo-entry-name">中區問卷投票統計區</span></div>' +
              '<span id="demoVoteTag">' + htmlVoteTag() + '</span></div>';
         h += '<div class="demo-entry" onclick="DemocracyModule.go(\'groupbuy\')">' +
-             '<div class="demo-entry-icon">🛒</div>' +
-             '<div class="demo-entry-name">中區團購區</div>' +
-             '<div class="demo-entry-desc">揪團一起買，管理員統整下單。</div>' +
+             '<div class="demo-entry-head"><span class="demo-entry-icon">🛒</span>' +
+             '<span class="demo-entry-name">中區團購區</span></div>' +
              '<span id="demoGbTag">' + htmlGbTag() + '</span></div>';
         h += '</div>';
 
@@ -1473,8 +1480,8 @@
         var today = core.getTodayStr();
         var body =
             '<div class="dm-field"><label>單據名稱</label><input id="dmOrdTitle" value="' + today + ' 文具採購單"></div>' +
-            '<div class="dm-field"><label>結單日期</label><input type="date" id="dmOrdDate" value="' + today + '"></div>' +
-            '<div class="dm-field"><label>結單時間</label><input type="time" id="dmOrdTime" value="17:00"></div>' +
+            '<div class="dm-field"><label>結單日期</label><input type="date" id="dmOrdDate" value="' + tomorrowStr() + '"></div>' +
+            '<div class="dm-field"><label>結單時間</label><input type="time" id="dmOrdTime" value="' + DEFAULT_TIME + '"></div>' +
             (orders.length >= MAX_ORDERS
                 ? '<div class="demo-muted" style="color:#b45309;">已有 ' + orders.length + ' 筆單據，建立後會自動刪除最舊的一筆（含其登記內容），無法復原。</div>'
                 : '');
@@ -1530,8 +1537,8 @@
         var o = viewingOrder();
         if (!o) return;
         var body =
-            '<div class="dm-field"><label>新的結單日期</label><input type="date" id="dmReDate" value="' + core.getTodayStr() + '"></div>' +
-            '<div class="dm-field"><label>新的結單時間</label><input type="time" id="dmReTime" value="17:00"></div>' +
+            '<div class="dm-field"><label>新的結單日期</label><input type="date" id="dmReDate" value="' + tomorrowStr() + '"></div>' +
+            '<div class="dm-field"><label>新的結單時間</label><input type="time" id="dmReTime" value="' + DEFAULT_TIME + '"></div>' +
             '<div class="demo-muted">重新開啟後，同仁又可以修改自己的登記。</div>';
         openModal('重新開啟登記', body, '開啟', function () {
             var date = document.getElementById('dmReDate').value;
@@ -1552,8 +1559,8 @@
         if (!o) return;
         var parts = (o.deadline || '').split(' ');
         var body =
-            '<div class="dm-field"><label>結單日期</label><input type="date" id="dmDlDate" value="' + esc(parts[0] || core.getTodayStr()) + '"></div>' +
-            '<div class="dm-field"><label>結單時間</label><input type="time" id="dmDlTime" value="' + esc(parts[1] || '17:00') + '"></div>';
+            '<div class="dm-field"><label>結單日期</label><input type="date" id="dmDlDate" value="' + esc(parts[0] || tomorrowStr()) + '"></div>' +
+            '<div class="dm-field"><label>結單時間</label><input type="time" id="dmDlTime" value="' + esc(parts[1] || DEFAULT_TIME) + '"></div>';
         openModal('修改結單時間', body, '儲存', function () {
             var date = document.getElementById('dmDlDate').value;
             var time = document.getElementById('dmDlTime').value;
@@ -2058,8 +2065,8 @@
             '> 開放填寫備註／意見</label></div>' +
             '<div class="dm-field"><label><input type="checkbox" id="dmVoteCmtPublic"' + (v && v.commentPublic ? ' checked' : '') +
             '> 備註在截止後公開給所有人看（不勾則僅管理員可見）</label></div>' +
-            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmVoteDate" value="' + esc(dl[0] || today) + '"></div>' +
-            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmVoteTime" value="' + esc(dl[1] || '17:00') + '"></div>';
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmVoteDate" value="' + esc(dl[0] || tomorrowStr()) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmVoteTime" value="' + esc(dl[1] || DEFAULT_TIME) + '"></div>';
 
         openModal(v ? '編輯投票' : '建立投票', body, v ? '儲存' : '建立', function () {
             var title = document.getElementById('dmVoteTitle').value.trim();
@@ -2123,8 +2130,8 @@
         var v = viewingVote();
         if (!v) return;
         var body =
-            '<div class="dm-field"><label>新的截止日期</label><input type="date" id="dmVReDate" value="' + core.getTodayStr() + '"></div>' +
-            '<div class="dm-field"><label>新的截止時間</label><input type="time" id="dmVReTime" value="17:00"></div>' +
+            '<div class="dm-field"><label>新的截止日期</label><input type="date" id="dmVReDate" value="' + tomorrowStr() + '"></div>' +
+            '<div class="dm-field"><label>新的截止時間</label><input type="time" id="dmVReTime" value="' + DEFAULT_TIME + '"></div>' +
             '<div class="demo-muted">重新開啟後，結果會先不對全員公布，同仁又可以投票或改票。</div>';
         openModal('重新開啟投票', body, '開啟', function () {
             var date = document.getElementById('dmVReDate').value;
@@ -2144,8 +2151,8 @@
         if (!v) return;
         var parts = (v.deadline || '').split(' ');
         var body =
-            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmVDlDate" value="' + esc(parts[0] || core.getTodayStr()) + '"></div>' +
-            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmVDlTime" value="' + esc(parts[1] || '17:00') + '"></div>';
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmVDlDate" value="' + esc(parts[0] || tomorrowStr()) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmVDlTime" value="' + esc(parts[1] || DEFAULT_TIME) + '"></div>';
         openModal('修改截止時間', body, '儲存', function () {
             var date = document.getElementById('dmVDlDate').value;
             var time = document.getElementById('dmVDlTime').value;
@@ -2406,9 +2413,6 @@
         }
 
         h += '<div class="demo-total"><span>我的合計</span><span id="demoGbTotal">' + money(gbMyTotal(g)) + '</span></div>';
-        if (!locked) {
-            h += '<div class="demo-muted">數量改完會自動儲存，右上角燈號變綠就是存好了。其他人只看得到參加人數，看不到你買了什麼。</div>';
-        }
         return h;
     }
 
@@ -2728,8 +2732,8 @@
             '敘述與備註可留空。從 Excel 直接複製整塊貼上也可以，全形逗號一樣認得。</div>' +
             '<button type="button" class="dm-btn dm-btn-ok" onclick="DemocracyModule.gbApplyBatch()">解析並加入清單</button>' +
             '</div></div>' +
-            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGbDate" value="' + esc(dl[0] || today) + '"></div>' +
-            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGbTime" value="' + esc(dl[1] || '17:00') + '"></div>';
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGbDate" value="' + esc(dl[0] || tomorrowStr()) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGbTime" value="' + esc(dl[1] || DEFAULT_TIME) + '"></div>';
 
         openModal(g ? '編輯團購' : '開新團', body, g ? '儲存' : '建立', function () {
             var title = document.getElementById('dmGbTitle').value.trim();
@@ -2793,8 +2797,8 @@
         var g = viewingGb();
         if (!g) return;
         var body =
-            '<div class="dm-field"><label>新的截止日期</label><input type="date" id="dmGReDate" value="' + core.getTodayStr() + '"></div>' +
-            '<div class="dm-field"><label>新的截止時間</label><input type="time" id="dmGReTime" value="17:00"></div>';
+            '<div class="dm-field"><label>新的截止日期</label><input type="date" id="dmGReDate" value="' + tomorrowStr() + '"></div>' +
+            '<div class="dm-field"><label>新的截止時間</label><input type="time" id="dmGReTime" value="' + DEFAULT_TIME + '"></div>';
         openModal('重新開啟團購', body, '開啟', function () {
             var date = document.getElementById('dmGReDate').value;
             var time = document.getElementById('dmGReTime').value;
@@ -2813,8 +2817,8 @@
         if (!g) return;
         var parts = (g.deadline || '').split(' ');
         var body =
-            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGDlDate" value="' + esc(parts[0] || core.getTodayStr()) + '"></div>' +
-            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGDlTime" value="' + esc(parts[1] || '17:00') + '"></div>';
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmGDlDate" value="' + esc(parts[0] || tomorrowStr()) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmGDlTime" value="' + esc(parts[1] || DEFAULT_TIME) + '"></div>';
         openModal('修改截止時間', body, '儲存', function () {
             var date = document.getElementById('dmGDlDate').value;
             var time = document.getElementById('dmGDlTime').value;
