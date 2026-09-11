@@ -384,10 +384,15 @@
     #democracyView .demo-cmt-text { font-size: 0.88rem; color: var(--text-main); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
 
     #democracyView .demo-gb-banner { font-size: 0.95rem; justify-content: flex-start; }
-    #democracyView .demo-gb-price { margin-left: 12px; font-size: 0.95rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
-    /* 欄寬收窄並靠左排，不再把備註拉到整列寬 */
-    #democracyView .demo-gb-fields { grid-template-columns: 92px 132px 96px minmax(180px, 300px); justify-content: start; }
+    #democracyView .demo-gb-price { margin-left: 12px; font-size: 1.05rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+    #democracyView .demo-gb-item .demo-item-name { font-size: 1.05rem; }
+    #democracyView .demo-gb-item .demo-item-sub { font-size: 1.05rem; }
+    /* 欄寬靠左排；備註加長一倍 */
+    #democracyView .demo-gb-fields { grid-template-columns: 92px 132px 96px minmax(360px, 600px); justify-content: start; }
+    #democracyView .demo-gb-fields > div { min-width: 0; }
     #democracyView .demo-gb-fields .demo-select { width: 100%; }
+    #democracyView .demo-gb-item { max-width: 100%; box-sizing: border-box; }
+    #democracyView .demo-gb-item input, #democracyView .demo-gb-item select { max-width: 100%; box-sizing: border-box; }
 
     /* --- 我要 +1 按鈕 --- */
     #democracyView .demo-plus-wrap { position: relative; display: block; }
@@ -428,8 +433,17 @@
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
         #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         #democracyView .demo-f-note { grid-column: 1 / -1; }
-        #democracyView .demo-gb-fields { grid-template-columns: 92px 1fr; justify-content: stretch; }
-        #democracyView .demo-gb-sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; }
+        /* 手機版：數量標題一行、滾輪與按鈕一行、備註一行、小計一行 */
+        #democracyView .demo-gb-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); justify-content: stretch; }
+        #democracyView .demo-gb-fields .demo-f-note { order: 1; grid-column: 1 / -1; }
+        #democracyView .demo-gb-fields .demo-gb-sub { order: 2; grid-column: 1 / -1; }
+        #democracyView .demo-gb-sub { display: flex; justify-content: space-between; align-items: baseline; }
+        #democracyView .demo-gb-item .demo-item-name { font-size: 1rem; }
+        #democracyView .demo-gb-price { font-size: 1rem; }
+        /* 按鈕縮一點、光暈少外擴，避免把卡片撐得比畫面寬造成左右滑動 */
+        #democracyView .demo-plus-btn { font-size: 0.88rem; padding: 10px 6px; gap: 5px; }
+        #democracyView .demo-plus-wrap::before { inset: -4px -5px; }
+        #democracyView .demo-plus-wrap::after { right: 0; top: -6px; }
         #democracyView table.demo-table { font-size: 0.8rem; }
         #democracyModal .dm-box { max-height: 92vh; }
     }
@@ -2296,7 +2310,7 @@
     }
 
     function htmlGbBanner(g) {
-        return '<span>🎉 <b>此團已團購 ' + gbTotalUnits(g) + ' 組了，快加入一起湊團更划算！</b></span>';
+        return '<span>🎉 <b>此團已團購 ' + gbTotalUnits(g) + ' 組，快加入湊團更划算！</b></span>';
     }
 
     /* ---------- 一般人：團購清單 ---------- */
@@ -2360,7 +2374,7 @@
             var p = gbPending[it.id] || { qty: 0, note: '' };
             var sub = it.price * toNum(p.qty);
             if (locked && !p.qty) continue;         // 已結束時只列出自己有買的
-            h += '<div class="demo-item">' +
+            h += '<div class="demo-item demo-gb-item">' +
                  '<div class="demo-item-top"><div>' +
                  '<div class="demo-item-name">' + esc(it.name) +
                  '<span class="demo-gb-price">' + money(it.price) + '</span></div>' +
@@ -2368,14 +2382,14 @@
                  (it.note ? '<div class="demo-item-code">備註：' + esc(it.note) + '</div>' : '') +
                  '</div></div>';
             if (locked) {
-                h += '<div class="demo-item-fields">' +
+                h += '<div class="demo-item-fields demo-gb-fields">' +
                      '<div><label>數量</label><div class="demo-item-ro">' + toNum(p.qty) + '</div></div>' +
-                     '<div><label>小計</label><div class="demo-item-sub">' + money(sub) + '</div></div>' +
+                     '<div class="demo-gb-sub"><label>小計</label><div class="demo-item-sub">' + money(sub) + '</div></div>' +
                      '<div class="demo-f-note"><label>我的備註</label><div class="demo-item-ro">' + (p.note ? esc(p.note) : '—') + '</div></div>' +
                      '</div>';
             } else {
                 h += '<div class="demo-item-fields demo-gb-fields">' +
-                     '<div><label>數量（0 為不參加）</label>' +
+                     '<div><label>數量</label>' +
                      '<select class="demo-select" id="demoGbQty_' + it.id + '" onchange="DemocracyModule.gbSetQty(\'' + it.id + '\',this.value)">' +
                      qtyOptions(toNum(p.qty), 0) + '</select></div>' +
                      '<div><label>&nbsp;</label><span class="demo-plus-wrap">' +
