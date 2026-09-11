@@ -288,10 +288,13 @@
     #democracyView .demo-entry-desc { font-size: 0.82rem; color: var(--text-light); margin-top: 4px; line-height: 1.5; }
     #democracyView .demo-entry-tag { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; margin-top: 8px; }
     #democracyView .demo-home-entry { min-height: 128px; display: flex; flex-direction: column; justify-content: space-between; }
-    #democracyView .demo-home-entry .demo-entry-tag { font-size: 1.05rem; padding: 5px 14px; align-self: flex-start; }
+    #democracyView .demo-home-entry .demo-entry-name { font-size: 1.15rem; }
+    #democracyView .demo-home-entry .demo-entry-tag { font-size: 0.95rem; padding: 5px 14px; align-self: flex-start;
+        font-family: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", sans-serif; }
     #democracyView .demo-tag-open { background: var(--primary-light); color: #115e59; }
     #democracyView .demo-tag-closed { background: var(--bg); color: var(--text-light); }
-    #democracyView .demo-admin-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-bottom: 2px; }
+    #democracyView .demo-admin-bar { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; padding-bottom: 2px; }
+    #democracyView .demo-admin-bar .demo-btn { padding: 11px 18px; font-size: 0.95rem; }
 
     /* --- 表格 --- */
     #democracyView .demo-table-wrap { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
@@ -448,7 +451,8 @@
         #democracyView .demo-admin-bar { width: 100%; }
         #democracyView .demo-admin-bar .demo-btn { flex: 1 1 45%; }
         #democracyView .demo-home-entry { min-height: 104px; }
-        #democracyView .demo-home-entry .demo-entry-tag { font-size: 0.95rem; }
+        #democracyView .demo-home-entry .demo-entry-name { font-size: 1.05rem; }
+        #democracyView .demo-home-entry .demo-entry-tag { font-size: 0.88rem; }
         #democracyView .demo-item-fields { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         #democracyView .demo-f-note { grid-column: 1 / -1; }
         /* 手機版：數量標題一行、滾輪與按鈕一行、備註一行、小計一行 */
@@ -710,10 +714,10 @@
     // 管理按鈕列：放在標題右側，只在首頁且為管理員時出現
     function htmlAdminBar() {
         if (!isAdmin() || currentScreen !== 'home') return '';
-        return '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
-               '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
-               '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
-               '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.go(\'gbAdmin\')">🛒 團購管理</button>';
+        return '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
+               '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
+               '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
+               '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'gbAdmin\')">🛒 團購管理</button>';
     }
 
     /* =================================================================
