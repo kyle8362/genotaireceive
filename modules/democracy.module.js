@@ -53,6 +53,14 @@
     var saving = false;              // 是否正在寫入
     var saveFailed = false;          // 上一次寫入是否失敗
     var entriesReady = false;        // 目前這張單的登記資料是否已回來過
+    var votes = [];                  // 投票案（新→舊）
+    var ballots = [];                // 目前檢視投票案的所有選票
+    var ballotsReady = false;        // 選票資料是否已回來過
+    var currentVoteId = null;        // 一般人正在看的投票案
+    var adminVoteId = null;          // 管理員正在檢視的投票案
+    var unsubBallots = null;         // 選票監聽的取消函式
+    var voteEditMode = 'single';     // 建立／編輯投票時選的方式
+    var voteOptSeq = 0;              // 選項列的流水號
 
     /* =================================================================
      * 工具函式
@@ -282,6 +290,14 @@
     #democracyModal .dm-sug-meta { font-size: 0.77rem; color: var(--text-light); margin-top: 2px; }
     #democracyModal .dm-sug-hint { padding: 9px 11px; font-size: 0.8rem; color: var(--text-light); }
 
+    #democracyModal .dm-opt-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    #democracyModal .dm-opt-row .dm-opt { flex: 1; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px;
+        font-size: 0.9rem; font-family: inherit; box-sizing: border-box; min-width: 0; }
+    #democracyModal .dm-opt-del { flex-shrink: 0; width: 38px; border: 1px solid var(--border); border-radius: 6px;
+        background: #fff; color: var(--danger); cursor: pointer; font-family: inherit; font-size: 0.9rem; }
+    #democracyModal .dm-field label input[type=checkbox] { width: 17px; height: 17px; margin-right: 7px; vertical-align: -3px; }
+    #democracyModal .dm-field > label { line-height: 1.6; }
+
     /* --- 公告類型切換 --- */
     #democracyModal .dm-seg { display: flex; gap: 8px; margin-bottom: 18px; }
     #democracyModal .dm-seg-btn { flex: 1; padding: 11px 8px; border: 1px solid var(--border); border-radius: 8px;
@@ -304,6 +320,26 @@
     #democracyModal .dm-pick-name { font-size: 0.88rem; font-weight: 600; color: var(--text-main); word-break: break-all; }
     #democracyModal .dm-pick-meta { font-size: 0.78rem; color: var(--text-light); }
     #democracyModal .dm-pick select { width: 76px; padding: 7px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: center; font-family: inherit; font-size: 0.9rem; background: #fff; }
+
+
+    /* --- 投票區 --- */
+    #democracyView .demo-opt { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid var(--border);
+        border-radius: 8px; background: #fff; margin-bottom: 8px; cursor: pointer; font-size: 0.92rem; color: var(--text-main); }
+    #democracyView .demo-opt:hover { border-color: var(--primary); }
+    #democracyView .demo-opt.on { border-color: var(--primary); background: var(--primary-light); font-weight: 600; }
+    #democracyView .demo-opt input { width: 18px; height: 18px; flex-shrink: 0; margin: 0; }
+    #democracyView .demo-opt span { min-width: 0; word-break: break-word; }
+    #democracyView .demo-res { margin-bottom: 14px; }
+    #democracyView .demo-res-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 5px; }
+    #democracyView .demo-res-name { font-size: 0.9rem; font-weight: 600; color: var(--text-main); min-width: 0; word-break: break-word; }
+    #democracyView .demo-res-num { font-size: 0.85rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+    #democracyView .demo-bar { height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    #democracyView .demo-bar-fill { height: 100%; background: #99f6e4; border-radius: 999px; transition: width 0.3s; }
+    #democracyView .demo-bar-fill.top { background: var(--primary); }
+    #democracyView .demo-res-users { font-size: 0.79rem; color: var(--text-light); margin-top: 5px; word-break: break-word; }
+    #democracyView .demo-cmt { border-left: 3px solid var(--border); padding: 2px 0 2px 11px; margin-bottom: 12px; }
+    #democracyView .demo-cmt-user { font-size: 0.82rem; font-weight: 700; color: var(--text-main); }
+    #democracyView .demo-cmt-text { font-size: 0.88rem; color: var(--text-main); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
 
     /* --- 手機版 --- */
     @media (max-width: 768px) {
@@ -391,6 +427,7 @@
         // 在別的裝置上新增的品項就不會出現
         if (name === 'stationery') pendingLoadedFor = null;
         currentScreen = name;
+        if (name === 'voteDetail' || name === 'voteAdmin') attachBallotsListener();
         render();
         var body = document.getElementById('demoBody');
         if (body) body.scrollTop = 0;
@@ -406,6 +443,9 @@
         if (!el) return;
         if (currentScreen === 'stationery') el.innerHTML = htmlStationery();
         else if (currentScreen === 'stAdmin') el.innerHTML = htmlStationeryAdmin();
+        else if (currentScreen === 'vote') el.innerHTML = htmlVoteList();
+        else if (currentScreen === 'voteDetail') el.innerHTML = htmlVoteDetail();
+        else if (currentScreen === 'voteAdmin') el.innerHTML = htmlVoteAdmin();
         else if (currentScreen === 'annAdmin') el.innerHTML = htmlAnnouncementAdmin();
         else if (currentScreen === 'catalogAdmin') el.innerHTML = htmlCatalogAdmin();
         else el.innerHTML = htmlHome();
@@ -474,6 +514,16 @@
                  '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.go(\'stationery\')">前往登記</button>' +
                  '</div>';
         }
+        if (homeSettings.showVote !== false) {
+            var ov = openVotes();
+            for (var i = 0; i < ov.length; i++) {
+                h += '<div class="demo-ongoing">' +
+                     '<span>🗳️ <b>投票進行中</b>：' + esc(ov[i].title || '投票案') +
+                     '，截止 ' + esc(ov[i].deadline || '未設定') + '（' + remainText(ov[i].deadline) + '）</span>' +
+                     '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.openVote(\'' + ov[i].id + '\')">前往投票</button>' +
+                     '</div>';
+            }
+        }
         return h + htmlVip();
     }
 
@@ -497,11 +547,11 @@
              '<div class="demo-entry-name">文具購買登記</div>' +
              '<div class="demo-entry-desc">登記你需要的文具用品，由採購同仁統整出單。</div>' +
              '<span id="demoStTag">' + htmlStTag() + '</span></div>';
-        h += '<div class="demo-entry disabled">' +
+        h += '<div class="demo-entry" onclick="DemocracyModule.go(\'vote\')">' +
              '<div class="demo-entry-icon">🗳️</div>' +
              '<div class="demo-entry-name">中區問卷投票統計區</div>' +
              '<div class="demo-entry-desc">記名投票、備註留言與統計輸出。</div>' +
-             '<span class="demo-entry-tag demo-tag-closed">階段二開放</span></div>';
+             '<span id="demoVoteTag">' + htmlVoteTag() + '</span></div>';
         h += '<div class="demo-entry disabled">' +
              '<div class="demo-entry-icon">🛒</div>' +
              '<div class="demo-entry-name">中區團購區</div>' +
@@ -513,6 +563,7 @@
             h += '<div class="demo-admin-bar">' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
                  '</div>';
         }
         return h;
@@ -533,7 +584,11 @@
              '<label class="demo-row" style="cursor:pointer;">' +
              '<input type="checkbox" id="demoShowSt" ' + (homeSettings.showStationery !== false ? 'checked' : '') +
              ' onchange="DemocracyModule.toggleOngoing()" style="width:18px;height:18px;">' +
-             '<span style="font-size:0.9rem;">在首頁顯示「文具登記進行中」提醒</span></label></div>';
+             '<span style="font-size:0.9rem;">在首頁顯示「文具登記進行中」提醒</span></label>' +
+             '<label class="demo-row" style="cursor:pointer;margin-top:8px;">' +
+             '<input type="checkbox" id="demoShowVote" ' + (homeSettings.showVote !== false ? 'checked' : '') +
+             ' onchange="DemocracyModule.toggleOngoing()" style="width:18px;height:18px;">' +
+             '<span style="font-size:0.9rem;">在首頁顯示「投票進行中」提醒</span></label></div>';
 
         h += '<div class="demo-card"><div class="demo-sec-title">全部公告（' + announcements.length + '）</div>';
         if (!announcements.length) {
@@ -658,8 +713,12 @@
     }
 
     function toggleOngoing() {
-        var on = document.getElementById('demoShowSt').checked;
-        db.collection('settings').doc('home').set({ showStationery: on }, { merge: true }).catch(dbErr);
+        var st = document.getElementById('demoShowSt');
+        var vt = document.getElementById('demoShowVote');
+        db.collection('settings').doc('home').set({
+            showStationery: st ? st.checked : true,
+            showVote: vt ? vt.checked : true
+        }, { merge: true }).catch(dbErr);
     }
 
     /* =================================================================
@@ -1486,6 +1545,545 @@
     }
 
     /* =================================================================
+     * 中區問卷投票統計區
+     * ================================================================= */
+    function openVotes() {
+        return votes.filter(function (v) { return !isLocked(v); });
+    }
+
+    function htmlVoteTag() {
+        var n = openVotes().length;
+        if (n) return '<span class="demo-entry-tag demo-tag-open">進行中 ' + n + ' 案</span>';
+        if (votes.length) return '<span class="demo-entry-tag demo-tag-closed">目前沒有進行中的投票</span>';
+        return '<span class="demo-entry-tag demo-tag-closed">尚未開案</span>';
+    }
+
+    function myBallot() {
+        var uid = safeId(myName());
+        for (var i = 0; i < ballots.length; i++) if (ballots[i].id === uid) return ballots[i];
+        return null;
+    }
+
+    function voteOptions(v) {
+        var arr = (v && v.options) || [];
+        var out = [];
+        for (var i = 0; i < arr.length; i++) {
+            // 舊資料可能是純字串，統一轉成物件
+            if (typeof arr[i] === 'string') out.push({ id: 'o' + i, text: arr[i] });
+            else out.push({ id: arr[i].id || ('o' + i), text: arr[i].text || '' });
+        }
+        return out;
+    }
+
+    // 統計：回傳每個選項的票數、投票人，以及自填與備註
+    function tally(v) {
+        var opts = voteOptions(v);
+        var rows = [];
+        var byId = {};
+        for (var i = 0; i < opts.length; i++) {
+            byId[opts[i].id] = { id: opts[i].id, text: opts[i].text, count: 0, users: [] };
+            rows.push(byId[opts[i].id]);
+        }
+        var customs = [];
+        var customMap = {};
+        var comments = [];
+
+        for (var b = 0; b < ballots.length; b++) {
+            var bal = ballots[b];
+            var who = core.getUserDisplayName(bal.username);
+            var ch = bal.choices || [];
+            for (var c = 0; c < ch.length; c++) {
+                if (byId[ch[c]]) { byId[ch[c]].count++; byId[ch[c]].users.push(who); }
+            }
+            if (bal.customText) {
+                var key = String(bal.customText).trim();
+                if (!customMap[key]) { customMap[key] = { text: key, count: 0, users: [] }; customs.push(customMap[key]); }
+                customMap[key].count++;
+                customMap[key].users.push(who);
+            }
+            if (bal.comment) comments.push({ user: who, text: bal.comment });
+        }
+        customs.sort(function (a, b2) { return b2.count - a.count; });
+        return { total: ballots.length, rows: rows, customs: customs, comments: comments };
+    }
+
+    /* ---------- 一般人：投票清單 ---------- */
+    function htmlVoteList() {
+        var h = '';
+        if (!votes.length) {
+            return '<div class="demo-card"><div class="demo-empty">目前沒有任何投票案。<br>等管理員開案後就可以投票了。</div></div>';
+        }
+        for (var i = 0; i < votes.length; i++) {
+            var v = votes[i];
+            var locked = isLocked(v);
+            h += '<div class="demo-entry" onclick="DemocracyModule.openVote(\'' + v.id + '\')" style="margin-bottom:10px;">' +
+                 '<div class="demo-entry-name">' + esc(v.title || '投票案') + '</div>' +
+                 (v.desc ? '<div class="demo-entry-desc">' + linkify(String(v.desc).replace(/\s*\n\s*/g, ' ')) + '</div>' : '') +
+                 '<div class="demo-muted" style="margin-top:6px;">' +
+                 (v.mode === 'multi' ? '可多選' : '單選') +
+                 '　截止 ' + esc(v.deadline || '未設定') + '</div>' +
+                 (locked ? '<span class="demo-entry-tag demo-tag-closed">已結束，可看結果</span>'
+                         : '<span class="demo-entry-tag demo-tag-open">投票中 · ' + remainText(v.deadline) + '</span>') +
+                 '</div>';
+        }
+        return h;
+    }
+
+    /* ---------- 一般人：投票與結果 ---------- */
+    function htmlVoteDetail() {
+        var v = findById(votes, currentVoteId);
+        if (!v) return '<div class="demo-card"><div class="demo-empty">這個投票案已經不存在了。</div></div>';
+
+        var h = '<button class="demo-back" onclick="DemocracyModule.go(\'vote\')">← 返回投票清單</button>';
+        h += '<div class="demo-order-bar">' +
+             '<div class="demo-order-title">' + esc(v.title || '投票案') + '</div>' +
+             (v.desc ? '<div class="demo-ann-body" style="color:var(--text-main);margin-top:6px;">' + linkify(v.desc) + '</div>' : '') +
+             '<div class="demo-deadline">截止時間：<b>' + esc(v.deadline || '未設定') + '</b>　' + remainText(v.deadline) + '</div>' +
+             '<div class="demo-muted" style="margin-top:4px;">' + (v.mode === 'multi' ? '可多選，不限選幾項' : '單選') +
+             '　這是記名投票，結果會顯示投票人</div></div>';
+
+        if (!ballotsReady) return h + '<div class="demo-card"><div class="demo-empty">載入投票資料…</div></div>';
+
+        var locked = isLocked(v);
+        if (locked) return h + htmlVoteResult(v, false);
+
+        var mine = myBallot();
+        var opts = voteOptions(v);
+        h += '<div class="demo-sec-row"><div class="demo-sec-title" style="margin:0;">' +
+             (mine ? '你已投票，可以修改' : '請選擇') + '</div>' +
+             (mine ? '<span class="demo-status demo-st-saved"><span class="demo-dot"></span>已投票</span>' : '') +
+             '</div>';
+
+        var chosen = (mine && mine.choices) || [];
+        var type = (v.mode === 'multi') ? 'checkbox' : 'radio';
+        for (var i = 0; i < opts.length; i++) {
+            var on = chosen.indexOf(opts[i].id) >= 0;
+            h += '<label class="demo-opt' + (on ? ' on' : '') + '">' +
+                 '<input type="' + type + '" name="demoVoteOpt" class="demo-opt-input" value="' + esc(opts[i].id) + '"' +
+                 (on ? ' checked' : '') + ' onchange="DemocracyModule.optChange()">' +
+                 '<span>' + esc(opts[i].text) + '</span></label>';
+        }
+
+        if (v.allowCustom) {
+            var hasCustom = !!(mine && mine.customText);
+            h += '<label class="demo-opt' + (hasCustom ? ' on' : '') + '">' +
+                 '<input type="' + type + '" name="demoVoteOpt" class="demo-opt-input" value="__custom__"' +
+                 (hasCustom ? ' checked' : '') + ' onchange="DemocracyModule.optChange()">' +
+                 '<span>其他（自行填寫）</span></label>' +
+                 '<input class="demo-input" id="demoVoteCustom" style="width:100%;margin-bottom:10px;" ' +
+                 'placeholder="勾選上面的「其他」後，在這裡填你的答案" value="' + esc(mine ? (mine.customText || '') : '') + '">';
+        }
+
+        if (v.allowComment) {
+            h += '<div class="demo-card" style="margin-top:4px;"><label class="demo-muted" style="display:block;margin-bottom:6px;">' +
+                 '備註／意見說明' +
+                 (v.commentPublic ? '（截止後所有人都看得到）' : '（僅管理員看得到）') + '</label>' +
+                 '<textarea class="demo-textarea" id="demoVoteComment" style="width:100%;min-height:80px;">' +
+                 esc(mine ? (mine.comment || '') : '') + '</textarea></div>';
+        }
+
+        h += '<div class="demo-row" style="margin:12px 0;">' +
+             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.submitBallot()">' +
+             (mine ? '更新我的投票' : '送出投票') + '</button>' +
+             (mine ? '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.withdrawBallot()">取消我的投票</button>' : '') +
+             '</div>';
+        h += '<div class="demo-total"><span>目前已投票</span><span>' + ballots.length + ' 人</span></div>';
+        h += '<div class="demo-muted">票數與投票內容會在截止後公布，截止前只看得到已投票人數。</div>';
+        return h;
+    }
+
+    // 結果畫面。forAdmin = true 時不管截止與否都顯示（管理員即時看票）
+    function htmlVoteResult(v, forAdmin) {
+        var t = tally(v);
+        var h = '<div class="demo-card"><div class="demo-sec-title">投票結果（' + t.total + ' 人已投）</div>';
+        if (!t.total) {
+            h += '<div class="demo-empty">還沒有人投票。</div></div>';
+            return h;
+        }
+        var max = 0;
+        for (var i = 0; i < t.rows.length; i++) if (t.rows[i].count > max) max = t.rows[i].count;
+        for (var k = 0; k < t.rows.length; k++) {
+            var r = t.rows[k];
+            var pct = t.total ? Math.round(r.count / t.total * 100) : 0;
+            h += '<div class="demo-res">' +
+                 '<div class="demo-res-top"><span class="demo-res-name">' + esc(r.text) + '</span>' +
+                 '<span class="demo-res-num">' + r.count + ' 票 · ' + pct + '%</span></div>' +
+                 '<div class="demo-bar"><div class="demo-bar-fill' + (r.count && r.count === max ? ' top' : '') +
+                 '" style="width:' + (max ? Math.round(r.count / max * 100) : 0) + '%;"></div></div>' +
+                 (r.users.length ? '<div class="demo-res-users">' + esc(r.users.join('、')) + '</div>' : '') +
+                 '</div>';
+        }
+        if (t.customs.length) {
+            h += '<div class="demo-sec-title" style="margin-top:16px;">自填答案</div>';
+            for (var c = 0; c < t.customs.length; c++) {
+                h += '<div class="demo-res"><div class="demo-res-top">' +
+                     '<span class="demo-res-name">' + esc(t.customs[c].text) + '</span>' +
+                     '<span class="demo-res-num">' + t.customs[c].count + ' 票</span></div>' +
+                     '<div class="demo-res-users">' + esc(t.customs[c].users.join('、')) + '</div></div>';
+            }
+        }
+        h += '</div>';
+
+        if (v.allowComment) {
+            var canSee = forAdmin || v.commentPublic;
+            h += '<div class="demo-card"><div class="demo-sec-title">備註／意見（' + t.comments.length + ' 則）</div>';
+            if (!canSee) {
+                h += '<div class="demo-empty">這個案子的備註僅管理員看得到。</div>';
+            } else if (!t.comments.length) {
+                h += '<div class="demo-empty">沒有人留下備註。</div>';
+            } else {
+                for (var m = 0; m < t.comments.length; m++) {
+                    h += '<div class="demo-cmt"><div class="demo-cmt-user">' + esc(t.comments[m].user) + '</div>' +
+                         '<div class="demo-cmt-text">' + linkify(t.comments[m].text) + '</div></div>';
+                }
+            }
+            h += '</div>';
+        }
+        return h;
+    }
+
+    // 勾選狀態改變時只更新外框樣式，不重繪整頁
+    function optChange() {
+        var inputs = document.querySelectorAll('#democracyView .demo-opt-input');
+        for (var i = 0; i < inputs.length; i++) {
+            var box = inputs[i].parentNode;
+            if (!box) continue;
+            box.className = 'demo-opt' + (inputs[i].checked ? ' on' : '');
+        }
+    }
+
+    function openVote(id) {
+        currentVoteId = id;
+        attachBallotsListener();
+        showScreen('voteDetail');
+    }
+
+    function submitBallot() {
+        var v = findById(votes, currentVoteId);
+        if (!v) return;
+        if (isLocked(v)) { alert('這個投票案已經截止了。'); return; }
+
+        var inputs = document.querySelectorAll('#democracyView .demo-opt-input');
+        var choices = [];
+        var wantCustom = false;
+        for (var i = 0; i < inputs.length; i++) {
+            if (!inputs[i].checked) continue;
+            if (inputs[i].value === '__custom__') wantCustom = true;
+            else choices.push(inputs[i].value);
+        }
+        var customEl = document.getElementById('demoVoteCustom');
+        var customText = (wantCustom && customEl) ? customEl.value.trim() : '';
+
+        if (!choices.length && !wantCustom) { alert('請至少選擇一個選項'); return; }
+        if (wantCustom && !customText) { alert('勾了「其他」就要填寫內容'); return; }
+
+        var commentEl = document.getElementById('demoVoteComment');
+        var mine = myBallot();
+        db.collection('votes').doc(v.id).collection('ballots').doc(safeId(myName())).set({
+            username: myName(),
+            choices: choices,
+            customText: customText,
+            comment: commentEl ? commentEl.value.trim() : '',
+            votedAt: nowStr(),
+            logs: (mine && mine.logs ? mine.logs : []).concat([logLine(mine ? '修改投票' : '投票')])
+        }).then(function () {
+            alert(mine ? '已更新你的投票' : '投票已送出');
+            render();
+        }).catch(dbErr);
+    }
+
+    function withdrawBallot() {
+        var v = findById(votes, currentVoteId);
+        if (!v || isLocked(v)) return;
+        if (!confirm('要取消你在「' + (v.title || '投票案') + '」的投票嗎？取消後這一案就等於你沒投。')) return;
+        db.collection('votes').doc(v.id).collection('ballots').doc(safeId(myName())).delete()
+            .then(function () { render(); }).catch(dbErr);
+    }
+
+    /* ---------- 管理員：投票管理 ---------- */
+    function viewingVote() {
+        if (adminVoteId) {
+            var v = findById(votes, adminVoteId);
+            if (v) return v;
+        }
+        return votes.length ? votes[0] : null;
+    }
+
+    function htmlVoteAdmin() {
+        var h = '<div class="demo-card"><div class="demo-row" style="justify-content:space-between;">' +
+                '<div class="demo-sec-title" style="margin:0;">投票管理</div>' +
+                '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openVoteEditor()">＋ 建立投票</button>' +
+                '</div><div class="demo-muted" style="margin-top:8px;">' +
+                '記名投票。票數與投票內容截止後才對全員公布，你在這裡隨時看得到即時票數。</div></div>';
+
+        var v = viewingVote();
+        if (!v) return h + '<div class="demo-card"><div class="demo-empty">還沒有任何投票案。按上方「建立投票」開第一案。</div></div>';
+
+        h += '<div class="demo-card"><div class="demo-row">' +
+             '<span class="demo-muted">檢視案件</span><select class="demo-select" onchange="DemocracyModule.pickVote(this.value)">';
+        for (var i = 0; i < votes.length; i++) {
+            h += '<option value="' + votes[i].id + '"' + (votes[i].id === v.id ? ' selected' : '') + '>' +
+                 esc(votes[i].title || '投票案') + (isLocked(votes[i]) ? ' · 已結束' : ' · 投票中') + '</option>';
+        }
+        h += '</select></div>';
+
+        var locked = isLocked(v);
+        h += '<div class="demo-deadline" style="margin-top:10px;">截止時間：<b>' + esc(v.deadline || '未設定') + '</b>　' +
+             (locked ? '（已結束）' : '（' + remainText(v.deadline) + '）') + '</div>';
+        h += '<div class="demo-muted" style="margin-top:4px;">' +
+             (v.mode === 'multi' ? '可多選' : '單選') +
+             (v.allowCustom ? '、可自填' : '') +
+             (v.allowComment ? (v.commentPublic ? '、開放備註（截止後公開）' : '、開放備註（僅管理員可見）') : '') +
+             '</div>';
+        h += '<div class="demo-row" style="margin-top:12px;">';
+        if (locked) {
+            h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.reopenVote()">重新開啟並延長截止</button>';
+        } else {
+            h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.lockVote()">提前結束投票</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.changeVoteDeadline()">修改截止時間</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openVoteEditor(\'' + v.id + '\')">編輯內容</button>';
+        }
+        h += '<button class="demo-btn demo-btn-danger" onclick="DemocracyModule.deleteVote()">刪除這一案</button>';
+        h += '</div></div>';
+
+        if (!ballotsReady) return h + '<div class="demo-card"><div class="demo-empty">載入投票資料…</div></div>';
+
+        h += htmlVoteResult(v, true);
+
+        h += '<div class="demo-card"><div class="demo-sec-title">分享文字</div>' +
+             '<div class="demo-row">' +
+             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyVoteNotice()">複製開案通知（LINE）</button>' +
+             '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyVoteResult()">複製統計結果（LINE）</button>' +
+             '</div><div class="demo-muted" style="margin-top:8px;">複製後直接貼到 LINE 群組即可。</div></div>';
+        return h;
+    }
+
+    function pickVote(id) {
+        adminVoteId = id;
+        attachBallotsListener();
+        render();
+    }
+
+    /* ---------- 建立／編輯投票 ---------- */
+    function voteOptRow(seq, text) {
+        return '<div class="dm-opt-row" id="dmOptRow_' + seq + '">' +
+               '<input class="dm-opt" value="' + esc(text || '') + '" placeholder="選項內容">' +
+               '<button type="button" class="dm-opt-del" onclick="DemocracyModule.removeVoteOption(' + seq + ')">✕</button>' +
+               '</div>';
+    }
+
+    function addVoteOption(text) {
+        var box = document.getElementById('dmVoteOpts');
+        if (!box) return;
+        box.insertAdjacentHTML('beforeend', voteOptRow(voteOptSeq++, text || ''));
+    }
+
+    function removeVoteOption(seq) {
+        var row = document.getElementById('dmOptRow_' + seq);
+        if (row && row.parentNode) row.parentNode.removeChild(row);
+    }
+
+    function setVoteMode(m) {
+        voteEditMode = m;
+        var s = document.getElementById('dmSegSingle');
+        var u = document.getElementById('dmSegMulti');
+        if (s) s.className = 'dm-seg-btn' + (m === 'single' ? ' on' : '');
+        if (u) u.className = 'dm-seg-btn' + (m === 'multi' ? ' on' : '');
+    }
+
+    function openVoteEditor(id) {
+        var v = id ? findById(votes, id) : null;
+        voteEditMode = (v && v.mode === 'multi') ? 'multi' : 'single';
+        voteOptSeq = 0;
+        var today = core.getTodayStr();
+        var opts = v ? voteOptions(v) : [];
+
+        var rows = '';
+        if (opts.length) {
+            for (var i = 0; i < opts.length; i++) rows += voteOptRow(voteOptSeq++, opts[i].text);
+        } else {
+            rows += voteOptRow(voteOptSeq++, '') + voteOptRow(voteOptSeq++, '');
+        }
+
+        var dl = (v && v.deadline ? v.deadline : '').split(' ');
+        var body =
+            '<div class="dm-seg">' +
+            '<button type="button" class="dm-seg-btn' + (voteEditMode === 'single' ? ' on' : '') + '" id="dmSegSingle" ' +
+            'onclick="DemocracyModule.setVoteMode(\'single\')">單選</button>' +
+            '<button type="button" class="dm-seg-btn' + (voteEditMode === 'multi' ? ' on' : '') + '" id="dmSegMulti" ' +
+            'onclick="DemocracyModule.setVoteMode(\'multi\')">多選</button>' +
+            '</div>' +
+            '<div class="dm-field"><label>投票主題</label><input id="dmVoteTitle" value="' + esc(v ? v.title : '') + '"></div>' +
+            '<div class="dm-field"><label>說明（可留空，可放網址）</label><textarea id="dmVoteDesc">' + esc(v ? (v.desc || '') : '') + '</textarea></div>' +
+            '<div class="dm-field"><label>選項</label><div id="dmVoteOpts">' + rows + '</div>' +
+            '<button type="button" class="dm-btn dm-btn-cancel" style="margin-top:8px;" onclick="DemocracyModule.addVoteOption()">＋ 新增選項</button></div>' +
+            '<div class="dm-field"><label><input type="checkbox" id="dmVoteCustom"' + (v && v.allowCustom ? ' checked' : '') +
+            '> 允許自行填寫其他答案</label></div>' +
+            '<div class="dm-field"><label><input type="checkbox" id="dmVoteComment"' + (v && v.allowComment ? ' checked' : '') +
+            '> 開放填寫備註／意見</label></div>' +
+            '<div class="dm-field"><label><input type="checkbox" id="dmVoteCmtPublic"' + (v && v.commentPublic ? ' checked' : '') +
+            '> 備註在截止後公開給所有人看（不勾則僅管理員可見）</label></div>' +
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmVoteDate" value="' + esc(dl[0] || today) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmVoteTime" value="' + esc(dl[1] || '17:00') + '"></div>';
+
+        openModal(v ? '編輯投票' : '建立投票', body, v ? '儲存' : '建立', function () {
+            var title = document.getElementById('dmVoteTitle').value.trim();
+            if (!title) { alert('請填投票主題'); return false; }
+
+            var nodes = document.querySelectorAll('#dmVoteOpts .dm-opt');
+            var opts2 = [];
+            for (var k = 0; k < nodes.length; k++) {
+                var txt = nodes[k].value.trim();
+                if (txt) opts2.push({ id: 'o' + k, text: txt });
+            }
+            if (opts2.length < 2) { alert('至少要有兩個有內容的選項'); return false; }
+
+            var date = document.getElementById('dmVoteDate').value;
+            var time = document.getElementById('dmVoteTime').value;
+            if (!date || !time) { alert('請填截止日期與時間'); return false; }
+            var deadline = date + ' ' + time;
+            if (!v && deadline <= nowStr()) { alert('截止時間必須晚於現在'); return false; }
+
+            var data = {
+                title: title,
+                desc: document.getElementById('dmVoteDesc').value,
+                mode: voteEditMode,
+                options: opts2,
+                allowCustom: document.getElementById('dmVoteCustom').checked,
+                allowComment: document.getElementById('dmVoteComment').checked,
+                commentPublic: document.getElementById('dmVoteCmtPublic').checked,
+                deadline: deadline
+            };
+
+            if (v) {
+                if (ballots.length && listeningVoteId === v.id &&
+                    !confirm('已經有 ' + ballots.length + ' 人投票了。修改或刪除選項可能讓已投的票對不上，確定要改嗎？')) {
+                    return false;
+                }
+                data.logs = (v.logs || []).concat([logLine('修改投票設定')]);
+                db.collection('votes').doc(v.id).update(data).catch(dbErr);
+            } else {
+                data.status = 'open';
+                data.createdBy = myName();
+                data.createdAt = nowStr();
+                data.logs = [logLine('建立投票，截止 ' + deadline)];
+                db.collection('votes').add(data).then(function (ref) {
+                    adminVoteId = ref.id;
+                }).catch(dbErr);
+            }
+        });
+    }
+
+    function lockVote() {
+        var v = viewingVote();
+        if (!v) return;
+        if (!confirm('提前結束「' + (v.title || '投票案') + '」？結束後結果就會對全員公布。')) return;
+        db.collection('votes').doc(v.id).update({
+            status: 'locked', lockedAt: nowStr(),
+            logs: (v.logs || []).concat([logLine('提前結束投票')])
+        }).catch(dbErr);
+    }
+
+    function reopenVote() {
+        var v = viewingVote();
+        if (!v) return;
+        var body =
+            '<div class="dm-field"><label>新的截止日期</label><input type="date" id="dmVReDate" value="' + core.getTodayStr() + '"></div>' +
+            '<div class="dm-field"><label>新的截止時間</label><input type="time" id="dmVReTime" value="17:00"></div>' +
+            '<div class="demo-muted">重新開啟後，結果會先不對全員公布，同仁又可以投票或改票。</div>';
+        openModal('重新開啟投票', body, '開啟', function () {
+            var date = document.getElementById('dmVReDate').value;
+            var time = document.getElementById('dmVReTime').value;
+            if (!date || !time) { alert('請填新的截止日期與時間'); return false; }
+            var deadline = date + ' ' + time;
+            if (deadline <= nowStr()) { alert('截止時間必須晚於現在'); return false; }
+            db.collection('votes').doc(v.id).update({
+                status: 'open', deadline: deadline,
+                logs: (v.logs || []).concat([logLine('重新開啟投票，截止改為 ' + deadline)])
+            }).catch(dbErr);
+        });
+    }
+
+    function changeVoteDeadline() {
+        var v = viewingVote();
+        if (!v) return;
+        var parts = (v.deadline || '').split(' ');
+        var body =
+            '<div class="dm-field"><label>截止日期</label><input type="date" id="dmVDlDate" value="' + esc(parts[0] || core.getTodayStr()) + '"></div>' +
+            '<div class="dm-field"><label>截止時間</label><input type="time" id="dmVDlTime" value="' + esc(parts[1] || '17:00') + '"></div>';
+        openModal('修改截止時間', body, '儲存', function () {
+            var date = document.getElementById('dmVDlDate').value;
+            var time = document.getElementById('dmVDlTime').value;
+            if (!date || !time) { alert('請填截止日期與時間'); return false; }
+            db.collection('votes').doc(v.id).update({
+                deadline: date + ' ' + time,
+                logs: (v.logs || []).concat([logLine('修改截止時間為 ' + date + ' ' + time)])
+            }).catch(dbErr);
+        });
+    }
+
+    function deleteVote() {
+        var v = viewingVote();
+        if (!v) return;
+        if (!confirm('確定刪除「' + (v.title || '投票案') + '」？所有人的投票內容會一起刪掉，無法復原。')) return;
+        var vref = db.collection('votes').doc(v.id);
+        vref.collection('ballots').get().then(function (snap) {
+            var jobs = [];
+            snap.forEach(function (d) { jobs.push(d.ref.delete()); });
+            return Promise.all(jobs);
+        }).then(function () { return vref.delete(); }).catch(dbErr);
+        adminVoteId = null;
+    }
+
+    /* ---------- LINE 分享文字 ---------- */
+    function copyVoteNotice() {
+        var v = viewingVote();
+        if (!v) return;
+        var opts = voteOptions(v);
+        var t = '【投票通知】' + (v.title || '投票案') + '\n';
+        if (v.desc) t += v.desc + '\n';
+        t += '------------------------------\n';
+        t += '投票方式：' + (v.mode === 'multi' ? '可多選（不限幾項）' : '單選') + (v.allowCustom ? '，可自行填寫其他答案' : '') + '\n';
+        t += '截止時間：' + (v.deadline || '未設定') + '\n';
+        t += '選項：\n';
+        for (var i = 0; i < opts.length; i++) t += '  ' + (i + 1) + '. ' + opts[i].text + '\n';
+        if (v.allowComment) t += '（可填寫備註意見）\n';
+        t += '------------------------------\n';
+        t += '請進入公司系統的「中區的民主聖地 → 中區問卷投票統計區」投票，謝謝！';
+        copyText(t);
+    }
+
+    function copyVoteResult() {
+        var v = viewingVote();
+        if (!v) return;
+        var r = tally(v);
+        var t = '【投票結果】' + (v.title || '投票案') + '\n';
+        t += '截止時間：' + (v.deadline || '未設定') + (isLocked(v) ? '（已結束）' : '（尚在投票中，以下為即時票數）') + '\n';
+        t += '投票人數：' + r.total + ' 人\n';
+        t += '------------------------------\n';
+        for (var i = 0; i < r.rows.length; i++) {
+            var row = r.rows[i];
+            var pct = r.total ? Math.round(row.count / r.total * 100) : 0;
+            t += (i + 1) + '. ' + row.text + '：' + row.count + ' 票（' + pct + '%）\n';
+            if (row.users.length) t += '   ' + row.users.join('、') + '\n';
+        }
+        if (r.customs.length) {
+            t += '\n自填答案：\n';
+            for (var c = 0; c < r.customs.length; c++) {
+                t += '  ' + r.customs[c].text + '：' + r.customs[c].count + ' 票（' + r.customs[c].users.join('、') + '）\n';
+            }
+        }
+        if (v.allowComment && r.comments.length) {
+            t += '\n備註意見：\n';
+            for (var m = 0; m < r.comments.length; m++) {
+                t += '  ' + r.comments[m].user + '：' + r.comments[m].text + '\n';
+            }
+        }
+        t += '------------------------------\n感謝大家參與投票！';
+        copyText(t);
+    }
+
+    /* =================================================================
      * 資料監聽
      * ================================================================= */
     function findById(arr, id) {
@@ -1539,6 +2137,14 @@
             render();
         }, dbErr);
 
+        db.collection('votes').onSnapshot(function (snap) {
+            votes = docsToArray(snap).sort(function (a, b) {
+                return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+            });
+            attachBallotsListener();
+            render();
+        }, dbErr);
+
         // 每分鐘更新倒數與自動鎖單狀態（僅在本分頁顯示時處理）
         if (!tickTimer) {
             tickTimer = setInterval(function () {
@@ -1550,6 +2156,8 @@
                     if (og) og.innerHTML = htmlOngoing();
                     var tag = document.getElementById('demoStTag');
                     if (tag) tag.innerHTML = htmlStTag();
+                    var vtag = document.getElementById('demoVoteTag');
+                    if (vtag) vtag.innerHTML = htmlVoteTag();
                 } else if (currentScreen === 'stationery') {
                     if (!isBusyEditing()) render();   // 正在填寫時不重繪，否則游標會被打斷
                 } else {
@@ -1583,6 +2191,30 @@
                     if (isBusyEditing()) { refreshStatus(); return; }
                     pendingLoadedFor = null;      // 允許重新從資料庫載入
                 }
+                render();
+            }, dbErr);
+    }
+
+    // 只監聽「目前檢視的那一個投票案」的選票
+    var listeningVoteId = null;
+    function attachBallotsListener() {
+        var v = (currentScreen === 'voteAdmin') ? viewingVote() : findById(votes, currentVoteId);
+        if (!v && currentScreen === 'voteAdmin') v = viewingVote();
+        var id = v ? v.id : null;
+        if (id === listeningVoteId) return;
+        if (unsubBallots) { unsubBallots(); unsubBallots = null; }
+        listeningVoteId = id;
+        ballots = [];
+        ballotsReady = false;
+        if (!id) { render(); return; }
+        unsubBallots = db.collection('votes').doc(id).collection('ballots')
+            .onSnapshot(function (snap) {
+                ballots = docsToArray(snap).sort(function (a, b) {
+                    return String(a.username || '').localeCompare(String(b.username || ''));
+                });
+                ballotsReady = true;
+                // 正在填備註時不重繪，否則游標會被打斷
+                if (currentScreen === 'voteDetail' && isBusyEditing()) return;
                 render();
             }, dbErr);
     }
@@ -1650,6 +2282,22 @@
         editItem: editItem,
         removeItem: removeItem,
         fieldBlur: fieldBlur,
+
+        openVote: openVote,
+        optChange: optChange,
+        submitBallot: submitBallot,
+        withdrawBallot: withdrawBallot,
+        pickVote: pickVote,
+        openVoteEditor: openVoteEditor,
+        setVoteMode: setVoteMode,
+        addVoteOption: addVoteOption,
+        removeVoteOption: removeVoteOption,
+        lockVote: lockVote,
+        reopenVote: reopenVote,
+        changeVoteDeadline: changeVoteDeadline,
+        deleteVote: deleteVote,
+        copyVoteNotice: copyVoteNotice,
+        copyVoteResult: copyVoteResult,
 
         pickOrder: pickOrder,
         openNewOrder: openNewOrder,
