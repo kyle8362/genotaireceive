@@ -32,6 +32,7 @@
 
     /* ---------- 常數 ---------- */
     var MAX_ORDERS = 5;              // 文具單最多保留筆數（超過自動刪最舊）
+    var MAX_VIP = 3;                 // VIP 框公告最多則數
     var ADMIN_ROLES = ['creator', 'senior', 'admin'];
 
     /* ---------- 模組私有狀態 ---------- */
@@ -200,6 +201,9 @@
     #democracyView .demo-mq-item .sep { color: #d97706; margin: 0 8px; }
     #democracyView .demo-ongoing { background: var(--primary-light); border: 1px solid #99f6e4; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.88rem; color: #115e59; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
     #democracyView .demo-ongoing b { font-weight: 700; }
+    /* VIP 框：紅色系，與跑馬燈（琥珀）和文具提醒（青綠）拉開差異 */
+    #democracyView .demo-ongoing.demo-vip { background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid var(--danger); color: #991b1b; }
+    #democracyView .demo-ongoing.demo-vip b { color: #7f1d1d; }
 
     /* --- 首頁功能卡 --- */
     #democracyView .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
@@ -261,6 +265,13 @@
     #democracyModal .dm-sug-name { font-size: 0.86rem; font-weight: 600; color: var(--text-main); word-break: break-all; }
     #democracyModal .dm-sug-meta { font-size: 0.77rem; color: var(--text-light); margin-top: 2px; }
     #democracyModal .dm-sug-hint { padding: 9px 11px; font-size: 0.8rem; color: var(--text-light); }
+
+    /* --- 公告類型切換 --- */
+    #democracyModal .dm-seg { display: flex; gap: 8px; margin-bottom: 18px; }
+    #democracyModal .dm-seg-btn { flex: 1; padding: 11px 8px; border: 1px solid var(--border); border-radius: 8px;
+        background: #fff; color: var(--text-light); font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+    #democracyModal .dm-seg-btn.on { border-color: var(--primary); background: var(--primary-light); color: #115e59; }
+    #democracyModal .dm-seg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     #democracyModal .dm-body { padding: 18px; overflow-y: auto; min-height: 0; }
     #democracyModal .dm-foot { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
     #democracyModal .dm-btn { border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
@@ -399,8 +410,14 @@
 
     function latestOrder() { return orders.length ? orders[0] : null; }
 
+    function annType(a) { return a && a.type === 'vip' ? 'vip' : 'marquee'; }
+
+    function vipList() {
+        return activeAnnouncements().filter(function (a) { return annType(a) === 'vip'; }).slice(0, MAX_VIP);
+    }
+
     function htmlMarquee() {
-        var list = activeAnnouncements();
+        var list = activeAnnouncements().filter(function (a) { return annType(a) === 'marquee'; });
         if (!list.length) return '';
         var text = '';
         for (var i = 0; i < list.length; i++) {
@@ -418,14 +435,30 @@
                text + text + '</div></div>';
     }
 
+    function htmlVip() {
+        var list = vipList();
+        var h = '';
+        for (var i = 0; i < list.length; i++) {
+            var a = list[i];
+            h += '<div class="demo-ongoing demo-vip">' +
+                 '<span>🚨 <b>重要公告</b> 🚨：' + esc(a.title) +
+                 (a.body ? '　' + esc(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
+                 '</span></div>';
+        }
+        return h;
+    }
+
     function htmlOngoing() {
         var o = latestOrder();
-        if (homeSettings.showStationery === false || !o || isLocked(o)) return '';
-        return '<div class="demo-ongoing">' +
-               '<span>🖊️ <b>文具購買登記進行中</b>：' + esc(o.title || '文具採購單') +
-               '，截止 ' + esc(o.deadline || '未設定') + '（' + remainText(o.deadline) + '）</span>' +
-               '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.go(\'stationery\')">前往登記</button>' +
-               '</div>';
+        var h = '';
+        if (!(homeSettings.showStationery === false || !o || isLocked(o))) {
+            h += '<div class="demo-ongoing">' +
+                 '<span>🖊️ <b>文具購買登記進行中</b>：' + esc(o.title || '文具採購單') +
+                 '，截止 ' + esc(o.deadline || '未設定') + '（' + remainText(o.deadline) + '）</span>' +
+                 '<button class="demo-btn demo-btn-primary demo-btn-sm" onclick="DemocracyModule.go(\'stationery\')">前往登記</button>' +
+                 '</div>';
+        }
+        return h + htmlVip();
     }
 
     function htmlBoard() {
@@ -477,7 +510,8 @@
              '<div class="demo-sec-title" style="margin:0;">公告管理</div>' +
              '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.openAnnEditor()">＋ 新增公告</button>' +
              '</div>';
-        h += '<div class="demo-muted" style="margin-top:8px;">公告會依起訖日期自動上下架，今天是 ' + core.getTodayStr() + '。</div></div>';
+        h += '<div class="demo-muted" style="margin-top:8px;">公告會依起訖日期自動上下架，今天是 ' + core.getTodayStr() +
+             '。跑馬燈公告不限則數；VIP 框公告最多 ' + MAX_VIP + ' 則，目前已用 ' + vipCount(null) + ' 則。</div></div>';
 
         h += '<div class="demo-card"><div class="demo-sec-title">進行中事項提醒</div>' +
              '<label class="demo-row" style="cursor:pointer;">' +
@@ -490,7 +524,7 @@
             h += '<div class="demo-empty">還沒有公告。按上方「新增公告」建立第一則。</div>';
         } else {
             h += '<div class="demo-table-wrap"><table class="demo-table"><thead><tr>' +
-                 '<th>狀態</th><th>標題</th><th>公告期間</th><th>建立者</th><th>操作</th>' +
+                 '<th>狀態</th><th>類型</th><th>標題</th><th>公告期間</th><th>建立者</th><th>操作</th>' +
                  '</tr></thead><tbody>';
             var today = core.getTodayStr();
             for (var i = 0; i < announcements.length; i++) {
@@ -502,6 +536,7 @@
                     else state = '顯示中';
                 }
                 h += '<tr><td>' + state + '</td>' +
+                     '<td>' + (annType(a) === 'vip' ? '🚨 VIP 框' : '📢 跑馬燈') + '</td>' +
                      '<td>' + esc(a.title) + '</td>' +
                      '<td>' + esc(a.startDate || '—') + ' ~ ' + esc(a.endDate || '—') + '</td>' +
                      '<td>' + esc(core.getUserDisplayName(a.createdBy || '')) + '</td>' +
@@ -518,14 +553,46 @@
         return h;
     }
 
+    var annEditType = 'marquee';     // 公告編輯彈窗目前選的類型
+
+    function vipCount(excludeId) {
+        var n = 0;
+        for (var i = 0; i < announcements.length; i++) {
+            if (announcements[i].id === excludeId) continue;
+            if (annType(announcements[i]) === 'vip') n++;
+        }
+        return n;
+    }
+
+    function setAnnType(t) {
+        annEditType = t;
+        var m = document.getElementById('dmSegMq');
+        var v = document.getElementById('dmSegVip');
+        if (m) m.className = 'dm-seg-btn' + (t === 'marquee' ? ' on' : '');
+        if (v) v.className = 'dm-seg-btn' + (t === 'vip' ? ' on' : '');
+    }
+
     function openAnnEditor(id) {
         var a = id ? findById(announcements, id) : null;
         var today = core.getTodayStr();
+        annEditType = annType(a);
+        var used = vipCount(a ? a.id : null);
+        var vipFull = (used >= MAX_VIP);
+
         var body =
+            '<div class="dm-seg">' +
+            '<button type="button" class="dm-seg-btn' + (annEditType === 'marquee' ? ' on' : '') + '" id="dmSegMq" ' +
+            'onclick="DemocracyModule.setAnnType(\'marquee\')">📢 跑馬燈公告</button>' +
+            '<button type="button" class="dm-seg-btn' + (annEditType === 'vip' ? ' on' : '') + '" id="dmSegVip" ' +
+            (vipFull && annEditType !== 'vip' ? 'disabled ' : '') +
+            'onclick="DemocracyModule.setAnnType(\'vip\')">🚨 VIP 框公告' +
+            (vipFull && annEditType !== 'vip' ? '（已滿）' : '（' + used + '/' + MAX_VIP + '）') + '</button>' +
+            '</div>' +
             '<div class="dm-field"><label>標題</label><input id="dmAnnTitle" value="' + esc(a ? a.title : '') + '"></div>' +
             '<div class="dm-field"><label>內容</label><textarea id="dmAnnBody">' + esc(a ? (a.body || '') : '') + '</textarea></div>' +
             '<div class="dm-field"><label>開始日期</label><input type="date" id="dmAnnStart" value="' + esc(a ? (a.startDate || today) : today) + '"></div>' +
             '<div class="dm-field"><label>結束日期</label><input type="date" id="dmAnnEnd" value="' + esc(a ? (a.endDate || '') : '') + '"></div>';
+
         openModal(a ? '編輯公告' : '新增公告', body, '儲存', function () {
             var title = document.getElementById('dmAnnTitle').value.trim();
             var start = document.getElementById('dmAnnStart').value;
@@ -533,20 +600,25 @@
             if (!title) { alert('請填標題'); return false; }
             if (!start || !end) { alert('請填公告的開始與結束日期'); return false; }
             if (end < start) { alert('結束日期不能早於開始日期'); return false; }
+            if (annEditType === 'vip' && vipCount(a ? a.id : null) >= MAX_VIP) {
+                alert('VIP 框公告最多 ' + MAX_VIP + ' 則，請先刪除或把其中一則改為跑馬燈公告。');
+                return false;
+            }
             var data = {
                 title: title,
                 body: document.getElementById('dmAnnBody').value,
+                type: annEditType,
                 startDate: start,
                 endDate: end,
                 enabled: a ? (a.enabled !== false) : true
             };
             if (a) {
-                data.logs = (a.logs || []).concat([logLine('修改公告')]);
+                data.logs = (a.logs || []).concat([logLine('修改公告（' + (annEditType === 'vip' ? 'VIP框' : '跑馬燈') + '）')]);
                 db.collection('announcements').doc(a.id).update(data).catch(dbErr);
             } else {
                 data.createdBy = myName();
                 data.createdAt = nowStr();
-                data.logs = [logLine('建立公告')];
+                data.logs = [logLine('建立公告（' + (annEditType === 'vip' ? 'VIP框' : '跑馬燈') + '）')];
                 db.collection('announcements').add(data).catch(dbErr);
             }
         });
@@ -1543,6 +1615,7 @@
         confirmModal: confirmModal,
 
         openAnnEditor: openAnnEditor,
+        setAnnType: setAnnType,
         toggleAnn: toggleAnn,
         deleteAnn: deleteAnn,
         toggleOngoing: toggleOngoing,
