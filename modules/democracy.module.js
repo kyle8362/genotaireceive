@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v12
+ * 模組：中區的民主聖地 (democracy)  ─ v13
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
@@ -368,6 +368,10 @@
     #democracyModal .dm-btn { border: none; border-radius: 6px; padding: 9px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; }
     #democracyModal .dm-btn-ok { background: var(--primary); color: #fff; }
     #democracyModal .dm-btn-cancel { background: #fff; color: var(--text-main); border: 1px solid var(--border); }
+    /* v13：不可復原的動作專用（目前只有「清除登記並重新開團」的最後確認） */
+    #democracyModal .dm-btn-danger { background: var(--danger); color: #fff; }
+    #democracyModal .dm-warn-box { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+        border-radius: 8px; padding: 12px 14px; font-size: 0.88rem; line-height: 1.7; margin-bottom: 16px; }
     #democracyModal .dm-field { margin-bottom: 14px; }
     #democracyModal .dm-field label { display: block; font-size: 0.82rem; color: var(--text-light); margin-bottom: 5px; }
     #democracyModal .dm-field input, #democracyModal .dm-field textarea, #democracyModal .dm-field select {
@@ -2563,7 +2567,8 @@
              (locked ? '（已結束）' : '（' + remainText(g.deadline) + '）') + '</div>';
         h += '<div class="demo-row" style="margin-top:12px;">';
         if (locked) {
-            h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.reopenGb()">重新開啟並延長截止</button>';
+            h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.reopenGb()">重新開啟並延長截止</button>' +
+                 '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.clearGbOrders()">清除登記並重新開團</button>';
         } else {
             h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.lockGb()">提前結束團購</button>' +
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.changeGbDeadline()">修改截止時間</button>' +
@@ -2846,6 +2851,81 @@
         });
     }
 
+    // v13：清除全部登記並重新開團。
+    //   固定週期的團購（例如每個月訂一次）不必每次開新團，
+    //   把上一輪的登記清掉、設定新的截止時間，同一團就能重新使用。
+    //   與「刪除這一團」的差別：團購案本身、品項與說明都保留，只清空 orders 子集合。
+    //
+    //   兩關確認：
+    //     第一關 = 原生 confirm（確定鍵位置由瀏覽器決定）
+    //     第二關 = 本模組彈窗，且按鈕左右顛倒（確認在左、取消在右）
+    //   兩關的確認鍵不在同一個位置，手滑連點不會一路按到底。
+    //
+    //   只在團購已結束時才提供。開團中清除沒有意義：同仁頁面上的暫存
+    //   會透過 autoSaveGroupbuy() 立刻寫回來，看起來會像刪除失敗。
+    function clearGbOrders() {
+        var g = viewingGb();
+        if (!g) return;
+        if (!isLocked(g)) {
+            alert('團購尚未結束。請先「提前結束團購」，或等截止時間到了再清除登記。');
+            return;
+        }
+        if (!gbOrders.length) {
+            alert('目前沒有登記資料可清除，可直接使用「重新開啟並延長截止」。');
+            return;
+        }
+
+        var title = g.title || '團購案';
+        var people = gbOrders.length;
+
+        /* ---------- 第一關 ---------- */
+        if (!confirm(
+            '即將清除「' + title + '」的所有登記資料。\n\n' +
+            '目前有 ' + people + ' 人登記，刪除後無法復原，\n' +
+            '也無法還原任何人的登記內容。\n\n' +
+            '確定要繼續嗎？'
+        )) return;
+
+        /* ---------- 第二關：本模組彈窗（順便設定新的截止時間） ---------- */
+        var body =
+            '<div class="dm-warn-box">⚠️ <b>這是最後確認。</b><br>' +
+            '按下左邊的按鈕後，<b>' + people + ' 人的登記資料會立刻永久刪除</b>，' +
+            '並以下方的新截止時間重新開團。<br>' +
+            '團購品項、單價與說明都會保留。</div>' +
+            '<div class="dm-field"><label>新的截止日期</label>' +
+            '<input type="date" id="dmGClrDate" value="' + tomorrowStr() + '"></div>' +
+            '<div class="dm-field"><label>新的截止時間</label>' +
+            '<input type="time" id="dmGClrTime" value="' + DEFAULT_TIME + '"></div>';
+
+        openModal('清除登記並重新開團', body, '確認清除並開團', function () {
+            var date = document.getElementById('dmGClrDate').value;
+            var time = document.getElementById('dmGClrTime').value;
+            if (!date || !time) { alert('請填新的截止日期與時間'); return false; }
+            var deadline = date + ' ' + time;
+            if (deadline <= nowStr()) { alert('截止時間必須晚於現在'); return false; }
+
+            var gref = db.collection('groupbuys').doc(g.id);
+            gref.collection('orders').get().then(function (snap) {
+                var jobs = [];
+                snap.forEach(function (d) { jobs.push(d.ref.delete()); });
+                return Promise.all(jobs);
+            }).then(function () {
+                return gref.update({
+                    status: 'open', deadline: deadline,
+                    logs: (g.logs || []).concat([
+                        logLine('清除全部登記資料（' + people + ' 人）並重新開團，截止改為 ' + deadline)
+                    ])
+                });
+            }).catch(dbErr);
+        });
+
+        // 按鈕左右顛倒：確認在左、取消在右，位置與第一關的 confirm 不同。
+        // 只覆寫這一次的頁尾，openModal 的預設行為不受影響。
+        document.getElementById('dmFoot').innerHTML =
+            '<button class="dm-btn dm-btn-danger" onclick="DemocracyModule.confirmModal()">確認清除並開團</button>' +
+            '<button class="dm-btn dm-btn-cancel" onclick="DemocracyModule.closeModal()">取消</button>';
+    }
+
     function deleteGb() {
         var g = viewingGb();
         if (!g) return;
@@ -3105,10 +3185,12 @@
                     return String(a.username || '').localeCompare(String(b.username || ''));
                 });
                 gbOrdersReady = true;
-                if (currentScreen === 'gbDetail') {
-                    if (isBusyEditing()) { refreshStatus(); return; }
-                    gbPendingLoadedFor = null;       // 沒在編輯就接受最新內容
-                }
+                if (currentScreen === 'gbDetail' && isBusyEditing()) { refreshStatus(); return; }
+                // v13：暫存標記改為一律清掉（原本只在 gbDetail 畫面才清）。
+                //      管理員「清除登記並重新開團」後，停在其他畫面的人若不清這個標記，
+                //      下次點進團購仍會看到上一輪的舊數量，還可能被自動儲存寫回去。
+                //      離開 gbDetail 時 showScreen() already flushSave()，不會掉資料。
+                gbPendingLoadedFor = null;
                 render();
             }, dbErr);
     }
@@ -3123,12 +3205,10 @@
         navButtonClass: 'btn-democracy',
 
         // permKey / permLabel：讓「成員設定管理 → 成員權限」自動長出勾選框。
-        // requiredRoles = 帳號「尚未被個別勾選」時的預設值。
-        // 測試期間設為只有創世神看得到；正式上線時把下面這一行整行刪掉，
-        // 刪掉後預設變成全員可見（大家都要登記文具），管理員仍可個別取消勾選。
+        // v13：測試期間的 requiredRoles: ['creator'] 已移除，預設改為全員可見
+        //      （大家都要登記文具）。要擋個別帳號，請到「成員設定管理 → 成員權限」取消勾選。
         permKey: 'democracy',
         permLabel: '🗳️ 中區的民主聖地',
-        requiredRoles: ['creator'],
 
         init: function (appCore) {
             core = appCore;
@@ -3205,6 +3285,7 @@
         removeGbItem: removeGbItem,
         lockGb: lockGb,
         reopenGb: reopenGb,
+        clearGbOrders: clearGbOrders,
         changeGbDeadline: changeGbDeadline,
         deleteGb: deleteGb,
         copyGbMerged: copyGbMerged,
