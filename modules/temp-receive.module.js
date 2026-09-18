@@ -260,7 +260,7 @@
     var tempDb = null;
     var configOk = false;
 
-    var currentDate = new Date().toISOString().split('T')[0];
+    var currentDate = todayStr();   // v98：改用本地日期（函式宣告會被提升，此處可安全呼叫）
     var dayDocs = [];
     var overdueDocs = [];
     var unsubDay = null;
@@ -277,7 +277,16 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
-    function todayStr() { return new Date().toISOString().split('T')[0]; }
+    // v98：原本用 toISOString()，那回傳的是 UTC 日期。台灣為 UTC+8，
+    //      每天 00:00~07:59 會取到前一天，導致看板停在昨天、
+    //      新收的件也被寫成前一天的 date。主系統 v91 已修正，這裡補上。
+    //      注意 nowIso() 是「時間戳記」不是日期，維持 ISO 格式不動。
+    function todayStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' +
+               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+               String(d.getDate()).padStart(2, '0');
+    }
     function nowIso()   { return new Date().toISOString(); }
     function me()       { return (core.state.currentUser && core.state.currentUser.name) || '未知'; }
     function displayName(u) { return core.getUserDisplayName ? core.getUserDisplayName(u) : u; }
