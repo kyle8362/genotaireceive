@@ -224,7 +224,11 @@
     #democracyView .demo-head .sub { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
     #democracyView .demo-home-btn { flex-shrink: 0; background: var(--primary); color: #fff; border: none; border-radius: 8px;
         padding: 11px 20px; font-size: 0.92rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        white-space: nowrap;
         box-shadow: 0 2px 6px rgba(15,118,110,0.25); }
+    /* 包住按鈕的這層 div 才是 .demo-head 的 flex item。沒設 flex-shrink 會被壓縮，
+       按鈕跟著變窄、「回首頁」在手機上就換行了。按鈕自己的 flex-shrink 對此無效。 */
+    #democracyView #demoHomeBtn { flex-shrink: 0; }
     #democracyView .demo-home-btn:hover { background: #0d635c; }
     #democracyView .demo-body { flex: 1; min-height: 0; min-width: 0; overflow-y: auto; }
 
