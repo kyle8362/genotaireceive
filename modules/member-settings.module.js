@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v97
+ * 模組：成員設定管理 (memberSettings)  ─ v99
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -61,6 +61,10 @@
     #memberSettingsView .role-pending { background: #fff7ed; color: #c2410c; border-color: #ffedd5; }
     #memberSettingsView .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
     #memberSettingsView .user-edit-row input, #memberSettingsView .user-edit-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
+    /* v99：訪客（唯讀）勾選框。第 63 行那條會把 padding 掃到 checkbox 上，這裡收掉。 */
+    #memberSettingsView .ms-viewonly { display: flex; align-items: center; gap: 5px; font-size: 0.85rem;
+        color: #b45309; font-weight: 600; white-space: nowrap; }
+    #memberSettingsView .ms-viewonly input { padding: 0; border: none; width: auto; }
     #memberSettingsView .readonly-text { font-size: 0.85rem; color: #6b7280; }
     #memberSettingsView .btn-approve { padding: 7px 14px; border: none; border-radius: 6px; background: var(--primary); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; font-family: inherit; }
     #memberSettingsView .btn-approve:hover { background: #0d9488; }
@@ -362,8 +366,16 @@
                         ? '<select disabled><option>創世神</option></select>'
                         : '<select id="msRole_' + user.docId + '"><option value="user" ' + selUser + '>一般者</option><option value="admin" ' + selAdmin + '>管理者</option><option value="senior" ' + selSenior + '>高級管理者</option></select>';
 
+                    // v99：訪客（唯讀）勾選框。
+                    //   創世神走上面那個分支，本來就不會走到這裡，等於自動滿足「創世神不可設為訪客」。
+                    //   自己已是訪客時停用，避免訪客替別人加掛（updateUser 另有擋門當保險）。
+                    var voChecked = (user.viewOnly === true) ? 'checked' : '';
+                    var voDisabled = core.isViewOnly() ? 'disabled' : '';
+                    var viewOnlyHtml = '<label class="ms-viewonly" title="勾選後此帳號僅能檢視，無法進行任何修改">' +
+                        '<input type="checkbox" id="msViewOnly_' + user.docId + '" ' + voChecked + ' ' + voDisabled + '>訪客（唯讀）</label>';
+
                     controlsHtml =
-                        '<div class="user-edit-row">' + roleSelect +
+                        '<div class="user-edit-row">' + roleSelect + viewOnlyHtml +
                             '<input type="text" id="msNote_' + user.docId + '" placeholder="備註" value="' + core.escAttr(user.remarks || '') + '" style="width:45%">' +
                             '<input type="text" id="msNick_' + user.docId + '" placeholder="稱謂 (選填)" value="' + core.escAttr(user.nickname || '') + '" style="width:28%">' +
                         '</div>' +
@@ -396,6 +408,7 @@
     }
 
     function updateUser(docId) {
+        if (core.denyViewOnly()) return;                       // v99
         var roleEl = document.getElementById('msRole_' + docId);
         var payload = {
             remarks: document.getElementById('msNote_' + docId).value,
@@ -414,12 +427,17 @@
         });
         if (hasEditable) payload.perms = perms;
 
+        // v99：訪客旗標。停用狀態（自己就是訪客）時不寫入，避免把別人的設定洗掉。
+        var voEl = document.getElementById('msViewOnly_' + docId);
+        if (voEl && !voEl.disabled) payload.viewOnly = voEl.checked;
+
         core.db.collection('users').doc(docId).update(payload)
             .then(function () { alert('資料已更新'); })
             .catch(function (e) { console.error(e); alert('更新失敗'); });
     }
 
     function deleteUser(docId) {
+        if (core.denyViewOnly()) return;                       // v99
         if (!confirm('確定要刪除此帳號？')) return;
         core.db.collection('users').doc(docId).delete()
             .then(function () { renderUsers(); })
@@ -427,6 +445,7 @@
     }
 
     function approveUser(docId) {
+        if (core.denyViewOnly()) return;                       // v99
         core.db.collection('users').doc(docId).update({ isApproved: true })
             .then(function () { alert('已核准'); })
             .catch(function (e) { console.error(e); alert('核准失敗'); });
@@ -488,6 +507,7 @@
     }
 
     function applyQuickPerm(enable) {
+        if (core.denyViewOnly()) return;                       // v99
         if (!canQuickPerm()) { alert('此功能僅限創世神／高級管理者使用。'); return; }
 
         var boxes = document.querySelectorAll('#qpPermList .qp-cb');
@@ -536,6 +556,7 @@
      * ② 標籤選單（NGS 負責業務）
      * ================================================================= */
     function saveSales(listArr) {
+        if (core.denyViewOnly()) return Promise.resolve();     // v99：三個呼叫端共用，擋這裡一次到位
         return core.db.collection('settings').doc('ngs_sales').set({ list: listArr }, { merge: true });
     }
 
@@ -612,6 +633,7 @@
     }
 
     function saveAssignRules() {
+        if (core.denyViewOnly()) return;                       // v99
         var newRules = {};
         core.ORDERED_CATEGORIES.forEach(function (cat) {
             var boxes = document.querySelectorAll('#msAssignContainer .ms-assign-cb[data-cat="' + cat + '"]');
