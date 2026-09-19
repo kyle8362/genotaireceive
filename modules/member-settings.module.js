@@ -61,10 +61,11 @@
     #memberSettingsView .role-pending { background: #fff7ed; color: #c2410c; border-color: #ffedd5; }
     #memberSettingsView .user-edit-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
     #memberSettingsView .user-edit-row input, #memberSettingsView .user-edit-row select { padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
-    /* v99：訪客（唯讀）勾選框。第 63 行那條會把 padding 掃到 checkbox 上，這裡收掉。 */
-    #memberSettingsView .ms-viewonly { display: flex; align-items: center; gap: 5px; font-size: 0.85rem;
-        color: #b45309; font-weight: 600; white-space: nowrap; }
-    #memberSettingsView .ms-viewonly input { padding: 0; border: none; width: auto; }
+    /* v99：訪客（唯讀）勾選框，位於 user-header 的角色徽章右邊。
+       用 inline-flex 而非 flex：外層那個 div 不是 flex 容器，用 flex 會整個掉到下一行。 */
+    #memberSettingsView .ms-viewonly { display: inline-flex; align-items: center; gap: 5px; font-size: 0.85rem;
+        color: #b45309; font-weight: 600; white-space: nowrap; margin-left: 10px; vertical-align: middle; cursor: pointer; }
+    #memberSettingsView .ms-viewonly input { padding: 0; border: none; width: auto; margin: 0; cursor: pointer; }
     #memberSettingsView .readonly-text { font-size: 0.85rem; color: #6b7280; }
     #memberSettingsView .btn-approve { padding: 7px 14px; border: none; border-radius: 6px; background: var(--primary); color: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; font-family: inherit; }
     #memberSettingsView .btn-approve:hover { background: #0d9488; }
@@ -353,6 +354,7 @@
 
             var isTargetCreator = (user.role === 'creator');
             var controlsHtml = '';
+            var viewOnlyHtml = '';      // v99：僅在可編輯該帳號時才有內容
 
             if (myRole === 'creator' || myRole === 'senior') {
                 if (myRole === 'senior' && isTargetCreator) {
@@ -366,16 +368,16 @@
                         ? '<select disabled><option>創世神</option></select>'
                         : '<select id="msRole_' + user.docId + '"><option value="user" ' + selUser + '>一般者</option><option value="admin" ' + selAdmin + '>管理者</option><option value="senior" ' + selSenior + '>高級管理者</option></select>';
 
-                    // v99：訪客（唯讀）勾選框。
+                    // v99：訪客（唯讀）勾選框，實際輸出位置在下方的 user-header（角色徽章右邊）。
                     //   創世神走上面那個分支，本來就不會走到這裡，等於自動滿足「創世神不可設為訪客」。
                     //   自己已是訪客時停用，避免訪客替別人加掛（updateUser 另有擋門當保險）。
                     var voChecked = (user.viewOnly === true) ? 'checked' : '';
                     var voDisabled = core.isViewOnly() ? 'disabled' : '';
-                    var viewOnlyHtml = '<label class="ms-viewonly" title="勾選後此帳號僅能檢視，無法進行任何修改">' +
+                    viewOnlyHtml = '<label class="ms-viewonly" title="勾選後此帳號僅能檢視，無法進行任何修改">' +
                         '<input type="checkbox" id="msViewOnly_' + user.docId + '" ' + voChecked + ' ' + voDisabled + '>訪客（唯讀）</label>';
 
                     controlsHtml =
-                        '<div class="user-edit-row">' + roleSelect + viewOnlyHtml +
+                        '<div class="user-edit-row">' + roleSelect +
                             '<input type="text" id="msNote_' + user.docId + '" placeholder="備註" value="' + core.escAttr(user.remarks || '') + '" style="width:45%">' +
                             '<input type="text" id="msNick_' + user.docId + '" placeholder="稱謂 (選填)" value="' + core.escAttr(user.nickname || '') + '" style="width:28%">' +
                         '</div>' +
@@ -402,7 +404,8 @@
 
             li.innerHTML =
                 '<div class="user-header"><div><span class="user-name">' + user.username + '</span>' +
-                '<span class="user-role-badge ' + badgeClass + '">' + badgeText + '</span></div></div>' + controlsHtml;
+                '<span class="user-role-badge ' + badgeClass + '">' + badgeText + '</span>' +
+                viewOnlyHtml + '</div></div>' + controlsHtml;
             list.appendChild(li);
         });
     }
