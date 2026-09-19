@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v13
+ * 模組：中區的民主聖地 (democracy)  ─ v14
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
@@ -807,6 +807,7 @@
     }
 
     function openAnnEditor(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var a = id ? findById(announcements, id) : null;
         var today = core.getTodayStr();
         annEditType = annType(a);
@@ -859,6 +860,7 @@
     }
 
     function toggleAnn(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var a = findById(announcements, id);
         if (!a) return;
         var next = (a.enabled === false);
@@ -869,6 +871,7 @@
     }
 
     function deleteAnn(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var a = findById(announcements, id);
         if (!a) return;
         if (!confirm('確定刪除公告「' + a.title + '」？此動作無法復原。')) return;
@@ -876,6 +879,7 @@
     }
 
     function toggleOngoing() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var st = document.getElementById('demoShowSt');
         var vt = document.getElementById('demoShowVote');
         var gb = document.getElementById('demoShowGb');
@@ -942,6 +946,7 @@
     }
 
     function openBatchCatalog() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var body =
             '<div class="dm-field"><label>每行一筆，格式：編號,品名,單價,單位</label>' +
             '<textarea id="dmBatch" style="min-height:180px;" placeholder="365650,得力Deli經典原子筆/EQ60-BL/藍色/0.7mm,7,支&#10;365651,自動鉛筆 0.5mm,15,支&#10;便利貼 3x3,25,包"></textarea></div>' +
@@ -979,6 +984,7 @@
     }
 
     function openCatalogEditor(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var c = id ? findById(catalog, id) : null;
         var body =
             '<div class="dm-field"><label>商品編號（可留空）</label><input id="dmCatCode" value="' + esc(c ? (c.code || '') : '') + '"></div>' +
@@ -1006,6 +1012,7 @@
     }
 
     function toggleCatalog(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var c = findById(catalog, id);
         if (!c) return;
         var next = (c.active === false);
@@ -1016,6 +1023,7 @@
     }
 
     function deleteCatalog(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var c = findById(catalog, id);
         if (!c) return;
         if (!confirm('確定刪除品項「' + c.name + '」？已登記的資料不受影響。')) return;
@@ -1502,6 +1510,7 @@
     }
 
     function openNewOrder() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var today = core.getTodayStr();
         var body =
             '<div class="dm-field"><label>單據名稱</label><input id="dmOrdTitle" value="' + today + ' 文具採購單"></div>' +
@@ -1548,6 +1557,7 @@
     }
 
     function lockOrder() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var o = viewingOrder();
         if (!o) return;
         if (!confirm('提前結束「' + (o.title || '文具採購單') + '」的登記？結束後只有管理員能再開啟。')) return;
@@ -1559,6 +1569,7 @@
     }
 
     function reopenOrder() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var o = viewingOrder();
         if (!o) return;
         var body =
@@ -1580,6 +1591,7 @@
     }
 
     function changeDeadline() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var o = viewingOrder();
         if (!o) return;
         var parts = (o.deadline || '').split(' ');
@@ -1599,6 +1611,7 @@
     }
 
     function deleteOrder() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var o = viewingOrder();
         if (!o) return;
         if (!confirm('確定刪除「' + (o.title || '文具採購單') + '」？所有人的登記內容會一起刪掉，無法復原。')) return;
@@ -2058,6 +2071,7 @@
     }
 
     function openVoteEditor(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var v = id ? findById(votes, id) : null;
         voteEditMode = (v && v.mode === 'multi') ? 'multi' : 'single';
         voteOptSeq = 0;
@@ -2141,6 +2155,7 @@
     }
 
     function lockVote() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var v = viewingVote();
         if (!v) return;
         if (!confirm('提前結束「' + (v.title || '投票案') + '」？結束後結果就會對全員公布。')) return;
@@ -2151,6 +2166,7 @@
     }
 
     function reopenVote() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var v = viewingVote();
         if (!v) return;
         var body =
@@ -2171,6 +2187,7 @@
     }
 
     function changeVoteDeadline() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var v = viewingVote();
         if (!v) return;
         var parts = (v.deadline || '').split(' ');
@@ -2189,6 +2206,7 @@
     }
 
     function deleteVote() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var v = viewingVote();
         if (!v) return;
         if (!confirm('確定刪除「' + (v.title || '投票案') + '」？所有人的投票內容會一起刪掉，無法復原。')) return;
@@ -2729,6 +2747,7 @@
     }
 
     function openGbEditor(id) {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var g = id ? findById(groupbuys, id) : null;
         gbOptSeq = 0;
         var today = core.getTodayStr();
@@ -2809,6 +2828,7 @@
     }
 
     function lockGb() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var g = viewingGb();
         if (!g) return;
         if (!confirm('提前結束「' + (g.title || '團購案') + '」？結束後同仁就不能再修改了。')) return;
@@ -2819,6 +2839,7 @@
     }
 
     function reopenGb() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var g = viewingGb();
         if (!g) return;
         var body =
@@ -2838,6 +2859,7 @@
     }
 
     function changeGbDeadline() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var g = viewingGb();
         if (!g) return;
         var parts = (g.deadline || '').split(' ');
@@ -2868,6 +2890,7 @@
     //   只在團購已結束時才提供。開團中清除沒有意義：同仁頁面上的暫存
     //   會透過 autoSaveGroupbuy() 立刻寫回來，看起來會像刪除失敗。
     function clearGbOrders() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var g = viewingGb();
         if (!g) return;
         if (!isLocked(g)) {
@@ -2931,6 +2954,7 @@
     }
 
     function deleteGb() {
+        if (core.denyViewOnly()) return;                  // v99：訪客唯讀
         var g = viewingGb();
         if (!g) return;
         if (!confirm('確定刪除「' + (g.title || '團購案') + '」？所有人的登記內容會一起刪掉，無法復原。')) return;
