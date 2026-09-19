@@ -369,12 +369,17 @@
                         : '<select id="msRole_' + user.docId + '"><option value="user" ' + selUser + '>一般者</option><option value="admin" ' + selAdmin + '>管理者</option><option value="senior" ' + selSenior + '>高級管理者</option></select>';
 
                     // v99：訪客（唯讀）勾選框，實際輸出位置在下方的 user-header（角色徽章右邊）。
-                    //   創世神走上面那個分支，本來就不會走到這裡，等於自動滿足「創世神不可設為訪客」。
+                    //   目標是創世神時不顯示：創世神不受 viewOnly 影響（isViewOnly() 內另有防線），
+                    //   勾了也不生效，長出來只會讓人誤以為鎖得住。
+                    //   注意上面那個「無法編輯」分支只攔 senior 看 creator，
+                    //   creator 看 creator（含看自己）會走到這裡，所以必須在這裡自己判斷。
                     //   自己已是訪客時停用，避免訪客替別人加掛（updateUser 另有擋門當保險）。
-                    var voChecked = (user.viewOnly === true) ? 'checked' : '';
-                    var voDisabled = core.isViewOnly() ? 'disabled' : '';
-                    viewOnlyHtml = '<label class="ms-viewonly" title="勾選後此帳號僅能檢視，無法進行任何修改">' +
-                        '<input type="checkbox" id="msViewOnly_' + user.docId + '" ' + voChecked + ' ' + voDisabled + '>訪客（唯讀）</label>';
+                    if (!isTargetCreator) {
+                        var voChecked = (user.viewOnly === true) ? 'checked' : '';
+                        var voDisabled = core.isViewOnly() ? 'disabled' : '';
+                        viewOnlyHtml = '<label class="ms-viewonly" title="勾選後此帳號僅能檢視，無法進行任何修改">' +
+                            '<input type="checkbox" id="msViewOnly_' + user.docId + '" ' + voChecked + ' ' + voDisabled + '>訪客（唯讀）</label>';
+                    }
 
                     controlsHtml =
                         '<div class="user-edit-row">' + roleSelect +
