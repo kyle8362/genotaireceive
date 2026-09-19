@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v98 Modular · 新功能上線)</title>
+    <title>中區收送件進度追蹤系統 (v99 Modular · 訪客唯讀)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -484,7 +484,7 @@
     // ---------- 版本與遠端強制更新 ----------
     // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 98;
+    const APP_VERSION = 99;
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -599,6 +599,26 @@
         return getPermsFor(rec)[permKey] !== false;
     }
 
+    // v99：訪客（唯讀）帳號。
+    //   role 決定「看得到什麼」，viewOnly 決定「能不能改」，兩者互不干涉，
+    //   所以任何角色都能加掛唯讀，不必新增第五種 role。
+    //   創世神不受此旗標影響，避免把管理權限鎖死沒有退路。
+    //   讀的是 Firestore 上的即時資料，管理者取消勾選後對方不必重新登入。
+    function isViewOnly() {
+        const rec = getCurrentUserRecord();
+        if (!rec) return false;
+        if (rec.role === 'creator') return false;
+        return rec.viewOnly === true;
+    }
+
+    // 擋門：回傳 true 代表「已擋下，呼叫端請直接 return」。
+    // 提示文字集中在這裡，日後改負責人名字只要改這一行。
+    function denyViewOnly() {
+        if (!isViewOnly()) return false;
+        alert('訪客帳號僅供檢視，無法進行修改。\n如需調整請洽高級管理者（Jeff 或楷沅）。');
+        return true;
+    }
+
     // 分頁 key → 是否可進入
     function canAccessView(viewKey) {
         if (viewKey === 'tasks') return canAccess('tasks');
@@ -630,6 +650,7 @@
         // --- 工具層 ---
         getTodayStr, getUserDisplayName, escAttr, hasRole, escapeAttr: escAttr,
         getPermissionItems, getPermsFor, canAccess, canAccessView,
+        isViewOnly, denyViewOnly,
         switchTab: (k) => switchTab(k),
         renderTasks: () => { if (state.activeTab === 'tasks') renderTasks(); },
 
@@ -1371,6 +1392,7 @@
 
     function maybeRunAutoPurge() {
         if (!hasRole(['creator', 'senior'])) return;          // 僅最高權限帳號負責清理
+        if (isViewOnly()) return;                             // v99：訪客不觸發清理（靜默跳過，不跳提示）
         const today = getTodayStr();
         if (localStorage.getItem('tt_last_purge') === today) return;   // 每天最多一次
         localStorage.setItem('tt_last_purge', today);                  // 先記錄，取消也不重複詢問
@@ -1620,9 +1642,9 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=97"></script>
+<script src="modules/member-settings.module.js?v=99"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
-<script src="modules/democracy.module.js?v=13"></script>
+<script src="modules/democracy.module.js?v=14"></script>
 
 <script>
     // 所有模組註冊完成後才啟動
