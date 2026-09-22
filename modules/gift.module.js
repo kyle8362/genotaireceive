@@ -107,6 +107,8 @@
     var keyword = '';
     var unsub = null;
     var editingId = null;
+    var purgeMode = false;        // 批次永久刪除模式（僅高級管理者以上）
+    var selected = {};            // 批次模式下被勾選的 id
 
     /* =====================================================================
      * 工具
@@ -149,6 +151,9 @@
         if (!u || !u.name) return '';
         return ACCOUNT_TO_SALES[String(u.name).toLowerCase()] || '';
     }
+
+    // 永久刪除限高級管理者以上，與系統其他地方的慣例一致
+    function canPurge() { return core.hasRole(['creator', 'senior']); }
 
     function findById(id) {
         for (var i = 0; i < localData.length; i++) {
@@ -193,10 +198,24 @@
     #giftView table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 0.95rem; }
     #giftView th { background: #34495e; color: #fff; padding: 11px 10px; text-align: left;
         white-space: nowrap; font-weight: 600; }
-    #giftView td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; text-align: left; }
-    /* 勾選欄置中，其餘一律靠左 */
-    #giftView th.gf-c, #giftView td.gf-c { text-align: center; }
+    #giftView td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; text-align: center; }
+    #giftView th { text-align: center; }
     #giftView .gf-nowrap { white-space: nowrap; }
+
+    /* 批次刪除模式（僅高級管理者以上）：最左邊多一欄勾選 */
+    #giftView .gf-btn-purge { padding: 10px 18px; font-size: 15px; background: #fff; color: #b91c1c;
+        border: 1px solid #fecaca; }
+    #giftView .gf-btn-purge:hover { background: #fef2f2; }
+    #giftView .gf-btn-purge.on { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+    #giftView .gf-purge-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;
+        padding: 10px 14px; margin-bottom: 12px; font-size: 0.9rem; color: #991b1b; }
+    #giftView .gf-purge-bar button { border: none; border-radius: 4px; padding: 7px 14px;
+        font-weight: 700; cursor: pointer; font-family: inherit; font-size: 0.9rem; }
+    #giftView .gf-purge-go { background: #dc2626; color: #fff; }
+    #giftView .gf-purge-go:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
+    #giftView .gf-purge-cancel { background: #fff; color: #374151; border: 1px solid #d1d5db !important; }
+    #giftView .gf-sel { width: 18px; height: 18px; cursor: pointer; }
     #giftView tbody tr:hover { background: #f9fafb; }
     #giftView .gf-empty { padding: 30px; text-align: center; color: #9ca3af; }
 
@@ -264,29 +283,38 @@
         </div>
         <div class="gf-toolbar">
             <button class="gf-btn gf-btn-lg" onclick="GiftModule.openNew()">＋ 新增兌換</button>
+            <button class="gf-btn gf-btn-purge" id="gfPurgeBtn" style="display:none;"
+                    onclick="GiftModule.togglePurgeMode()">🧹 刪除資料</button>
             <input type="text" class="gf-search" id="gfSearch" placeholder="🔍 搜尋客戶／贈品／業務／備註"
                    oninput="GiftModule.onSearch(this.value)">
             <span class="gf-count" id="gfCount"></span>
         </div>
+        <div class="gf-purge-bar" id="gfPurgeBar" style="display:none;">
+            <span>⚠️ 永久刪除模式：勾選要刪除的項目，<b>刪除後無法復原</b>。</span>
+            <span id="gfSelCount" style="font-weight:700;">已選 0 筆</span>
+            <button class="gf-purge-go" id="gfPurgeGo" onclick="GiftModule.purgeSelected()" disabled>永久刪除所選</button>
+            <button class="gf-purge-cancel" onclick="GiftModule.togglePurgeMode()">結束刪除模式</button>
+        </div>
         <div class="gf-table-wrap">
             <table>
                 <thead>
-                    <tr>
-                        <th>申請時間</th>
+                    <tr id="gfHeadRow">
+                        <th class="gf-selcol" style="display:none;"></th>
+                        <th>申請日期</th>
                         <th>客戶名稱</th>
                         <th>贈品項目</th>
                         <th>數量</th>
                         <th>負責業務</th>
                         <th>備註</th>
-                        <th class="gf-c">已送台北</th>
-                        <th class="gf-c">已到貨</th>
-                        <th class="gf-c">已發送</th>
+                        <th>已送台北</th>
+                        <th>已到貨</th>
+                        <th>已發送</th>
                         <th>狀態</th>
                         <th>執行操作</th>
                     </tr>
                 </thead>
                 <tbody id="gfBody">
-                    <tr><td colspan="11" class="gf-empty">載入中…</td></tr>
+                    <tr><td colspan="12" class="gf-empty">載入中…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -330,7 +358,7 @@
         }, function (e) {
             console.error('[gift] 訂閱失敗', e);
             var body = document.getElementById('gfBody');
-            if (body) body.innerHTML = '<tr><td colspan="11" class="gf-empty">資料載入失敗，請重新整理頁面。</td></tr>';
+            if (body) body.innerHTML = '<tr><td colspan="12" class="gf-empty">資料載入失敗，請重新整理頁面。</td></tr>';
         });
     }
 
@@ -364,7 +392,7 @@
         var enabled = !it.deleted && (idx === nextIdx || idx === lastDone);
         var timeHtml = done && rec.time ? '<span class="gf-chk-time">' + esc(shortDateTime(rec.time)) + '</span>' : '';
 
-        return '<td class="gf-c">' +
+        return '<td>' +
             '<input type="checkbox" class="gf-chk" ' + (done ? 'checked' : '') +
             (enabled ? '' : ' disabled') +
             ' onclick="GiftModule.toggleStage(\'' + it.id + '\',' + idx + ',this)"' +
@@ -386,8 +414,13 @@
         var cnt = document.getElementById('gfCount');
         if (cnt) cnt.textContent = '共 ' + rows.length + ' 筆' + (keyword ? '（已篩選）' : '');
 
+        // 批次模式的欄位顯示/隱藏
+        var selTh = document.querySelector('#giftView .gf-selcol');
+        if (selTh) selTh.style.display = purgeMode ? '' : 'none';
+        var colspan = purgeMode ? 12 : 11;
+
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="11" class="gf-empty">' +
+            body.innerHTML = '<tr><td colspan="' + colspan + '" class="gf-empty">' +
                 (keyword ? '沒有符合的資料' : '目前沒有兌換紀錄，點左上角「＋ 新增兌換」開始。') + '</td></tr>';
             return;
         }
@@ -396,6 +429,10 @@
         rows.forEach(function (it) {
             var ptsTxt = (it.points || it.points === 0) ? '<span class="gf-pts">（' + it.points + ' 點）</span>' : '';
             html += '<tr class="' + (it.deleted ? 'gf-deleted' : '') + '">' +
+                (purgeMode
+                    ? '<td><input type="checkbox" class="gf-sel" ' + (selected[it.id] ? 'checked' : '') +
+                      ' onclick="GiftModule.toggleSelect(\'' + it.id + '\', this.checked)"></td>'
+                    : '') +
                 '<td class="gf-nowrap">' + esc(shortDate(it.createdAt)) + '</td>' +
                 '<td class="gf-cust">' + esc(it.customer) + '</td>' +
                 '<td>' + esc(it.giftName) + ' ' + ptsTxt + '</td>' +
@@ -406,6 +443,8 @@
                 '<td>' + badgeHtml(it) + '</td>' +
                 '<td><div class="gf-act">' +
                     '<button class="gf-ico" title="操作紀錄" onclick="GiftModule.showHistory(\'' + it.id + '\')">📋</button>' +
+                    (it.deleted ? '' :
+                        '<button class="gf-ico" title="編輯內容" onclick="GiftModule.openEdit(\'' + it.id + '\')">✏️</button>') +
                     (it.deleted
                         ? '<button class="gf-ico" title="復原" onclick="GiftModule.restore(\'' + it.id + '\')">↩️</button>'
                         : '<button class="gf-ico" title="刪除此項" onclick="GiftModule.softDelete(\'' + it.id + '\')">🗑️</button>') +
@@ -487,9 +526,11 @@
         if (wrap) wrap.style.display = (GIFT_ITEMS[idx] && GIFT_ITEMS[idx].custom) ? 'block' : 'none';
     }
 
-    function saveNew() {
+    // 新增與編輯共用同一份表單，驗證也共用一份，避免兩邊邏輯走鐘。
+    // 驗證未過回傳 null，呼叫端據此回傳 false 讓 Modal 不關閉。
+    function readForm() {
         var customer = (document.getElementById('gfCustomer').value || '').trim();
-        if (!customer) { alert('請填寫客戶名稱'); return false; }
+        if (!customer) { alert('請填寫客戶名稱'); return null; }
 
         var idx = parseInt(document.getElementById('gfItem').value, 10);
         var g = GIFT_ITEMS[idx];
@@ -498,8 +539,8 @@
         if (g.custom) {
             giftName = (document.getElementById('gfCustomName').value || '').trim();
             var ptsRaw = document.getElementById('gfCustomPts').value;
-            if (!giftName) { alert('請填寫 Apple 系列的品項名稱'); return false; }
-            if (ptsRaw === '' || isNaN(parseInt(ptsRaw, 10))) { alert('請填寫點數'); return false; }
+            if (!giftName) { alert('請填寫 Apple 系列的品項名稱'); return null; }
+            if (ptsRaw === '' || isNaN(parseInt(ptsRaw, 10))) { alert('請填寫點數'); return null; }
             points = parseInt(ptsRaw, 10);
         } else {
             giftName = g.name;
@@ -507,24 +548,168 @@
         }
 
         var qty = parseInt(document.getElementById('gfQty').value, 10);
-        if (!qty || qty < 1) { alert('數量至少為 1'); return false; }
+        if (!qty || qty < 1) { alert('數量至少為 1'); return null; }
+
+        return {
+            customer: customer, giftName: giftName, points: points, qty: qty,
+            sales: document.getElementById('gfSales').value || '',
+            note: (document.getElementById('gfNote').value || '').trim()
+        };
+    }
+
+    function saveNew() {
+        var f = readForm();
+        if (!f) return false;
 
         var rec = {
-            customer:  customer,
-            giftName:  giftName,
-            points:    points,
-            qty:       qty,
-            sales:     document.getElementById('gfSales').value || '',
-            note:      (document.getElementById('gfNote').value || '').trim(),
+            customer:  f.customer,
+            giftName:  f.giftName,
+            points:    f.points,
+            qty:       f.qty,
+            sales:     f.sales,
+            note:      f.note,
             status:    STATUS_INIT,
             deleted:   false,
             createdAt: nowStr(),
             createdBy: currentUserName(),
-            logs:      [logLine('建立申請：' + giftName + ' × ' + qty)]
+            logs:      [logLine('建立申請：' + f.giftName + ' × ' + f.qty)]
         };
         STAGES.forEach(function (s) { rec[s.key] = { done: false, time: '' }; });
 
         db.collection(COLLECTION).add(rec).catch(dbErr);
+    }
+
+    /* =====================================================================
+     * 編輯內容
+     * ===================================================================== */
+
+    // 依品項名稱找回它在 GIFT_ITEMS 的位置；找不到（例如 Apple 自填品項）回傳 custom 那一項
+    function itemIdxOf(name) {
+        for (var i = 0; i < GIFT_ITEMS.length; i++) {
+            if (!GIFT_ITEMS[i].custom && GIFT_ITEMS[i].name === name) return i;
+        }
+        for (var j = 0; j < GIFT_ITEMS.length; j++) {
+            if (GIFT_ITEMS[j].custom) return j;
+        }
+        return 0;
+    }
+
+    function openEdit(id) {
+        var it = findById(id);
+        if (!it) return;
+
+        var idx = itemIdxOf(it.giftName);
+        var isCustom = !!GIFT_ITEMS[idx].custom;
+
+        var opts = GIFT_ITEMS.map(function (g, i) {
+            var txt = g.custom ? g.name + '（自行填寫）' : g.name + '（' + g.points + ' 點）';
+            return '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + txt + '</option>';
+        }).join('');
+
+        var body =
+            '<div class="gf-field"><label>客戶名稱 <span style="color:#dc2626;">*</span></label>' +
+                '<input type="text" id="gfCustomer" value="' + esc(it.customer) + '"></div>' +
+            '<div class="gf-field"><label>贈品項目 <span style="color:#dc2626;">*</span></label>' +
+                '<select id="gfItem" onchange="GiftModule.onItemChange()">' + opts + '</select></div>' +
+            '<div id="gfCustomWrap" style="display:' + (isCustom ? 'block' : 'none') + ';">' +
+                '<div class="gf-row2">' +
+                    '<div class="gf-field"><label>品項名稱 <span style="color:#dc2626;">*</span></label>' +
+                        '<input type="text" id="gfCustomName" value="' + (isCustom ? esc(it.giftName) : '') + '"></div>' +
+                    '<div class="gf-field"><label>點數 <span style="color:#dc2626;">*</span></label>' +
+                        '<input type="number" id="gfCustomPts" min="0" value="' + (isCustom ? esc(it.points) : '') + '"></div>' +
+                '</div></div>' +
+            '<div class="gf-row2">' +
+                '<div class="gf-field"><label>數量 <span style="color:#dc2626;">*</span></label>' +
+                    '<input type="number" id="gfQty" min="1" value="' + esc(it.qty) + '"></div>' +
+                '<div class="gf-field"><label>負責業務</label>' +
+                    '<select id="gfSales">' + salesOptionsHtml(it.sales || '') + '</select></div>' +
+            '</div>' +
+            '<div class="gf-field"><label>備註</label><textarea id="gfNote">' + esc(it.note || '') + '</textarea></div>';
+
+        openModal('編輯內容', body, '儲存變更', function () { return saveEdit(id); });
+    }
+
+    function saveEdit(id) {
+        var it = findById(id);
+        if (!it) return;
+
+        var f = readForm();
+        if (!f) return false;
+
+        // 只記錄真的有變動的欄位，紀錄才有參考價值
+        var changes = [];
+        if (f.customer !== it.customer) changes.push('客戶：' + (it.customer || '') + ' → ' + f.customer);
+        if (f.giftName !== it.giftName) changes.push('贈品：' + (it.giftName || '') + ' → ' + f.giftName);
+        if (f.points !== it.points)     changes.push('點數：' + it.points + ' → ' + f.points);
+        if (f.qty !== it.qty)           changes.push('數量：' + it.qty + ' → ' + f.qty);
+        if (f.sales !== (it.sales || '')) changes.push('業務：' + (it.sales || '未指定') + ' → ' + (f.sales || '未指定'));
+        if (f.note !== (it.note || ''))   changes.push('備註已修改');
+
+        if (!changes.length) return;     // 沒改動就直接關閉，不寫入
+
+        db.collection(COLLECTION).doc(id).update({
+            customer: f.customer, giftName: f.giftName, points: f.points,
+            qty: f.qty, sales: f.sales, note: f.note,
+            logs: (it.logs || []).concat([logLine('修改內容 — ' + changes.join('；'))])
+        }).catch(dbErr);
+    }
+
+    /* =====================================================================
+     * 批次永久刪除（僅高級管理者以上）
+     * ===================================================================== */
+    function togglePurgeMode() {
+        if (!canPurge()) { alert('此功能僅限高級管理者以上使用。'); return; }
+        purgeMode = !purgeMode;
+        selected = {};
+        var bar = document.getElementById('gfPurgeBar');
+        var btn = document.getElementById('gfPurgeBtn');
+        if (bar) bar.style.display = purgeMode ? 'flex' : 'none';
+        if (btn) btn.classList.toggle('on', purgeMode);
+        refreshSelCount();
+        render();
+    }
+
+    function toggleSelect(id, checked) {
+        if (checked) selected[id] = true; else delete selected[id];
+        refreshSelCount();
+    }
+
+    function selectedIds() { return Object.keys(selected); }
+
+    function refreshSelCount() {
+        var n = selectedIds().length;
+        var lbl = document.getElementById('gfSelCount');
+        var go = document.getElementById('gfPurgeGo');
+        if (lbl) lbl.textContent = '已選 ' + n + ' 筆';
+        if (go) go.disabled = (n === 0);
+    }
+
+    function purgeSelected() {
+        if (!canPurge()) { alert('此功能僅限高級管理者以上使用。'); return; }
+        var ids = selectedIds();
+        if (!ids.length) return;
+
+        // 第一關
+        var names = ids.slice(0, 5).map(function (id) {
+            var it = findById(id);
+            return it ? '・' + (it.customer || '') + ' － ' + (it.giftName || '') : '';
+        }).join('\n');
+        var more = ids.length > 5 ? '\n…等共 ' + ids.length + ' 筆' : '';
+
+        if (!confirm('即將永久刪除以下 ' + ids.length + ' 筆資料：\n\n' + names + more +
+                     '\n\n這些資料會從資料庫徹底移除，無法復原，也無法還原。\n\n確定要繼續嗎？')) return;
+
+        // 第二關：要求輸入筆數，避免連點兩下就刪掉
+        var ans = prompt('最後確認。\n\n請輸入要刪除的筆數「' + ids.length + '」以確認執行：', '');
+        if (ans === null) return;
+        if (String(ans).trim() !== String(ids.length)) { alert('輸入不符，已取消刪除。'); return; }
+
+        var jobs = ids.map(function (id) { return db.collection(COLLECTION).doc(id).delete(); });
+        Promise.all(jobs).then(function () {
+            selected = {};
+            refreshSelCount();
+            alert('已永久刪除 ' + ids.length + ' 筆資料。');
+        }).catch(dbErr);
     }
 
     /* =====================================================================
@@ -629,12 +814,18 @@
 
         // 切到此分頁時才訂閱，平時不消耗額度
         activate: function () {
+            var btn = document.getElementById('gfPurgeBtn');
+            if (btn) btn.style.display = canPurge() ? 'block' : 'none';
             if (initFirebase()) subscribe();
         },
 
         // 對外 API（供 HTML onclick 呼叫）
         openNew: openNew,
+        openEdit: openEdit,
         onItemChange: onItemChange,
+        togglePurgeMode: togglePurgeMode,
+        toggleSelect: toggleSelect,
+        purgeSelected: purgeSelected,
         toggleStage: toggleStage,
         softDelete: softDelete,
         restore: restore,
