@@ -123,6 +123,19 @@
                String(d.getMinutes()).padStart(2, '0');
     }
 
+    // 顯示用的日期縮短。儲存的 createdAt 仍是完整的 'YYYY-MM-DD HH:MM'，
+    // 排序靠的是那個完整字串，這裡只負責畫面呈現，舊資料不受影響。
+    function shortDateTime(v) {
+        var m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+        if (!m) return v || '';
+        return parseInt(m[2], 10) + '/' + parseInt(m[3], 10) + ' ' + m[4] + ':' + m[5];
+    }
+    function shortDate(v) {
+        var m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!m) return v || '';
+        return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
+    }
+
     function esc(s) { return core.escAttr(s == null ? '' : s); }
 
     function currentUserName() {
@@ -171,26 +184,32 @@
     #giftView .gf-btn-lg:hover { background: #d35400; }
     #giftView .gf-count { font-size: 0.85rem; color: #6b7280; margin-left: auto; }
 
-    /* 橫向捲動容器：min-width:0 + overflow-x:auto，避免撐破手機版版面 */
-    #giftView .gf-table-wrap { width: 100%; min-width: 0; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    /* 橫向捲動容器：min-width:0 + overflow-x:auto，避免撐破手機版版面。
+       max-width 限制總寬：欄位少、內容短，寬螢幕上放任它撐滿會被拉得很鬆散。
+       不用 table-layout:fixed（那會讓設定的 px 欄寬失效，改用 max-width 控總寬）。 */
+    #giftView .gf-table-wrap { width: 100%; max-width: 1180px; min-width: 0; overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    #giftView table { width: 100%; min-width: 1040px; border-collapse: collapse; font-size: 0.88rem; }
-    #giftView th { background: #34495e; color: #fff; padding: 10px 8px; text-align: left;
+    #giftView table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 0.95rem; }
+    #giftView th { background: #34495e; color: #fff; padding: 11px 10px; text-align: left;
         white-space: nowrap; font-weight: 600; }
-    #giftView td { padding: 9px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    #giftView td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; text-align: left; }
+    /* 勾選欄置中，其餘一律靠左 */
+    #giftView th.gf-c, #giftView td.gf-c { text-align: center; }
+    #giftView .gf-nowrap { white-space: nowrap; }
     #giftView tbody tr:hover { background: #f9fafb; }
     #giftView .gf-empty { padding: 30px; text-align: center; color: #9ca3af; }
 
     #giftView .gf-cust { font-weight: 700; color: #111827; }
-    #giftView .gf-note { color: #6b7280; font-size: 0.82rem; }
-    #giftView .gf-pts { color: #9ca3af; font-size: 0.8rem; }
+    #giftView .gf-note { color: #6b7280; font-size: 0.88rem; }
+    #giftView .gf-pts { color: #9ca3af; font-size: 0.86rem; }
 
     /* 已刪除：整列刪除線 + 淡化，資料仍在 */
     #giftView tr.gf-deleted td { color: #9ca3af; text-decoration: line-through; }
     #giftView tr.gf-deleted .gf-badge { text-decoration: line-through; }
 
     #giftView .gf-badge { display: inline-block; padding: 3px 9px; border-radius: 999px;
-        font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+        font-size: 0.84rem; font-weight: 700; white-space: nowrap; }
     #giftView .gf-st-init { background: #f3f4f6; color: #4b5563; }
     #giftView .gf-st-taipei { background: #fef3c7; color: #92400e; }
     #giftView .gf-st-wait { background: #dbeafe; color: #1e40af; }
@@ -199,7 +218,7 @@
 
     #giftView .gf-chk { width: 18px; height: 18px; cursor: pointer; }
     #giftView .gf-chk:disabled { cursor: not-allowed; opacity: 0.4; }
-    #giftView .gf-chk-time { display: block; font-size: 0.72rem; color: #9ca3af; white-space: nowrap; margin-top: 2px; }
+    #giftView .gf-chk-time { display: block; font-size: 0.78rem; color: #9ca3af; white-space: nowrap; margin-top: 2px; }
 
     #giftView .gf-act { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
     #giftView .gf-ico { background: none; border: none; cursor: pointer; font-size: 1.05rem;
@@ -259,9 +278,9 @@
                         <th>數量</th>
                         <th>負責業務</th>
                         <th>備註</th>
-                        <th>已送台北</th>
-                        <th>已到貨</th>
-                        <th>已發送</th>
+                        <th class="gf-c">已送台北</th>
+                        <th class="gf-c">已到貨</th>
+                        <th class="gf-c">已發送</th>
                         <th>狀態</th>
                         <th>執行操作</th>
                     </tr>
@@ -343,9 +362,9 @@
         var lastDone = nextIdx === -1 ? STAGES.length - 1 : nextIdx - 1;
 
         var enabled = !it.deleted && (idx === nextIdx || idx === lastDone);
-        var timeHtml = done && rec.time ? '<span class="gf-chk-time">' + esc(rec.time) + '</span>' : '';
+        var timeHtml = done && rec.time ? '<span class="gf-chk-time">' + esc(shortDateTime(rec.time)) + '</span>' : '';
 
-        return '<td style="text-align:center;">' +
+        return '<td class="gf-c">' +
             '<input type="checkbox" class="gf-chk" ' + (done ? 'checked' : '') +
             (enabled ? '' : ' disabled') +
             ' onclick="GiftModule.toggleStage(\'' + it.id + '\',' + idx + ',this)"' +
@@ -377,10 +396,10 @@
         rows.forEach(function (it) {
             var ptsTxt = (it.points || it.points === 0) ? '<span class="gf-pts">（' + it.points + ' 點）</span>' : '';
             html += '<tr class="' + (it.deleted ? 'gf-deleted' : '') + '">' +
-                '<td style="white-space:nowrap;">' + esc(it.createdAt) + '</td>' +
+                '<td class="gf-nowrap">' + esc(shortDate(it.createdAt)) + '</td>' +
                 '<td class="gf-cust">' + esc(it.customer) + '</td>' +
                 '<td>' + esc(it.giftName) + ' ' + ptsTxt + '</td>' +
-                '<td style="text-align:center;">' + esc(it.qty) + '</td>' +
+                '<td>' + esc(it.qty) + '</td>' +
                 '<td>' + esc(it.sales || '—') + '</td>' +
                 '<td class="gf-note">' + esc(it.note || '') + '</td>' +
                 stageCell(it, 0) + stageCell(it, 1) + stageCell(it, 2) +
