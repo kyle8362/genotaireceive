@@ -238,7 +238,7 @@
      * HTML
      * ===================================================================== */
     var VIEW_HTML = `
-    <div id="giftView" class="view-section" style="display:none;">
+    <div id="giftView" class="view-section">
         <div class="gf-head">
             <h1>🎁 活動集點兌換區</h1>
             <p>業務活動集點的贈品兌換登記與發放追蹤</p>
