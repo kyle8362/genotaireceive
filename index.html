@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v100 Modular · 集點兌換)</title>
+    <title>中區收送件進度追蹤系統 (v1.0.0 Modular · 帳號管控)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -32,6 +32,7 @@
         .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
         .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
         .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+        #registerModal .input-group input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
         .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
         /* Layout Structure */
@@ -272,7 +273,7 @@
         <input type="text" id="username" placeholder="帳號" autofocus>
         <input type="password" id="password" placeholder="密碼">
         <button class="auth-btn" id="btnAuthAction" onclick="window.handleAuth()">登入</button>
-        <div class="switch-auth" id="switchAuthLink" onclick="window.toggleAuthMode()">沒有帳號？註冊新帳號</div>
+        <div class="switch-auth" id="switchAuthLink" onclick="window.openRegisterModal()">沒有帳號？註冊新帳號</div>
     </div>
 </div>
 
@@ -416,6 +417,17 @@
     </div>
 </div>
 
+<!-- v1.0.0：註冊改為浮動視窗，「你是誰？」必填，送出後存入 users.remarks -->
+<div class="modal-overlay" id="registerModal">
+    <div class="modal-card" style="width: 360px;">
+        <h3 style="margin-top:0; color:#0f766e;">註冊新帳號</h3>
+        <div class="input-group"><label>帳號</label><input type="text" id="regUsername" placeholder="帳號"></div>
+        <div class="input-group"><label>密碼</label><input type="password" id="regPassword" placeholder="密碼"></div>
+        <div class="input-group"><label>你是誰？（必填）</label><input type="text" id="regWho" placeholder="請填寫姓名與部門，方便管理員審核"></div>
+        <div class="modal-btns"><button class="btn btn-cancel" onclick="window.closeRegisterModal()">取消</button><button class="btn btn-save" id="btnRegister" onclick="window.handleRegister()">送出註冊</button></div>
+    </div>
+</div>
+
 
 <!-- =====================================================================
      CORE：Firebase / state / 共用工具 / 任務看板
@@ -486,9 +498,10 @@
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw9sCxtJ-rcRLdkwwGJgBCUCKxCFXujD4Ciq_fJxFqbly4Wldb-9nTSE5kqTst16hKg2Q/exec";
 
     // ---------- 版本與遠端強制更新 ----------
-    // 部署新版時務必同步調高此數字，並在 Firestore 的 settings/app_control
-    // 文件將 minVersion 設為相同數字，即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = 100;
+    // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
+    // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
+    // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
+    const APP_VERSION = '1.0.0';
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -587,6 +600,7 @@
         getPermissionItems().forEach(it => {
             if (isCreator) { result[it.key] = true; return; }                  // 創世神固定全開，避免鎖死
             if (typeof stored[it.key] === 'boolean') { result[it.key] = stored[it.key]; return; }
+            if (user && user.permsDefaultOff) { result[it.key] = false; return; }   // v1.0.0：新註冊帳號未勾選的分頁一律關閉
             result[it.key] = it.defaultRoles ? it.defaultRoles.includes(user && user.role) : true;
         });
         return result;
@@ -1419,39 +1433,53 @@
     // ==========================================
     async function handleAuth() {
         const u = document.getElementById('username').value.trim(); const p = document.getElementById('password').value.trim();
-        const title = document.getElementById('auth-title').innerText; const btn = document.getElementById('btnAuthAction');
+        const btn = document.getElementById('btnAuthAction');
         if(!u || !p) return alert('請輸入帳號密碼'); btn.disabled = true;
         try {
-            if (title.includes('註冊')) {
-                if (u.toLowerCase() === 'admin') throw new Error('不可使用 Admin 作為帳號');
-                const q = await db.collection('users').where('username', '==', u).get();
-                if (!q.empty) throw new Error('帳號已存在');
-                await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: '', nickname: '' });
-                alert('註冊成功！待管理員核准後方可登入。');
-                toggleAuthMode();
-            } else {
-                // v93：移除硬編碼的萬用登入。
-                //      原本 Admin/固定密碼會繞過資料庫直接以 creator 身分登入，
-                //      且該密碼寫在前端原始碼中，任何人檢視網頁原始碼即可取得。
-                //      現在所有帳號一律比對 Firestore。
-                //      若日後需要復原最高權限帳號，請從 Firebase Console 直接編輯
-                //      users 集合（Console 不受 Security Rules 與 App Check 限制）。
-                const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
-                if (q.empty) alert('帳號或密碼錯誤');
-                else {
-                    const user = q.docs[0].data();
-                    if (!user.isApproved) alert('⚠️ 您的帳號尚未通過審核。');
-                    else loginSuccess(user.username, user.role || 'user');
-                }
+            // v93：移除硬編碼的萬用登入。
+            //      原本 Admin/固定密碼會繞過資料庫直接以 creator 身分登入，
+            //      且該密碼寫在前端原始碼中，任何人檢視網頁原始碼即可取得。
+            //      現在所有帳號一律比對 Firestore。
+            //      若日後需要復原最高權限帳號，請從 Firebase Console 直接編輯
+            //      users 集合（Console 不受 Security Rules 與 App Check 限制）。
+            const q = await db.collection('users').where('username', '==', u).where('password', '==', p).get();
+            if (q.empty) alert('帳號或密碼錯誤');
+            else {
+                const user = q.docs[0].data();
+                if (!user.isApproved) alert('⚠️ 您的帳號尚未通過審核。');
+                else loginSuccess(user.username, user.role || 'user');
             }
         } catch (e) { alert(e.message || '發生錯誤'); console.error(e); }
         finally { btn.disabled = false; }
     }
 
-    function toggleAuthMode() {
-        const title = document.getElementById('auth-title'); const btn = document.getElementById('btnAuthAction'); const link = document.getElementById('switchAuthLink');
-        if (title.innerText.includes('登入')) { title.innerText = '註冊新帳號'; btn.innerText = '註冊'; link.innerText = '已有帳號？登入'; }
-        else { title.innerText = '系統登入'; btn.innerText = '登入'; link.innerText = '沒有帳號？註冊新帳號'; }
+    // v1.0.0：註冊改為浮動視窗（原本與登入共用同一個框、用 toggleAuthMode 切換）
+    function openRegisterModal() {
+        ['regUsername', 'regPassword', 'regWho'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('registerModal').style.display = 'flex';
+        document.getElementById('regUsername').focus();
+    }
+    function closeRegisterModal() {
+        document.getElementById('registerModal').style.display = 'none';
+    }
+    async function handleRegister() {
+        const u = document.getElementById('regUsername').value.trim();
+        const p = document.getElementById('regPassword').value.trim();
+        const who = document.getElementById('regWho').value.trim();
+        if (!u || !p || !who) return alert('請填寫帳號、密碼與「你是誰？」');
+        if (u.toLowerCase() === 'admin') return alert('不可使用 Admin 作為帳號');
+        if (/[<>"'&]/.test(u)) return alert('帳號不可包含 < > " \' & 等符號');   // 帳號會顯示在各處畫面，擋掉 HTML 字元
+        const btn = document.getElementById('btnRegister'); btn.disabled = true;
+        try {
+            const q = await db.collection('users').where('username', '==', u).get();
+            if (!q.empty) throw new Error('帳號已存在');
+            // permsDefaultOff：未勾選的分頁一律關閉，由管理員核准時再勾選要開放的分頁（見 getPermsFor）
+            await db.collection('users').add({ username: u, password: p, isApproved: false, role: 'user', remarks: who, nickname: '', permsDefaultOff: true });
+            alert('註冊成功！待管理員核准後方可登入。');
+            closeRegisterModal();
+            document.getElementById('username').value = u;
+        } catch (e) { alert(e.message || '發生錯誤'); console.error(e); }
+        finally { btn.disabled = false; }
     }
 
     function loginSuccess(username, role) {
@@ -1520,13 +1548,27 @@
     // ==========================================
 
     // 遠端強制更新：純讀取，絕不寫入。
-    // Firestore 建立 settings/app_control 文件，欄位 minVersion（數字）。
+    // Firestore 建立 settings/app_control 文件，欄位 minVersion（字串，如 "1.0.1"）。
     // 將 minVersion 設為新版本號，所有跑舊版的分頁會立刻顯示提示並停止運作。
+    // 過渡：v100 以前 minVersion 是數字；切換到 v1.0.0 時填數字 101 讓 v100 舊分頁更新。
+    //       本程式把數字、或不是「數字.數字.數字」格式的值一律忽略（視為比 1.0.0 舊）。
+    function parseVersion(v) {
+        const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(v).trim());
+        return m ? [+m[1], +m[2], +m[3]] : null;
+    }
+    // a > b 回傳正數、a < b 回傳負數、相等回傳 0；逐段當數字比（避免字串比較時 1.10.0 < 1.9.0）
+    function compareVersion(a, b) {
+        for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] - b[i];
+        return 0;
+    }
     function watchAppVersion() {
         db.collection('settings').doc('app_control').onSnapshot(doc => {
             if (!doc.exists) return;
-            const minV = Number(doc.data().minVersion || 0);
-            if (minV > APP_VERSION) showForceUpdateScreen(minV);
+            const raw = doc.data().minVersion;
+            if (raw == null || typeof raw === 'number') return;
+            const minV = parseVersion(raw);
+            if (!minV) { console.warn('[app_control] minVersion 格式不符（應為如 "1.0.1" 的字串），已忽略:', raw); return; }
+            if (compareVersion(minV, parseVersion(APP_VERSION)) > 0) showForceUpdateScreen(minV.join('.'));
         }, err => console.warn('[app_control] 版本監聽失敗（不影響使用）:', err.code || err.message));
     }
 
@@ -1598,6 +1640,14 @@
             // 管理員若在他人登入期間調整角色/權限，這裡即時同步
             if (state.currentUser) {
                 const rec = getCurrentUserRecord();
+                // v1.0.0：帳號已被刪除 → 強制登出（v55 曾有此功能，v71 大改版時遺失）。
+                //         只認伺服器回傳的快照：開頁時的本機快取可能還不完整，若據此判斷會誤踢正常帳號。
+                //         此處只登出、不寫入 Firestore。
+                if (!rec && !snapshot.metadata.fromCache) {
+                    alert('您的帳號已被移除，即將強制登出。');
+                    logout();
+                    return;
+                }
                 if (rec && rec.role && rec.role !== state.currentUser.role) {
                     state.currentUser.role = rec.role;
                     localStorage.setItem('tt_current_user', JSON.stringify(state.currentUser));
@@ -1646,7 +1696,7 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=99"></script>
+<script src="modules/member-settings.module.js?v=101"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
 <script src="modules/democracy.module.js?v=14"></script>
 <script src="modules/gift.module.js?v=100"></script>

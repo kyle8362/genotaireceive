@@ -1,8 +1,10 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v99
+ * 模組：成員設定管理 (memberSettings)  ─ v101
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
+ * v101 變更（系統 v1.0.0）：帳號名稱與備註改以 escAttr 輸出。
+ *          註冊時的「你是誰？」會寫入備註，須防止註冊者塞入 HTML。
  *
  * 內含三個分頁：
  *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
@@ -402,13 +404,13 @@
                     : '<span style="color:#10b981; font-size:0.85rem;">已核准</span>';
                 controlsHtml =
                     '<div class="user-edit-row"><span class="readonly-text">角色: ' + badgeText + '</span>' +
-                    '<span class="readonly-text" style="margin-left:15px;">備註: ' + (user.remarks || '(無)') + '</span></div>' +
+                    '<span class="readonly-text" style="margin-left:15px;">備註: ' + (core.escAttr(user.remarks) || '(無)') + '</span></div>' +
                     permCheckboxesHtml(user, false) +
                     '<div style="text-align:right;">' + actionBtn + '</div>';
             }
 
             li.innerHTML =
-                '<div class="user-header"><div><span class="user-name">' + user.username + '</span>' +
+                '<div class="user-header"><div><span class="user-name">' + core.escAttr(user.username) + '</span>' +
                 '<span class="user-role-badge ' + badgeClass + '">' + badgeText + '</span>' +
                 viewOnlyHtml + '</div></div>' + controlsHtml;
             list.appendChild(li);
