@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v103
+ * 模組：成員設定管理 (memberSettings)  ─ v104
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -11,6 +11,8 @@
  * v103 變更（系統 v1.2.0）：新增分頁「📣 發布通知」（creator / senior / admin）：
  *          手動發布通知（必填結束時間）＋發布紀錄（最近 30 筆、狀態、已讀 N／M、未讀名單、撤回）。
  *          通知的資料規則集中在 core（index.html 的通知中心區塊），本模組只負責畫面。
+ * v104 變更（系統 v1.2.1）：手動發布可設開始日期／時間（預約發送，寫入 showFrom）；
+ *          發布紀錄的「尚未開始」會顯示預約發送時間，發送前也可以撤回。
  *
  * 內含三個分頁：
  *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
@@ -274,6 +276,12 @@
             <div class="notif-form">
                 <div><label>標題（必填）</label><input type="text" id="msNotifTitle" maxlength="60" placeholder="例如：10/20 系統維護通知"></div>
                 <div><label>內容</label><textarea id="msNotifBody" placeholder="通知內容（可換行）"></textarea></div>
+                <!-- v104：預約發送。沒填開始日期＝立刻發送 -->
+                <div class="notif-form-row">
+                    <div><label>開始日期（選填，預約發送）</label><input type="date" id="msNotifStartDate"></div>
+                    <div><label>開始時間</label><input type="time" id="msNotifStartTime" value="08:00"></div>
+                    <div style="flex:0 0 auto; visibility:hidden;" aria-hidden="true"><button class="btn btn-save" tabindex="-1">發布通知</button></div>   <!-- 佔位，讓兩列欄寬對齊 -->
+                </div>
                 <div class="notif-form-row">
                     <div><label>結束日期（必填）</label><input type="date" id="msNotifEndDate"></div>
                     <div><label>結束時間</label><input type="time" id="msNotifEndTime" value="23:59"></div>
@@ -867,16 +875,23 @@
         if (!date) return alert('請選擇結束日期');
         var expireAt = date + ' ' + time;
         if (expireAt <= nowMinute()) return alert('結束時間必須晚於現在');
-        if (!confirm('確定發布這則通知給全員？\n\n' + title + '\n結束時間：' + expireAt)) return;
+        // v104：預約發送。開始時間已過或沒填＝立刻發送（不存 showFrom）
+        var sDate = document.getElementById('msNotifStartDate').value;
+        var showFrom = sDate ? sDate + ' ' + (document.getElementById('msNotifStartTime').value || '00:00') : null;
+        if (showFrom && showFrom >= expireAt) return alert('開始時間必須早於結束時間');
+        if (showFrom && showFrom <= nowMinute()) showFrom = null;
+        if (!confirm((showFrom ? '確定預約這則通知？將於 ' + showFrom + ' 發送給全員。' : '確定發布這則通知給全員？') +
+                     '\n\n' + title + '\n結束時間：' + expireAt)) return;
 
         var btn = document.getElementById('msNotifPublishBtn');
         btn.disabled = true;
-        core.createNotification({ kind: 'manual', title: title, body: body, expireAt: expireAt })
+        core.createNotification({ kind: 'manual', title: title, body: body, expireAt: expireAt, showFrom: showFrom })
             .then(function () {
                 document.getElementById('msNotifTitle').value = '';
                 document.getElementById('msNotifBody').value = '';
+                document.getElementById('msNotifStartDate').value = '';
                 btn.disabled = false;
-                alert('已發布');
+                alert(showFrom ? '已預約，將於 ' + showFrom + ' 發送' : '已發布');
                 loadNotifHistory();
             })
             .catch(function (e) {
@@ -922,7 +937,8 @@
                     '<td style="white-space:normal; min-width:140px;">' + core.escAttr(n.title) + '</td>' +
                     '<td>' + core.escAttr(core.getUserDisplayName(n.createdBy || '')) + '</td>' +
                     '<td>' + core.escAttr((n.expireAt || '—').slice(5)) + '</td>' +
-                    '<td>' + NOTIF_STATUS_LABEL[st] + '</td>' +
+                    '<td>' + NOTIF_STATUS_LABEL[st] +
+                        (st === 'scheduled' ? '<br><span style="font-size:0.75rem; color:#6b7280;">' + core.escAttr((n.showFrom || '').slice(5)) + ' 發送</span>' : '') + '</td>' +   // v104
                     '<td><button class="notif-read-btn" onclick="MemberSettingsModule.toggleUnread(\'' + n.id + '\')">已讀 ' +
                         (aud.length - unread.length) + '／' + aud.length + '</button></td>' +
                     '<td>' + ops + '</td></tr>' +
