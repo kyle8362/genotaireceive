@@ -2,9 +2,10 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.0.0 Modular · 帳號管控)</title>
+    <title>中區收送件進度追蹤系統 (v1.1.0 Modular · 介面優化)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -24,7 +25,7 @@
             --assign-bg: #4338ca;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; height: 100dvh; display: flex; overflow: hidden; }   /* v1.1.0：100dvh 避免 iOS 網址列吃掉底部，100vh 為舊瀏覽器 fallback */
 
         /* Auth Screen */
         #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 2000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
@@ -50,7 +51,6 @@
         .sidebar-scroll::-webkit-scrollbar { width: 5px; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
 
-        #mobile-menu-btn { display: none; position: absolute; top: 15px; left: 15px; z-index: 1100; background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: var(--primary); }
         #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 900; backdrop-filter: blur(2px); }
 
         .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; margin-bottom: 0.5rem; }
@@ -87,7 +87,9 @@
         .task-date-display:hover { border-color: var(--primary); }
         .task-date-text { color: var(--text-main); font-weight: 600; font-size: 0.95rem; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         /* 日曆按鈕：原生 date input 透明疊在按鈕上方，點擊即開啟系統日曆 */
-        .task-date-picker { position: relative; display: inline-flex; width: 32px; height: 30px; flex-shrink: 0; }
+        /* v1.1.0：overflow hidden — iOS Safari 的 date input 有內建最小寬度，手機版字級改 16px 後會撐出 32px，
+           透明的 input 蓋住右邊「當日」按鈕，造成點了沒反應。裁切在日曆按鈕範圍內即可 */
+        .task-date-picker { position: relative; display: inline-flex; width: 32px; height: 30px; flex-shrink: 0; overflow: hidden; }
         .task-date-picker-btn { width: 100%; height: 100%; border: none; background: transparent; border-radius: 6px; font-size: 1rem; line-height: 1; cursor: pointer; padding: 0; }
         .task-date-picker-btn:hover { background: #f0fdfa; }
         .task-date-picker input[type="date"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: none; padding: 0; margin: 0; cursor: pointer; }
@@ -152,7 +154,8 @@
         .details-content { padding: 10px; background: #fff; }
         .category-group.overdue-section .cat-title { color: #dc2626; }
 
-        .task-item { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; align-items: flex-start; transition: all 0.2s; border-left: 4px solid transparent; position: relative; }
+        /* v1.1.0 方案 C：第一列「勾選框＋操作按鈕」，第二列內容佔滿寬度（手機、電腦皆同） */
+        .task-item { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 0.8rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: grid; grid-template-columns: auto 1fr; grid-template-areas: "check actions" "content content"; column-gap: 10px; row-gap: 10px; align-items: center; transition: all 0.2s; border-left: 4px solid transparent; position: relative; }
         .task-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); transform: translateY(-1px); }
         .task-item[data-cat="定序收件"] { border-left-color: #3b82f6; }
         .task-item[data-cat="引子送件"] { border-left-color: #8b5cf6; }
@@ -162,9 +165,14 @@
         .task-item.overdue-item { animation: blink-alert 2s infinite ease-in-out; border-left-width: 6px; }
         @keyframes blink-alert { 0% { border-left-color: #ef4444; } 50% { border-left-color: #b91c1c; } 100% { border-left-color: #ef4444; } }
 
-        .task-checkbox { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 5px; margin-right: 15px; cursor: pointer; flex-shrink: 0; display: grid; place-items: center; margin-top: 3px; }
-        .task-checkbox:hover { border-color: var(--primary); }
-        .task-content { flex-grow: 1; display: flex; flex-direction: column; padding-right: 10px; }
+        /* v1.1.0：勾選框改為 <button aria-pressed>，視覺 28px、::before 撐出 44px 點擊範圍，完成為綠底白勾 */
+        .task-checkbox { grid-area: check; position: relative; width: 28px; height: 28px; border: 2px solid #94a3b8; border-radius: 6px; background: #fff; padding: 0; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; transition: all .15s; }
+        .task-checkbox::before { content: ""; position: absolute; inset: -9px; }
+        .task-checkbox:hover { border-color: var(--primary); background: #f0fdfa; }
+        .task-checkbox:active { transform: scale(.9); }
+        .task-checkbox.is-checked { background: var(--primary); border-color: var(--primary); }
+        .task-checkbox.is-checked::after { content: ""; width: 7px; height: 13px; border: solid #fff; border-width: 0 3px 3px 0; transform: rotate(45deg) translate(-1px,-1px); }
+        .task-content { grid-area: content; min-width: 0; display: flex; flex-direction: column; border-top: 1px solid #f3f4f6; padding-top: 10px; }
         .task-title { font-size: 1rem; line-height: 1.5; word-break: break-all; padding: 2px 4px; border-radius: 4px; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; }
         .task-meta { font-size: 0.8rem; color: var(--text-light); margin-top: 6px; line-height: 1.4; }
         .completed-info { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; display: inline-block; font-weight: 500; }
@@ -173,7 +181,7 @@
 
         .assign-badge { display: inline-block; font-size: 0.95rem; background-color: var(--assign-bg); color: white; padding: 4px 10px; border-radius: 6px; margin-left: 10px; vertical-align: middle; font-weight: 800; box-shadow: 0 2px 4px rgba(0,0,0,0.3); white-space: nowrap; letter-spacing: 0.5px; border: 1px solid #312e81; }
 
-        .action-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .action-area { grid-area: actions; display: flex; flex-direction: row; justify-content: flex-end; align-items: center; gap: 8px; }
         .btn-icon { background: none; border: 1px solid transparent; cursor: pointer; font-size: 1.2rem; padding: 2px 6px; color: #9ca3af; border-radius: 4px; }
         .btn-icon:hover { background-color: #f3f4f6; color: var(--text-main); border-color: #ddd; }
         .btn-delete:hover { color: var(--danger); }
@@ -185,6 +193,39 @@
         .history-dot:hover { color: var(--text-main); }
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
+
+        /* v1.1.0：手機版 ⋮ 選單。掛在 body 下（main 有 overflow 會裁切），位置由 JS 計算 */
+        #taskMoreMenu { display: none; position: fixed; z-index: 2050; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 6px; min-width: 150px; }
+        #taskMoreMenu.open { display: block; }
+        #taskMoreMenu button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 12px 14px; font-size: 1rem; border-radius: 6px; font-family: inherit; cursor: pointer; color: var(--text-main); }
+        #taskMoreMenu button:hover { background: #f3f4f6; }
+        #taskMoreMenu button.danger { color: var(--danger); }
+
+        /* v1.1.0：手機版底部 Tab bar（電腦版不顯示）；z-index 低於側邊欄遮罩 900，高於 FAB 800 */
+        #mobileTabBar { display: none; }
+        .mtab { position: relative; z-index: 1; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; border-radius: 13px; padding: 0; font-family: inherit; font-size: 0.72rem; font-weight: 600; color: var(--text-light); cursor: pointer; transition: color .2s; -webkit-tap-highlight-color: transparent; }
+        .mtab .mtab-ico { font-size: 1.25rem; line-height: 1; transition: transform .22s cubic-bezier(.3, 1.6, .5, 1); }
+        .mtab:active .mtab-ico { transform: scale(.82); transition-duration: .08s; }   /* 按壓回饋：縮小後彈回 */
+        .mtab.is-active { color: var(--primary); }
+        /* 選取底色：獨立的膠囊，切換時滑到新的格子（位置由 positionTabPill() 設定） */
+        .mtab-pill { position: absolute; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: 13px; background: #f0fdfa; z-index: 0; transition: transform .3s cubic-bezier(.2, .8, .2, 1), width .3s cubic-bezier(.2, .8, .2, 1); }
+
+        /* v1.1.0：手機版分頁切換時，新頁面依 Tab 左右方向滑入＋淡入。
+           只動「內容」子元素、排除 .fab：transform 會讓 position:fixed 的子孫跟著位移。
+           fill-mode both 結束後為 transform:none，不會留下新的定位基準。 */
+        @keyframes view-in-r { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+        @keyframes view-in-l { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+
+        /* v1.1.0：任務載入中的骨架畫面 */
+        .sk-block { background: linear-gradient(90deg, #eef2f6 25%, #f8fafc 37%, #eef2f6 63%); background-size: 400% 100%; animation: sk-shimmer 1.4s ease infinite; }
+        .sk-title { height: 18px; width: 140px; border-radius: 6px; margin: 6px 0 12px; }
+        .sk-card { height: 84px; border-radius: 8px; margin-bottom: 0.8rem; }
+        @keyframes sk-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+        @media (prefers-reduced-motion: reduce) { .sk-block { animation: none; } .mtab-pill, .mtab .mtab-ico { transition: none; } }
+        @media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+            .view-section.view-enter-r > :not(.fab) { animation: view-in-r .22s cubic-bezier(.2, .8, .2, 1) both; }
+            .view-section.view-enter-l > :not(.fab) { animation: view-in-l .22s cubic-bezier(.2, .8, .2, 1) both; }
+        }
 
         /* ---------- 共用 Modal 基底（模組會沿用這些 class） ---------- */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2100; justify-content: center; align-items: center; }
@@ -236,7 +277,6 @@
         #maintenance-screen .mt-foot { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed var(--border); font-size: 0.8rem; color: #9ca3af; }
 
         @media (max-width: 768px) {
-            #mobile-menu-btn { display: block; }
             #sidebar-overlay { display: none; }
             #sidebar-overlay.active { display: block; }
             aside { position: fixed; top: 0; left: 0; height: 100%; width: 280px; z-index: 1000; transform: translateX(-100%); box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
@@ -244,11 +284,21 @@
             /* v89：恢復手機版只能上下滑動的行為。
                需要橫向捲動的元素（如採購表格）自行以 overflow-x: auto 處理，
                避免整個頁面被撐開。 */
-            main { padding-top: 70px; width: 100%; max-width: 100%; overflow-x: hidden; }
-            .task-item { flex-direction: column; }
-            .task-content { padding-right: 0; margin-bottom: 10px; }
-            .action-area { flex-direction: row; width: 100%; justify-content: flex-end; }
-            .fab { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 28px; }
+            /* v1.1.0：☰ 移除後頂部只需避開瀏海；底部預留 Tab bar（58）＋間距（10）＋留白（16）＋ Home 指示條 */
+            main { padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(58px + 10px + 16px + env(safe-area-inset-bottom)); width: 100%; max-width: 100%; overflow-x: hidden; }
+            .fab { bottom: calc(58px + 10px + 12px + env(safe-area-inset-bottom)); right: 20px; width: 50px; height: 50px; font-size: 28px; }
+
+            /* v1.1.0：iOS 輸入框字級 < 16px 會自動放大。模組內選擇器權重較高，故只對字級用 !important 統一蓋過
+               （只影響 font-size，checkbox 等元件不會有視覺變化） */
+            input, select, textarea, [contenteditable] { font-size: 16px !important; }
+
+            /* v1.1.0：任務卡片操作按鈕點擊範圍 44px；× 不外露，刪除改由 ⋮ 選單進入 */
+            .action-area .btn-icon, .action-area .history-dot { min-width: 44px; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
+            .action-area .btn-delete { display: none; }
+
+            /* v1.1.0：底部 Tab bar；前三個入口已在 Tab bar 上，側邊欄不重複顯示（按鈕有 JS inline display，故用 !important） */
+            #mobileTabBar { display: flex; position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); height: 58px; box-sizing: border-box; padding: 5px; gap: 4px; background: #fff; border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); z-index: 850; }
+            #btnTabTasks, #tempTasksBtn, #btnTabCustomers, .sidebar-fixed hr { display: none !important; }
 
             /* v87：手機版日期列與搜尋面板 */
             .task-date-bar { gap: 6px; }
@@ -264,7 +314,6 @@
 </head>
 <body>
 
-<button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div id="auth-screen">
@@ -388,6 +437,21 @@
         <!-- ===== 模組主畫面掛載點（由 module 自行注入 HTML） ===== -->
         <div id="module-mount-views" style="display:contents;"></div>
     </main>
+
+    <!-- v1.1.0：手機版底部 Tab bar（電腦版 CSS 隱藏）。data-tab 對應 switchTab 的 key，權限由 updateTabBar() 控制 -->
+    <nav id="mobileTabBar" aria-label="主要頁面">
+        <span class="mtab-pill" aria-hidden="true"></span>
+        <button type="button" class="mtab" data-tab="tasks" onclick="window.switchTab('tasks')"><span class="mtab-ico">📋</span>任務看板</button>
+        <button type="button" class="mtab" data-tab="tempTasks" onclick="window.switchTab('tempTasks')"><span class="mtab-ico">🚨</span>臨時收件</button>
+        <button type="button" class="mtab" data-tab="customers" onclick="window.switchTab('customers')"><span class="mtab-ico">🏢</span>客戶查詢</button>
+        <button type="button" class="mtab" data-tab="more" onclick="toggleSidebar()"><span class="mtab-ico">☰</span>更多</button>
+    </nav>
+</div>
+
+<!-- v1.1.0：手機版任務卡片 ⋮ 選單（掛在最外層，避免被 main 的 overflow 裁切） -->
+<div id="taskMoreMenu" role="menu">
+    <button type="button" role="menuitem" onclick="taskMoreAction('history')">操作紀錄</button>
+    <button type="button" role="menuitem" class="danger" onclick="taskMoreAction('delete')">刪除</button>
 </div>
 
 <!-- ===== 模組彈窗掛載點（由 module 自行注入 HTML） ===== -->
@@ -501,7 +565,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.0.0';
+    const APP_VERSION = '1.1.0';   // v1.1.0：UX 調整（方案 C 卡片、Tab bar、骨架畫面、16px 輸入框、100dvh、Enter 登入）＋讀取紀錄
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -514,6 +578,7 @@
     let state = {
         currentUser: null, currentDate: getTodayStr(), activeTab: 'tasks',   // v91：改用本地日期
         tasks: [], users: [], salesOptions: [], assignmentRules: {},
+        tasksLoading: false,   // v1.1.0：當日任務第一次 snapshot 回來前為 true，renderTasks 顯示骨架畫面
         history: JSON.parse(localStorage.getItem('tt_history')||'[]'), editingTaskId: null
     };
     let assigningTaskId = null;
@@ -637,6 +702,18 @@
         return true;
     }
 
+    // v1.1.0：讀取紀錄（usage_logs）。只在「會大量讀取」的操作完成後寫 1 筆：
+    //         搜尋任務（實際讀庫時）、清除舊任務、任務完成統整（member-settings 經 AppCore 呼叫）。
+    //         用途是收到 Firestore 讀取警報時，查得到是誰、做了什麼、讀了幾筆。
+    //         ⚠️ 絕不可在 onSnapshot 監聽器內呼叫（會形成寫入迴圈）。寫入失敗只記 Console，不影響使用。
+    function logUsage(action, range, count) {
+        if (!state.currentUser) return;
+        const d = new Date(), p = n => String(n).padStart(2, '0');
+        const at = formatDateLocal(d) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+        db.collection('usage_logs').add({ at, user: state.currentUser.name, action, range: range || '', count: count || 0 })
+            .catch(e => console.warn('[usage_logs] 寫入失敗（不影響使用）:', e.code || e.message));
+    }
+
     // 分頁 key → 是否可進入
     function canAccessView(viewKey) {
         if (viewKey === 'tasks') return canAccess('tasks');
@@ -669,6 +746,7 @@
         getTodayStr, getUserDisplayName, escAttr, hasRole, escapeAttr: escAttr,
         getPermissionItems, getPermsFor, canAccess, canAccessView,
         isViewOnly, denyViewOnly,
+        logUsage,                                        // v1.1.0
         switchTab: (k) => switchTab(k),
         renderTasks: () => { if (state.activeTab === 'tasks') renderTasks(); },
 
@@ -708,7 +786,9 @@
     function createTaskElement(task, isOverdue = false) {
         const div = document.createElement('div'); div.className = `task-item ${isOverdue?'overdue-item':''} ${task.completed?'completed-item':''} ${task.isDeleted?'deleted-item':''}`;
         div.setAttribute('data-cat', task.category);
-        let checkboxHtml = task.isDeleted ? '' : `<div class="task-checkbox" onclick="toggleTask('${task.id}')"></div>`;
+        // v1.1.0：改為 <button>，完成狀態以 is-checked + aria-pressed 表示
+        let checkboxHtml = task.isDeleted ? '' :
+            `<button type="button" class="task-checkbox ${task.completed ? 'is-checked' : ''}" aria-pressed="${!!task.completed}" aria-label="標記完成" onclick="toggleTask('${task.id}')"></button>`;
         let metaHtml = '';
         if (task.completed && !task.isDeleted) { const d = new Date(task.completedAt); metaHtml = `<div class="task-meta">原始分類: ${task.category}<br><span class="completed-info">${getUserDisplayName(task.completedBy)} 於 ${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')} 完成</span></div>`; }
         else if (isOverdue) { metaHtml = `<div class="task-meta"><span class="task-overdue-date">建立於: ${task.date}</span></div>`; }
@@ -733,12 +813,21 @@
         let assignedBadge = task.assignedTo ? `<span class="assign-badge">${getUserDisplayName(task.assignedTo)}</span>` : '';
         let locBadgeHtml = task.isDeleted ? '' : renderTaskLocationBadge(task);
         const clickEvent = (!task.isDeleted) ? `onclick="openModal('${task.id}')"` : '';
-        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title} ${assignedBadge}</div>${locBadgeHtml}${ngsInfoHtml}${metaHtml}</div><div class="action-area">${rightButtonsHtml}<div class="history-dot" onclick="showHistory('${task.id}')">⋮</div>${actionBtn}</div>`;
+        div.innerHTML = `${checkboxHtml}<div class="task-content"><div class="task-title" ${clickEvent}>${task.title} ${assignedBadge}</div>${locBadgeHtml}${ngsInfoHtml}${metaHtml}</div><div class="action-area">${rightButtonsHtml}<div class="history-dot" onclick="onTaskMore(event, '${task.id}', ${!!task.isDeleted})">⋮</div>${actionBtn}</div>`;
         return div;
     }
 
     function renderTasks() {
         const container = document.getElementById('taskListContainer'); container.innerHTML = '';
+        // v1.1.0：資料到之前顯示骨架，避免先閃出「本日無任何案件或任務」讓同仁誤以為今天沒件
+        if (state.tasksLoading) {
+            container.innerHTML = '<div class="category-group" aria-busy="true" aria-label="載入中">' +
+                '<div class="sk-block sk-title"></div>' +
+                '<div class="sk-block sk-card"></div><div class="sk-block sk-card"></div><div class="sk-block sk-card"></div></div>';
+            document.getElementById('overallProgressText').innerText = '…';   // 不沿用前一天的進度數字
+            document.getElementById('overallProgressBar').style.width = '0%';
+            return;
+        }
         const overdueTasks = state.tasks.filter(t => t.date < state.currentDate && !t.completed && !t.isDeleted);
         if (overdueTasks.length > 0) {
             const group = document.createElement('div'); group.className = 'category-group overdue-section';
@@ -850,15 +939,19 @@
         if (unsubOverdueTasks) { unsubOverdueTasks(); unsubOverdueTasks = null; }
         dayTaskDocs = [];
         overdueTaskDocs = [];
+        state.tasksLoading = true;   // v1.1.0：只看「當日任務」；先前未完成較慢或失敗都不影響骨架消失
 
         // A. 當日任務（含已完成、已刪除，供「已完成項目」「被刪除項目」區塊使用）
         unsubDayTasks = db.collection('tasks')
             .where('date', '==', dateStr)
             .onSnapshot(snap => {
                 dayTaskDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                state.tasksLoading = false;
                 mergeTaskDocs();
             }, err => {
                 console.error('[tasks/day] 訂閱失敗:', err);
+                state.tasksLoading = false;   // 失敗也要解除，避免骨架畫面卡住
+                if (state.activeTab === 'tasks') renderTasks();
                 showTaskWarning('⚠️ 當日任務讀取失敗：' + (err.message || err.code) +
                     '<br>請重新整理頁面；若持續發生請聯絡系統管理員。');
             });
@@ -1013,6 +1106,7 @@
         document.getElementById('noAccessView').classList.add('active');
         document.getElementById('taskSearchSection').style.display = 'none';
         document.getElementById('taskDateSection').style.display = 'none';
+        updateTabBar();
     }
 
     function switchTab(tab) {
@@ -1024,6 +1118,7 @@
             return;
         }
 
+        const prevTab = state.activeTab;   // v1.1.0：判斷滑入方向用
         state.activeTab = tab;
 
         // 1) 全部隱藏
@@ -1061,8 +1156,54 @@
                 if (typeof mod.activate === 'function') mod.activate();
             }
         }
+        updateTabBar();
+        animateViewEnter(prevTab, tab);
         if (window.innerWidth <= 768 && document.querySelector('aside').classList.contains('open')) toggleSidebar();
     }
+
+    // v1.1.0：手機版切換分頁的滑入動畫（實際效果由 CSS media query 控制，電腦版與「減少動態效果」不會動）。
+    //         方向依 Tab bar 順序：往右邊的 Tab → 從右滑入；往左 → 從左滑入。側邊欄裡的模組都視為最右邊（「更多」）。
+    const TAB_ORDER = { tasks: 0, tempTasks: 1, customers: 2 };
+    function animateViewEnter(prevTab, tab) {
+        if (!prevTab || prevTab === tab) return;   // 初次載入或原地切換不動
+        const mod = tab === 'tasks' ? null : AppCore.getModule(tab);
+        const el = document.getElementById(tab === 'tasks' ? 'taskView' : (mod && mod.viewId));
+        if (!el) return;
+        const idx = k => (k in TAB_ORDER ? TAB_ORDER[k] : 3);
+        el.classList.remove('view-enter-r', 'view-enter-l');
+        void el.offsetWidth;                        // 強制重排，讓連續切換也能重新播放
+        el.classList.add(idx(tab) >= idx(prevTab) ? 'view-enter-r' : 'view-enter-l');
+    }
+
+    // v1.1.0：手機版 Tab bar — 沒權限的格子隱藏（其餘平均撐滿），並標示目前頁面。
+    //         不在前三格的頁面（從側邊欄進入的模組）由「更多」亮起。
+    function updateTabBar() {
+        const bar = document.getElementById('mobileTabBar');
+        if (!bar) return;
+        const onMainTab = ['tasks', 'tempTasks', 'customers'].includes(state.activeTab);
+        bar.querySelectorAll('.mtab').forEach(btn => {
+            const key = btn.dataset.tab;
+            if (key !== 'more') btn.style.display = canAccessView(key) ? '' : 'none';
+            btn.classList.toggle('is-active', key === 'more' ? !onMainTab : key === state.activeTab);
+        });
+        positionTabPill();
+    }
+
+    // v1.1.0：把選取膠囊移到目前亮起的格子（CSS transition 負責滑動）。
+    //         第一次定位不播動畫，避免開頁時膠囊從最左邊滑過來；電腦版 Tab bar 隱藏時略過。
+    function positionTabPill() {
+        const bar = document.getElementById('mobileTabBar');
+        const pill = bar && bar.querySelector('.mtab-pill');
+        const btn = bar && bar.querySelector('.mtab.is-active');
+        if (!pill || !btn || !bar.getClientRects().length) return;   // 隱藏時沒有 rect（fixed 元素的 offsetParent 恆為 null，不能拿來判斷）
+        const first = !pill.dataset.placed;
+        if (first) pill.style.transition = 'none';
+        pill.style.width = btn.offsetWidth + 'px';
+        pill.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+        if (first) { void pill.offsetWidth; pill.style.transition = ''; pill.dataset.placed = '1'; }
+    }
+    window.addEventListener('resize', positionTabPill);           // 旋轉、視窗縮放後格子寬度會變
+    document.addEventListener('touchstart', () => {}, { passive: true });   // 讓 iOS Safari 套用 :active（按壓回饋）
 
     // ==========================================
     // 7. 任務 CRUD / NGS 表單 / 匯入 / 搜尋 / 統計
@@ -1193,6 +1334,43 @@
     function restoreTask(id) { updateTaskDb(id, { isDeleted: false }, '還原', '從刪除項目中還原'); }
     function deleteTask(id) { if(confirm('移至被刪除項目？')) updateTaskDb(id, { isDeleted: true }, '刪除', '移至被刪除項目'); }
 
+    // v1.1.0：⋮ 按鈕。電腦版（及已刪除項目）維持直接開操作紀錄；
+    //         手機版跳出「操作紀錄／刪除」選單，刪除仍走 deleteTask() 的 confirm。
+    //         斷點與 CSS 的 @media (max-width: 768px) 一致，視窗縮放或旋轉不需重新渲染。
+    const MOBILE_MQ = window.matchMedia('(max-width: 768px)');
+    let taskMoreFor = null;   // 選單目前所屬的任務 id；null 表示選單關閉（同時只開一個）
+    function onTaskMore(ev, id, isDeleted) {
+        ev.stopPropagation();
+        if (!MOBILE_MQ.matches || isDeleted) { closeTaskMoreMenu(); showHistory(id); return; }
+        if (taskMoreFor === id) { closeTaskMoreMenu(); return; }   // 再點同一個 ⋮ → 關閉
+        const menu = document.getElementById('taskMoreMenu');
+        taskMoreFor = id;
+        menu.classList.add('open');
+        const r = ev.currentTarget.getBoundingClientRect();
+        const mw = menu.offsetWidth, mh = menu.offsetHeight, gap = 6;
+        const bar = document.getElementById('mobileTabBar');
+        const bottomLimit = (bar && bar.getClientRects().length ? bar.getBoundingClientRect().top : window.innerHeight) - 8;
+        let top = r.bottom + gap;
+        if (top + mh > bottomLimit) top = Math.max(8, r.top - mh - gap);   // 下方放不下（含 Tab bar）→ 往上彈出
+        const left = Math.min(Math.max(8, r.right - mw), window.innerWidth - mw - 8);
+        menu.style.top = top + 'px';
+        menu.style.left = left + 'px';
+    }
+    function closeTaskMoreMenu() {
+        taskMoreFor = null;
+        document.getElementById('taskMoreMenu').classList.remove('open');
+    }
+    function taskMoreAction(action) {
+        const id = taskMoreFor;
+        closeTaskMoreMenu();
+        if (!id) return;
+        if (action === 'history') showHistory(id);
+        else if (action === 'delete') deleteTask(id);
+    }
+    document.addEventListener('click', e => { if (taskMoreFor && !e.target.closest('#taskMoreMenu')) closeTaskMoreMenu(); });
+    document.addEventListener('scroll', () => { if (taskMoreFor) closeTaskMoreMenu(); }, true);   // capture：main 內部捲動也會關閉
+    window.addEventListener('resize', () => { if (taskMoreFor) closeTaskMoreMenu(); });
+
     function openAssignModal(taskId, category) {
         assigningTaskId = taskId; const list = document.getElementById('assignUserList'); list.innerHTML = '';
         const allowedUsers = state.assignmentRules[category] || [];
@@ -1280,6 +1458,7 @@
                 const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 searchCache[key] = list;
                 searchFetching = null;
+                logUsage('搜尋任務', range.start + ' ~ ' + range.end, list.length);   // v1.1.0：只有實際讀庫才記，走快取的不記
                 setSearchHint('已載入 ' + range.label + '，共 ' + list.length + ' 筆（本次登入期間不會重複讀取）', false);
                 return list;
             })
@@ -1381,6 +1560,8 @@
         const opts = options || {};
         const cutoff = shiftDateStr(getTodayStr(), -PURGE_AFTER_DAYS);
         let totalDeleted = 0;
+        let totalRead = 0;   // v1.1.0：讀取紀錄用；沒有舊任務的日子（讀到 0 筆）不記
+        const logPurge = () => { if (totalRead > 0) logUsage('清除舊任務', '早於 ' + cutoff, totalRead); };
 
         for (let round = 0; round < PURGE_MAX_ROUNDS; round++) {
             const snap = await db.collection('tasks')
@@ -1388,6 +1569,7 @@
                 .limit(PURGE_BATCH)
                 .get();
             if (snap.empty) break;
+            totalRead += snap.size;
 
             if (round === 0 && opts.confirm) {
                 const more = snap.size >= PURGE_BATCH ? ' 以上' : '';
@@ -1395,7 +1577,7 @@
                     '偵測到 ' + snap.size + more + ' 筆日期早於 ' + cutoff + ' 的任務（超過 ' + PURGE_AFTER_DAYS + ' 天）。\n\n' +
                     '刪除後無法復原，且「任務完成統整」將無法再統計這些資料。\n\n確定要清除嗎？'
                 );
-                if (!ok) { console.info('[purge] 使用者取消'); return 0; }
+                if (!ok) { console.info('[purge] 使用者取消'); logPurge(); return 0; }   // 取消也已經讀過了
             }
 
             const batch = db.batch();
@@ -1405,6 +1587,7 @@
             console.info('[purge] 已刪除 ' + snap.size + ' 筆（累計 ' + totalDeleted + '）');
             if (snap.size < PURGE_BATCH) break;
         }
+        logPurge();
         return totalDeleted;
     }
 
@@ -1452,6 +1635,14 @@
         } catch (e) { alert(e.message || '發生錯誤'); console.error(e); }
         finally { btn.disabled = false; }
     }
+
+    // v1.1.0：登入框按 Enter 送出。注音／中文輸入法選字時的 Enter（isComposing，舊版 Safari 為 keyCode 229）不觸發；
+    //         按鈕 disabled（登入進行中）時不重複送出。註冊視窗依使用者決定不加。
+    ['username', 'password'].forEach(id => document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+        e.preventDefault();
+        if (!document.getElementById('btnAuthAction').disabled) handleAuth();
+    }));
 
     // v1.0.0：註冊改為浮動視窗（原本與登入共用同一個框、用 toggleAuthMode 切換）
     function openRegisterModal() {
@@ -1541,6 +1732,8 @@
         // 故此處單獨處理（模組 navButtonId 為 null）。
         const btnCust = document.getElementById('btnTabCustomers');
         if (btnCust) btnCust.style.display = canAccess('customers') ? 'block' : 'none';
+
+        updateTabBar();   // v1.1.0：登入後與權限即時變更（users 監聽）時都會經過這裡
     }
 
     // ==========================================
@@ -1596,11 +1789,9 @@
 
     function showMaintenanceScreen() {
         var authEl = document.getElementById('auth-screen');
-        var appEl = document.getElementById('app-screen');
-        var menuBtn = document.getElementById('mobile-menu-btn');
+        var appEl = document.getElementById('app-screen');   // v1.1.0：Tab bar 在 app-screen 內，隨之隱藏（☰ 已移除）
         if (authEl) authEl.style.display = 'none';
         if (appEl) appEl.style.display = 'none';
-        if (menuBtn) menuBtn.style.display = 'none';
 
         var wrap = document.createElement('div');
         wrap.id = 'maintenance-screen';
@@ -1696,7 +1887,7 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=101"></script>
+<script src="modules/member-settings.module.js?v=102"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
 <script src="modules/democracy.module.js?v=14"></script>
 <script src="modules/gift.module.js?v=100"></script>

@@ -1,10 +1,13 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v101
+ * 模組：成員設定管理 (memberSettings)  ─ v102
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
  * v101 變更（系統 v1.0.0）：帳號名稱與備註改以 escAttr 輸出。
  *          註冊時的「你是誰？」會寫入備註，須防止註冊者塞入 HTML。
+ * v102 變更（系統 v1.1.0）：新增第五分頁「📜 讀取紀錄」（creator / senior），
+ *          顯示 usage_logs 最近 50 筆，一次性讀取、不做即時監聽；
+ *          「任務完成統整」查詢後寫入一筆讀取紀錄（core.logUsage）。
  *
  * 內含三個分頁：
  *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
@@ -24,11 +27,16 @@
         { key: 'perm',   label: '👥 成員權限', roles: ['creator', 'senior', 'admin'] },
         { key: 'sales',  label: '⚙️ 標籤選單', roles: ['creator', 'senior'] },
         { key: 'assign', label: '👤 指派帳號', roles: ['creator', 'senior'] },
-        { key: 'stats',  label: '📊 任務完成統整', roles: ['creator', 'senior'] }
+        { key: 'stats',  label: '📊 任務完成統整', roles: ['creator', 'senior'] },
+        { key: 'logs',   label: '📜 讀取紀錄', roles: ['creator', 'senior'] }     // v102
     ];
 
     // v96：統整區間超過此天數會先提示（原在 index.html）
     var STATS_WARN_DAYS = 92;
+
+    // v102：讀取紀錄一次讀取的筆數（固定上限，紀錄再多，每次開啟的讀取量都不會變大）與紅字門檻
+    var LOGS_LIMIT = 50;
+    var LOGS_WARN_COUNT = 500;
 
     /* ---------- CSS（全部收斂在 #memberSettingsView 內） ---------- */
     var CSS = `
@@ -127,6 +135,16 @@
     #memberSettingsView .stat-track { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
     #memberSettingsView .stat-fill { height: 100%; background: var(--primary); }
 
+    /* ⑤ 讀取紀錄（v102） */
+    #memberSettingsView .logs-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 900px; margin-bottom: 10px; flex-wrap: wrap; }
+    #memberSettingsView .logs-info { font-size: 0.8rem; color: var(--text-light); }
+    #memberSettingsView .logs-wrap { max-width: 900px; overflow-x: auto; border: 1px solid #eee; border-radius: 8px; }
+    #memberSettingsView .logs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
+    #memberSettingsView .logs-table th, #memberSettingsView .logs-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; text-align: left; }
+    #memberSettingsView .logs-table th { background: #f9fafb; color: #6b7280; font-weight: 600; }
+    #memberSettingsView .logs-table td.num { text-align: right; }
+    #memberSettingsView .logs-table tr.heavy td { color: var(--danger); font-weight: 700; }
+
     /* ③ 指派帳號 */
     #memberSettingsView .assign-section { border: 1px solid #eee; padding: 12px; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
     #memberSettingsView .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
@@ -219,6 +237,16 @@
             <div class="ms-body stats-result-area" id="statsResultDisplay"></div>
         </div>
 
+        <!-- ⑤ 讀取紀錄（v102） -->
+        <div class="ms-panel" id="msPanel-logs">
+            <div class="ms-panel-desc">記錄會大量讀取資料庫的操作（搜尋任務、任務完成統整、清除舊任務）。收到 Firestore 讀取警報時，可在此查看是誰、何時、讀了多少筆。單次超過 500 筆以紅字標示。</div>
+            <div class="logs-head">
+                <div class="logs-info" id="msLogsInfo"></div>
+                <button class="btn btn-save" onclick="MemberSettingsModule.loadUsageLogs()">重新整理</button>
+            </div>
+            <div class="ms-body" id="msLogsDisplay"></div>
+        </div>
+
         <!-- ③ 指派帳號 -->
         <div class="ms-panel" id="msPanel-assign">
             <!-- v97：說明文字與儲存按鈕同一行，總寬對齊下方區塊的 900px -->
@@ -284,6 +312,7 @@
         else if (key === 'sales') renderSales();
         else if (key === 'assign') renderAssignRules();
         else if (key === 'stats') initStats();
+        else if (key === 'logs') loadUsageLogs();
     }
 
     /* =================================================================
@@ -724,11 +753,56 @@
                     data.id = d.id;
                     return data;
                 });
+                core.logUsage('任務完成統整', start + ' ~ ' + end, snap.size);   // v102：統整沒有快取，每次查詢都記
                 renderStats(tasks, selectedUser, span);
             })
             .catch(function (e) {
                 console.error('[stats] 查詢失敗:', e);
                 display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">查詢失敗：' + (e.message || e.code) + '</div>';
+            });
+    }
+
+    /* =================================================================
+     * ⑤ 讀取紀錄（v102）
+     *   一次性 .get() 最近 LOGS_LIMIT 筆；不用 onSnapshot，避免分頁開著時
+     *   每新增一筆紀錄就重讀。`at` 為本地時間字串 YYYY-MM-DD HH:mm:ss，
+     *   單一欄位排序不需要複合索引。
+     * ================================================================= */
+    function loadUsageLogs() {
+        var display = document.getElementById('msLogsDisplay');
+        var info = document.getElementById('msLogsInfo');
+        if (!display) return;
+        display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--primary);">⏳ 讀取中...</div>';
+
+        core.db.collection('usage_logs')
+            .orderBy('at', 'desc')
+            .limit(LOGS_LIMIT)
+            .get()
+            .then(function (snap) {
+                var now = new Date();
+                info.innerText = '最近 ' + LOGS_LIMIT + ' 筆（共讀取 ' + snap.size + ' 筆）　更新於 ' +
+                                 now.getHours() + ':' + ('0' + now.getMinutes()).slice(-2);
+                if (snap.empty) {
+                    display.innerHTML = '<div style="text-align:center; padding:24px; color:#9ca3af;">目前沒有讀取紀錄</div>';
+                    return;
+                }
+                var rows = snap.docs.map(function (d) {
+                    var r = d.data();
+                    var heavy = (r.count || 0) > LOGS_WARN_COUNT;
+                    return '<tr' + (heavy ? ' class="heavy"' : '') + '>' +
+                        '<td>' + core.escAttr(r.at) + '</td>' +
+                        '<td>' + core.escAttr(core.getUserDisplayName(r.user)) + '</td>' +
+                        '<td>' + core.escAttr(r.action) + '</td>' +
+                        '<td>' + core.escAttr(r.range) + '</td>' +
+                        '<td class="num">' + (r.count || 0) + '</td></tr>';
+                }).join('');
+                display.innerHTML = '<div class="logs-wrap"><table class="logs-table">' +
+                    '<thead><tr><th>時間</th><th>帳號</th><th>操作</th><th>區間</th><th class="num" style="text-align:right;">讀取筆數</th></tr></thead>' +
+                    '<tbody>' + rows + '</tbody></table></div>';
+            })
+            .catch(function (e) {
+                console.error('[usage_logs] 讀取失敗:', e);
+                display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">讀取失敗：' + core.escAttr(e.message || e.code) + '</div>';
             });
     }
 
@@ -859,6 +933,7 @@
         deleteSales: deleteSales,
         saveAssignRules: saveAssignRules,
         updateStats: updateStats,
+        loadUsageLogs: loadUsageLogs,       // v102
         openQuickPerm: openQuickPerm,
         closeQuickPerm: closeQuickPerm,
         applyQuickPerm: applyQuickPerm
