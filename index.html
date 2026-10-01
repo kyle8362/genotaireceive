@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.1.0 Modular · 介面優化)</title>
+    <title>中區收送件進度追蹤系統 (v1.2.0 Modular · 通知中心)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -216,6 +216,37 @@
         @keyframes view-in-r { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
         @keyframes view-in-l { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
 
+        /* v1.2.0：通知中心 — 紅色數字、電腦版側邊欄 🔔 與提示泡泡、信箱列表 */
+        .mtab-badge { position: absolute; top: 3px; left: calc(50% + 4px); min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #ef4444; color: #fff; font-size: 0.66rem; font-weight: 700; line-height: 18px; text-align: center; display: none; }
+        .mtab-badge.show { display: block; }
+        .notif-bell-wrap { margin-left: auto; position: relative; flex-shrink: 0; }
+        /* 電腦版鈴鐺：無外框、放大；滑鼠移上去放大＋搖一下（減少動態效果時只放大） */
+        .notif-bell { position: relative; width: 40px; height: 40px; border: 0; background: none; font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0; transition: transform .15s; }
+        .notif-bell:hover { transform: scale(1.15); }
+        .notif-bell:hover .notif-bell-ico { animation: bell-ring .6s ease-in-out; }
+        .notif-bell:active { transform: scale(.95); }
+        .notif-bell:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
+        .notif-bell-ico { display: inline-block; transform-origin: 50% 10%; }
+        @keyframes bell-ring { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(16deg); } 40% { transform: rotate(-14deg); } 60% { transform: rotate(9deg); } 80% { transform: rotate(-5deg); } }
+        @media (prefers-reduced-motion: reduce) { .notif-bell:hover .notif-bell-ico { animation: none; } }
+        .notif-bell .mtab-badge { top: 0; left: auto; right: -4px; }
+        .notif-head { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 12px; }
+        .notif-head h3 { margin: 0; }
+        .notif-back { display: none; border: 0; background: none; font-size: 1.9rem; line-height: 1; padding: 0 8px 0 0; cursor: pointer; color: var(--text-main); font-family: inherit; }
+        .notif-bubble { display: none; position: absolute; top: calc(100% + 8px); right: -4px; background: #ef4444; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 20; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        .notif-bubble::before { content: ""; position: absolute; top: -5px; right: 14px; border: 5px solid transparent; border-top: 0; border-bottom-color: #ef4444; }
+        .notif-bubble.show { display: block; }
+        .notif-list { max-height: 60vh; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+        .notif-item { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 8px; background: #fff; cursor: pointer; text-align: left; width: 100%; font-family: inherit; }
+        .notif-item:hover { border-color: var(--primary); background: #f0fdfa; }
+        .notif-item-ico { font-size: 1.3rem; line-height: 1.2; flex-shrink: 0; }
+        .notif-item-main { min-width: 0; flex: 1; }
+        .notif-item-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
+        .notif-item-body { color: var(--text-light); font-size: 0.82rem; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+        .notif-item-time { color: #9ca3af; font-size: 0.72rem; margin-top: 4px; }
+        .notif-empty { text-align: center; color: #9ca3af; padding: 28px 0; }
+        .notif-detail-body { white-space: pre-wrap; word-break: break-word; line-height: 1.6; color: var(--text-main); }
+
         /* v1.1.0：任務載入中的骨架畫面 */
         .sk-block { background: linear-gradient(90deg, #eef2f6 25%, #f8fafc 37%, #eef2f6 63%); background-size: 400% 100%; animation: sk-shimmer 1.4s ease infinite; }
         .sk-title { height: 18px; width: 140px; border-radius: 6px; margin: 6px 0 12px; }
@@ -223,6 +254,7 @@
         @keyframes sk-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
         @media (prefers-reduced-motion: reduce) { .sk-block { animation: none; } .mtab-pill, .mtab .mtab-ico { transition: none; } }
         @media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+            #notifModal .modal-card, #notifDetailModal .modal-card { animation: view-in-r .22s cubic-bezier(.2, .8, .2, 1) both; }   /* v1.2.0 */
             .view-section.view-enter-r > :not(.fab) { animation: view-in-r .22s cubic-bezier(.2, .8, .2, 1) both; }
             .view-section.view-enter-l > :not(.fab) { animation: view-in-l .22s cubic-bezier(.2, .8, .2, 1) both; }
         }
@@ -299,6 +331,18 @@
             /* v1.1.0：底部 Tab bar；前三個入口已在 Tab bar 上，側邊欄不重複顯示（按鈕有 JS inline display，故用 !important） */
             #mobileTabBar { display: flex; position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); height: 58px; box-sizing: border-box; padding: 5px; gap: 4px; background: #fff; border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); z-index: 850; }
             #btnTabTasks, #tempTasksBtn, #btnTabCustomers, .sidebar-fixed hr { display: none !important; }
+            .notif-bell-wrap { display: none; }   /* v1.2.0：手機版的 🔔 在 Tab bar 上 */
+
+            /* v1.2.0：手機版通知信箱／全文改為全螢幕頁面（參考 FB、IG），由右滑入。
+               底部留給 Tab bar（z-index 840 < Tab bar 850），讓 🔔 那格亮著、點其他 Tab 直接離開 */
+            #notifModal, #notifDetailModal { background: var(--bg); align-items: stretch; justify-content: stretch; z-index: 840;
+                bottom: calc(58px + 10px + env(safe-area-inset-bottom)); height: auto; }
+            #notifModal .modal-card, #notifDetailModal .modal-card { width: 100%; max-width: 100%; max-height: none; height: 100%; border-radius: 0; box-shadow: none; box-sizing: border-box;
+                padding: calc(14px + env(safe-area-inset-top)) 16px 16px; display: flex; flex-direction: column; background: var(--bg); }
+            #notifModal .notif-list { max-height: none; flex: 1; min-height: 0; }
+            #notifModal .modal-btns, #notifDetailModal .modal-btns { display: none; }   /* 改用左上「‹」返回 */
+            .notif-back { display: block; }
+            #notifDetailModal .notif-detail-body { flex: 1; overflow-y: auto; }
 
             /* v87：手機版日期列與搜尋面板 */
             .task-date-bar { gap: 6px; }
@@ -336,6 +380,11 @@
                     <div class="logout-link" onclick="window.logout()">登出帳號</div>
                     <div id="appVersionLabel" style="font-size:0.72rem; color:#9ca3af; margin-top:3px;"></div>
                 </div>
+                <!-- v1.2.0：電腦版通知入口（手機版改在 Tab bar） -->
+                <span class="notif-bell-wrap">
+                    <button type="button" class="notif-bell" id="notifBell" onclick="openNotifMailbox()" title="通知" aria-label="通知"><span class="notif-bell-ico">🔔</span><span class="mtab-badge" id="notifBellBadge"></span></button>
+                    <span class="notif-bubble" id="notifBubble">尚未讀取通知</span>
+                </span>
             </div>
 
             <button class="sidebar-btn btn-nav-active" id="btnTabTasks" onclick="window.switchTab('tasks')">📋 任務看板</button>
@@ -444,6 +493,7 @@
         <button type="button" class="mtab" data-tab="tasks" onclick="window.switchTab('tasks')"><span class="mtab-ico">📋</span>任務看板</button>
         <button type="button" class="mtab" data-tab="tempTasks" onclick="window.switchTab('tempTasks')"><span class="mtab-ico">🚨</span>臨時收件</button>
         <button type="button" class="mtab" data-tab="customers" onclick="window.switchTab('customers')"><span class="mtab-ico">🏢</span>客戶查詢</button>
+        <button type="button" class="mtab" data-tab="notify" onclick="openNotifMailbox()"><span class="mtab-ico">🔔</span>通知<span class="mtab-badge" id="mtabNotifBadge"></span></button>   <!-- v1.2.0 -->
         <button type="button" class="mtab" data-tab="more" onclick="toggleSidebar()"><span class="mtab-ico">☰</span>更多</button>
     </nav>
 </div>
@@ -478,6 +528,35 @@
         <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">👤 指派任務給...</h3>
         <ul class="assign-list" id="assignUserList"></ul>
         <div class="modal-btns"><button class="btn btn-cancel" onclick="document.getElementById('assignModal').style.display='none'">取消</button></div>
+    </div>
+</div>
+
+<!-- v1.2.0：通知信箱（遊戲信件：只放未讀，點開即從自己的信箱消失） -->
+<div class="modal-overlay" id="notifModal">
+    <div class="modal-card" style="width: 420px;">
+        <div class="notif-head"><button type="button" class="notif-back" onclick="closeNotifMailbox()" aria-label="返回">‹</button><h3>🔔 通知信箱</h3></div>
+        <div class="notif-list" id="notifList"></div>
+        <div class="modal-btns"><button class="btn btn-cancel" onclick="closeNotifMailbox()">關閉</button></div>
+    </div>
+</div>
+<!-- v1.2.0：手動通知全文 -->
+<div class="modal-overlay" id="notifDetailModal">
+    <div class="modal-card" style="width: 420px;">
+        <div class="notif-head"><button type="button" class="notif-back" onclick="closeNotifDetail()" aria-label="返回">‹</button><h3 id="notifDetailTitle"></h3></div>
+        <div class="notif-item-time" id="notifDetailMeta" style="margin:-4px 0 12px;"></div>
+        <div class="notif-detail-body" id="notifDetailBody"></div>
+        <div class="modal-btns"><button class="btn btn-save" onclick="closeNotifDetail()">關閉</button></div>
+    </div>
+</div>
+<!-- v1.2.0：每天第一次進入系統的未讀提醒 -->
+<div class="modal-overlay" id="notifPromptModal">
+    <div class="modal-card" style="width: 340px; text-align:center;">
+        <div style="font-size:2.2rem;">🔔</div>
+        <div id="notifPromptText" style="font-size:1rem; line-height:1.6; margin-top:6px;"></div>
+        <div class="modal-btns" style="justify-content:center;">
+            <button class="btn btn-cancel" onclick="document.getElementById('notifPromptModal').style.display='none'">稍後</button>
+            <button class="btn btn-save" onclick="document.getElementById('notifPromptModal').style.display='none'; openNotifMailbox();">立即查看</button>
+        </div>
     </div>
 </div>
 
@@ -565,7 +644,8 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.1.0';   // v1.1.0：UX 調整（方案 C 卡片、Tab bar、骨架畫面、16px 輸入框、100dvh、Enter 登入）＋讀取紀錄
+    const APP_VERSION = '1.2.0';   // v1.2.0：通知中心（遊戲信件、手動發布、民主聖地自動通知、發布紀錄）＋民主聖地 LINE 文字
+                                   // v1.1.0：UX 調整（方案 C 卡片、Tab bar、骨架畫面、16px 輸入框、100dvh、Enter 登入）＋讀取紀錄
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
 
     // ---------- Firestore 讀取成本控制設定 ----------
@@ -714,6 +794,223 @@
             .catch(e => console.warn('[usage_logs] 寫入失敗（不影響使用）:', e.code || e.message));
     }
 
+    // ==========================================
+    // v1.2.0：通知中心（遊戲信件模式）
+    // ------------------------------------------
+    // notifications/{autoId}：title, body, kind(manual|announcement|vote|groupbuy), refId(民主聖地案件 id),
+    //   status(active|revoked|deleted), createdAt(YYYY-MM-DD HH:mm:ss), createdBy, showFrom / expireAt(YYYY-MM-DD HH:mm)
+    //   「已過期」不另存，由 expireAt 判斷。過期／撤回／案件刪除只改狀態不刪文件，發布紀錄才看得到；
+    //   文件由 cleanupNotifications() 依「超過 30 筆或超過 180 天、先達成者先刪」刪除，有效中的永不提早刪。
+    // notif_reads/{u_帳號}：username, readIds[] — 自己點開過的通知 id（點開一封就從自己的信箱消失）。
+    // 已讀紀錄不放在 users：users 有全員監聽，寫在那裡會讓 11 個人都重讀一次。
+    // ⚠️ 監聽器內只更新畫面，不寫入 Firestore。
+    // ==========================================
+    const NOTIF_LIMIT = 30;          // 監聽筆數 = 發布紀錄保留上限（已讀人數要算得到這 30 則）
+    const NOTIF_RECENT_DAYS = 30;    // 信箱只放最近 30 天的通知（新帳號也不會收到一大堆舊信）
+    const NOTIF_KEEP_DAYS = 180;
+    const NOTIF_KIND = {
+        manual:       { ico: '📣', label: '手動' },
+        announcement: { ico: '📢', label: '公告', screen: 'home' },
+        vote:         { ico: '🗳️', label: '投票', screen: 'vote' },
+        groupbuy:     { ico: '🛒', label: '團購', screen: 'groupbuy' }
+    };
+    let unsubNotifs = null;
+    let notifSnapReady = false, notifReadsReady = false, notifPromptChecked = false, initAppAt = 0;
+    state.notifs = [];
+    state.notifReadIds = null;       // null = 尚未讀到自己的已讀紀錄（不判斷未讀，避免誤報）
+
+    function nowMinuteStr() {
+        const d = new Date(), p = n => String(n).padStart(2, '0');
+        return formatDateLocal(d) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+    function notifReadDocId(name) { return 'u_' + String(name).replace(/\//g, '_'); }   // 文件 id 不可含 /
+
+    // 狀態：active（顯示中）／scheduled（尚未開始）／expired／revoked／deleted
+    function notifStatus(n, now) {
+        now = now || nowMinuteStr();
+        if (n.status === 'revoked') return 'revoked';
+        if (n.status === 'deleted') return 'deleted';
+        if (n.expireAt && now >= n.expireAt) return 'expired';
+        if (n.showFrom && now < n.showFrom) return 'scheduled';
+        return 'active';
+    }
+    // 這則通知該給誰看：已核准帳號；民主聖地的通知只給有 democracy 權限的人（看不到頁面的人不算未讀）
+    function notifAudience(n) {
+        return state.users.filter(u => u.isApproved && (n.kind === 'manual' || getPermsFor(u).democracy !== false));
+    }
+    function myUnreadNotifs() {
+        if (!state.currentUser || state.notifReadIds === null) return [];
+        const now = nowMinuteStr(), cutoff = shiftDateStr(getTodayStr(), -NOTIF_RECENT_DAYS);
+        const canDemo = canAccess('democracy');
+        return state.notifs.filter(n =>
+            notifStatus(n, now) === 'active' &&
+            (n.createdAt || '').slice(0, 10) >= cutoff &&
+            (n.kind === 'manual' || canDemo) &&
+            !state.notifReadIds.includes(n.id));
+    }
+
+    function subscribeNotifications() {
+        if (unsubNotifs || !state.currentUser) return;
+        initAppAt = Date.now();
+        // 多聽 1 筆：回來的筆數 ≤ 30 時，代表資料庫裡的通知已全部在手上，才能安全清理 readIds
+        unsubNotifs = db.collection('notifications').orderBy('createdAt', 'desc').limit(NOTIF_LIMIT + 1)
+            .onSnapshot(snap => {
+                state.notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (!snap.metadata.fromCache) notifSnapReady = true;
+                renderNotifUI();
+                maybePromptNotifs();
+            }, err => console.warn('[notifications] 監聽失敗（不影響使用）:', err.code || err.message));
+        db.collection('notif_reads').doc(notifReadDocId(state.currentUser.name)).get()
+            .then(doc => {
+                state.notifReadIds = (doc.exists && doc.data().readIds) || [];
+                notifReadsReady = !doc.metadata.fromCache;
+                renderNotifUI();
+                maybePromptNotifs();
+            })
+            .catch(e => { console.warn('[notif_reads] 讀取失敗:', e.code || e.message); state.notifReadIds = []; renderNotifUI(); });
+    }
+
+    function renderNotifUI() {
+        const n = myUnreadNotifs().length, txt = n > 99 ? '99+' : String(n);
+        ['mtabNotifBadge', 'notifBellBadge'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = txt; el.classList.toggle('show', n > 0); }
+        });
+        const bubble = document.getElementById('notifBubble');
+        if (bubble) bubble.classList.toggle('show', n > 0);
+        if (document.getElementById('notifModal').style.display === 'flex') renderNotifList();
+    }
+
+    function renderNotifList() {
+        const list = myUnreadNotifs(), box = document.getElementById('notifList');
+        if (!list.length) { box.innerHTML = '<div class="notif-empty">📭 信箱是空的，沒有未讀通知</div>'; return; }
+        box.innerHTML = list.map(n => {
+            const k = NOTIF_KIND[n.kind] || NOTIF_KIND.manual;
+            return `<button type="button" class="notif-item" onclick="openNotif('${n.id}')">` +
+                `<span class="notif-item-ico">${k.ico}</span><span class="notif-item-main">` +
+                `<div class="notif-item-title">${escAttr(n.title)}</div>` +
+                (n.body ? `<div class="notif-item-body">${escAttr(n.body)}</div>` : '') +
+                `<div class="notif-item-time">${escAttr((n.createdAt || '').slice(5, 16))}　${escAttr(getUserDisplayName(n.createdBy || ''))}</div>` +
+                `</span></button>`;
+        }).join('');
+    }
+    // 手機版信箱是「全螢幕頁面」：開著時 Tab bar 的 🔔 亮起，再點一次 🔔 或點其他 Tab 就離開
+    function isNotifPageOpen() {
+        return document.getElementById('notifModal').style.display === 'flex' ||
+               document.getElementById('notifDetailModal').style.display === 'flex';
+    }
+    function openNotifMailbox() {
+        if (MOBILE_MQ.matches && isNotifPageOpen()) { closeNotifPages(); return; }
+        document.getElementById('notifDetailModal').style.display = 'none';
+        renderNotifList();
+        document.getElementById('notifModal').style.display = 'flex';
+        updateTabBar();
+    }
+    function closeNotifMailbox() { document.getElementById('notifModal').style.display = 'none'; updateTabBar(); }
+    function closeNotifDetail() { document.getElementById('notifDetailModal').style.display = 'none'; updateTabBar(); }
+    function closeNotifPages() {
+        document.getElementById('notifModal').style.display = 'none';
+        document.getElementById('notifDetailModal').style.display = 'none';
+        updateTabBar();
+    }
+
+    // 點開一封：先從畫面移除（樂觀更新），再寫入已讀；寫入失敗也不影響這次的畫面
+    function openNotif(id) {
+        const n = state.notifs.find(x => x.id === id);
+        if (!n) return;
+        markNotifRead(id);
+        closeNotifMailbox();
+        const k = NOTIF_KIND[n.kind];
+        if (k && k.screen) {
+            switchTab('democracy');
+            if (state.activeTab === 'democracy' && window.DemocracyModule) window.DemocracyModule.go(k.screen);
+        } else {
+            document.getElementById('notifDetailTitle').textContent = n.title || '';
+            document.getElementById('notifDetailMeta').textContent = (n.createdAt || '').slice(0, 16) + '　' + getUserDisplayName(n.createdBy || '');
+            document.getElementById('notifDetailBody').textContent = n.body || '';
+            document.getElementById('notifDetailModal').style.display = 'flex';
+            updateTabBar();
+        }
+    }
+    function markNotifRead(id) {
+        if (!state.currentUser || !state.notifReadIds || state.notifReadIds.includes(id)) return;
+        state.notifReadIds.push(id);
+        renderNotifUI();
+        const FV = firebase.firestore.FieldValue, ref = db.collection('notif_reads').doc(notifReadDocId(state.currentUser.name));
+        ref.set({ username: state.currentUser.name, readIds: FV.arrayUnion(id) }, { merge: true })
+            .then(() => {
+                // 順便清掉已經不存在的通知 id（只依「文件已被刪除」清，不依過期清，否則發布紀錄的已讀人數會變少）
+                if (!notifSnapReady || state.notifs.length > NOTIF_LIMIT) return;   // 手上的不是完整清單 → 不清
+                const alive = new Set(state.notifs.map(x => x.id));
+                const stale = state.notifReadIds.filter(x => !alive.has(x));
+                if (!stale.length) return;
+                state.notifReadIds = state.notifReadIds.filter(x => alive.has(x));
+                return ref.update({ readIds: FV.arrayRemove(...stale) });
+            })
+            .catch(e => console.warn('[notif_reads] 寫入失敗:', e.code || e.message));
+    }
+
+    // 每天第一次進入（每台裝置各算一次）有未讀就提醒。
+    // 等通知與已讀紀錄都拿到伺服器資料才判斷；並排在清除舊任務（登入 4 秒後、會跳 confirm）之後。
+    function maybePromptNotifs() {
+        if (notifPromptChecked || !notifSnapReady || !notifReadsReady) return;
+        notifPromptChecked = true;
+        const key = 'tt_notif_prompt_' + state.currentUser.name, today = getTodayStr();
+        if (localStorage.getItem(key) === today) return;
+        setTimeout(() => {
+            if (document.getElementById('force-update-screen')) return;
+            const n = myUnreadNotifs().length;
+            if (!n) return;
+            localStorage.setItem(key, today);
+            const where = MOBILE_MQ.matches ? '下方' : '左上角';
+            document.getElementById('notifPromptText').innerHTML =
+                `您還有 <b style="color:#ef4444;">${n}</b> 則訊息尚未讀取，<br>請盡快點選${where} 🔔 查看`;
+            document.getElementById('notifPromptModal').style.display = 'flex';
+        }, Math.max(0, initAppAt + 4500 - Date.now()));
+    }
+
+    // 給模組使用：發布通知（member-settings 手動發布、democracy 新案件自動發布）
+    function createNotification(opts) {
+        const d = new Date(), p = n => String(n).padStart(2, '0');
+        const createdAt = formatDateLocal(d) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+        return db.collection('notifications').add({
+            title: opts.title || '', body: opts.body || '', kind: opts.kind || 'manual', refId: opts.refId || null,
+            status: 'active', createdAt, createdBy: state.currentUser ? state.currentUser.name : '',
+            showFrom: opts.showFrom || null, expireAt: opts.expireAt || null
+        });
+    }
+    // 民主聖地案件刪除時：對應通知改為「案件已刪除」（保留給發布紀錄）
+    function markNotificationsDeleted(refId) {
+        if (!refId) return Promise.resolve();
+        return db.collection('notifications').where('refId', '==', refId).get().then(snap => {
+            if (snap.empty) return;
+            const batch = db.batch();
+            snap.docs.forEach(d => batch.update(d.ref, { status: 'deleted' }));
+            return batch.commit();
+        }).catch(e => console.warn('[notifications] 標記刪除失敗:', e.code || e.message));
+    }
+    function revokeNotification(id) {
+        return db.collection('notifications').doc(id).update({ status: 'revoked' });
+    }
+
+    // 每日清理（creator／senior，與清除舊任務同一個每日時機）：
+    // 超過 180 天，或排在第 30 筆之後，且已不在有效期間（過期／撤回／已刪除）→ 刪除文件
+    async function cleanupNotifications() {
+        const snap = await db.collection('notifications').orderBy('createdAt', 'desc').limit(200).get();
+        const now = nowMinuteStr(), cutoff = shiftDateStr(getTodayStr(), -NOTIF_KEEP_DAYS);
+        const del = snap.docs.filter((d, i) => {
+            const n = d.data(), s = notifStatus(n, now);
+            if (s === 'active' || s === 'scheduled') return false;           // 有效中（含尚未開始）永不提早刪
+            return i >= NOTIF_LIMIT || (n.createdAt || '').slice(0, 10) < cutoff;
+        });
+        if (!del.length) return 0;
+        const batch = db.batch();
+        del.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        console.info('[notifications] 已清理 ' + del.length + ' 筆');
+        return del.length;
+    }
+
     // 分頁 key → 是否可進入
     function canAccessView(viewKey) {
         if (viewKey === 'tasks') return canAccess('tasks');
@@ -747,6 +1044,8 @@
         getPermissionItems, getPermsFor, canAccess, canAccessView,
         isViewOnly, denyViewOnly,
         logUsage,                                        // v1.1.0
+        createNotification, markNotificationsDeleted, revokeNotification,   // v1.2.0：通知中心
+        notifStatus, notifAudience, notifReadDocId, NOTIF_KIND, NOTIF_LIMIT,
         switchTab: (k) => switchTab(k),
         renderTasks: () => { if (state.activeTab === 'tasks') renderTasks(); },
 
@@ -1120,6 +1419,8 @@
 
         const prevTab = state.activeTab;   // v1.1.0：判斷滑入方向用
         state.activeTab = tab;
+        document.getElementById('notifModal').style.display = 'none';         // v1.2.0：點其他 Tab 就離開通知頁
+        document.getElementById('notifDetailModal').style.display = 'none';
 
         // 1) 全部隱藏
         document.getElementById('taskView').classList.remove('active');
@@ -1181,10 +1482,12 @@
         const bar = document.getElementById('mobileTabBar');
         if (!bar) return;
         const onMainTab = ['tasks', 'tempTasks', 'customers'].includes(state.activeTab);
+        const notifOpen = isNotifPageOpen();   // v1.2.0：通知頁開著時只亮 🔔
         bar.querySelectorAll('.mtab').forEach(btn => {
             const key = btn.dataset.tab;
-            if (key !== 'more') btn.style.display = canAccessView(key) ? '' : 'none';
-            btn.classList.toggle('is-active', key === 'more' ? !onMainTab : key === state.activeTab);
+            if (key !== 'more' && key !== 'notify') btn.style.display = canAccessView(key) ? '' : 'none';   // 🔔 與「更多」永遠顯示
+            btn.classList.toggle('is-active', key === 'notify' ? notifOpen
+                : notifOpen ? false : key === 'more' ? !onMainTab : key === state.activeTab);
         });
         positionTabPill();
     }
@@ -1601,6 +1904,8 @@
         purgeOldTasks({ confirm: PURGE_CONFIRM })
             .then(n => { if (n > 0) alert('已清除 ' + n + ' 筆超過 ' + PURGE_AFTER_DAYS + ' 天的舊任務。'); })
             .catch(e => console.warn('[purge] 執行失敗（不影響使用）:', e));
+        cleanupNotifications()                                          // v1.2.0：同一個每日時機，靜默執行
+            .catch(e => console.warn('[notifications] 清理失敗（不影響使用）:', e.code || e.message));
     }
 
     // 供 Console 手動執行：purgeOldTasksNow()
@@ -1695,6 +2000,7 @@
         AppCore.emit('user:login', state.currentUser);
         handleSearchRangeChange();                  // 初始化搜尋區間提示
         setTimeout(maybeRunAutoPurge, 4000);        // 延遲執行，不與初始載入搶資源
+        subscribeNotifications();                   // v1.2.0：通知中心（未讀提醒排在清除舊任務之後）
     }
 
     function updateUIForRole() {
@@ -1734,6 +2040,7 @@
         if (btnCust) btnCust.style.display = canAccess('customers') ? 'block' : 'none';
 
         updateTabBar();   // v1.1.0：登入後與權限即時變更（users 監聽）時都會經過這裡
+        renderNotifUI();  // v1.2.0：民主聖地權限變更會影響未讀數
     }
 
     // ==========================================
@@ -1887,9 +2194,9 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=102"></script>
+<script src="modules/member-settings.module.js?v=103"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
-<script src="modules/democracy.module.js?v=14"></script>
+<script src="modules/democracy.module.js?v=15"></script>
 <script src="modules/gift.module.js?v=100"></script>
 
 <script>

@@ -1,11 +1,18 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v14
+ * 模組：中區的民主聖地 (democracy)  ─ v15
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
  *   2. 文具購買登記（常用品項、自動儲存、管理員開單鎖單與統整輸出）
  *   3. 投票問卷區（單選／多選／自填／備註、記名投票、統計與 LINE 文字）
  *   4. 團購 GOGO（多品項、我要 +1、管理員統整輸出）
+ *
+ * v15：LINE 分享文字定案（使用者指定格式）
+ *      - 投票開案通知：只留標題、投票方式、截止時間（拿掉說明與選項）
+ *      - 新增團購「複製開團通知」、公告「複製 LINE」
+ *      - 手機版首頁管理列「文具登記設定」顯示為「文具設定」
+ *      - 系統 v1.2.0 通知中心：新公告／新投票／新團購自動發通知（notifyNew），
+ *        刪除案件時通知改為「案件已刪除」（core.markNotificationsDeleted）；文具不發
  *
  * 連自己的 Firebase 專案（gbt-central-democracy），不動 AppCore.db。
  * 權限：permKey = 'democracy'，全員預設可進入（大家都要登記文具），
@@ -185,6 +192,16 @@
         if (order.status === 'locked') return true;
         if (!order.deadline) return false;
         return Date.now() >= deadlineMs(order.deadline);
+    }
+
+    // v15：新公告／投票／團購建立成功後，發一則通知到系統的通知中心。
+    //      標題不加圖示：信箱與發布紀錄會依 kind 自動加上 📢／🗳️／🛒。
+    //      寫入「主資料庫」（core 提供），不是本模組的 democracyApp；失敗不影響案件本身。
+    //      只在新建時發，之後編輯不會同步更新通知內容（使用者已同意）。
+    function notifyNew(kind, refId, title, body, expireAt, showFrom) {
+        if (!core.createNotification) return;
+        core.createNotification({ kind: kind, refId: refId, title: title, body: body, expireAt: expireAt, showFrom: showFrom || null })
+            .catch(function (e) { console.warn('[democracy] 通知發布失敗（不影響案件）:', e.code || e.message); });
     }
 
     function copyText(text) {
@@ -451,7 +468,11 @@
         animation-name: demoPlusFloat; animation-duration: 1.2s; animation-timing-function: ease-out; animation-fill-mode: forwards; }
 
     /* --- 手機版 --- */
+    /* v15：按鈕長／短名稱，手機版顯示短名稱 */
+    #democracyView .demo-lbl-short { display: none; }
     @media (max-width: 768px) {
+        #democracyView .demo-lbl-long { display: none; }
+        #democracyView .demo-lbl-short { display: inline; }
         #democracyView .demo-head h1 { font-size: 1.25rem; }
         #democracyView .demo-grid { grid-template-columns: 1fr; }
         #democracyView .demo-card { padding: 12px; }
@@ -723,7 +744,7 @@
     function htmlAdminBar() {
         if (!isAdmin() || currentScreen !== 'home') return '';
         return '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'annAdmin\')">📢 公告管理</button>' +
-               '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ 文具登記設定</button>' +
+               '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'stAdmin\')">🖊️ <span class="demo-lbl-long">文具登記設定</span><span class="demo-lbl-short">文具設定</span></button>' +   // v15：手機版用短名稱
                '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'voteAdmin\')">🗳️ 投票管理</button>' +
                '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.go(\'gbAdmin\')">🛒 團購管理</button>';
     }
@@ -776,6 +797,7 @@
                      '<td>' + esc(core.getUserDisplayName(a.createdBy || '')) + '</td>' +
                      '<td><div class="demo-row">' +
                      '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.openAnnEditor(\'' + a.id + '\')">編輯</button>' +
+                     '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.copyAnnNotice(\'' + a.id + '\')">複製 LINE</button>' +   // v15
                      '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.toggleAnn(\'' + a.id + '\')">' +
                      (a.enabled === false ? '啟用' : '停用') + '</button>' +
                      '<button class="demo-btn demo-btn-danger demo-btn-sm" onclick="DemocracyModule.deleteAnn(\'' + a.id + '\')">刪除</button>' +
@@ -854,7 +876,10 @@
                 data.createdBy = myName();
                 data.createdAt = nowStr();
                 data.logs = [logLine('建立公告（' + (annEditType === 'vip' ? 'VIP框' : '跑馬燈') + '）')];
-                db.collection('announcements').add(data).catch(dbErr);
+                db.collection('announcements').add(data).then(function (ref) {
+                    notifyNew('announcement', ref.id, '新公告：' + data.title, data.body,
+                              data.endDate + ' 23:59', data.startDate + ' 00:00');   // v15：開始日才顯示
+                }).catch(dbErr);
             }
         });
     }
@@ -876,6 +901,7 @@
         if (!a) return;
         if (!confirm('確定刪除公告「' + a.title + '」？此動作無法復原。')) return;
         db.collection('announcements').doc(id).delete().catch(dbErr);
+        core.markNotificationsDeleted(id);                // v15：通知改為「案件已刪除」
     }
 
     function toggleOngoing() {
@@ -2149,6 +2175,7 @@
                 data.logs = [logLine('建立投票，截止 ' + deadline)];
                 db.collection('votes').add(data).then(function (ref) {
                     adminVoteId = ref.id;
+                    notifyNew('vote', ref.id, '新投票：' + data.title, '截止時間：' + deadline, deadline);   // v15
                 }).catch(dbErr);
             }
         });
@@ -2210,6 +2237,7 @@
         var v = viewingVote();
         if (!v) return;
         if (!confirm('確定刪除「' + (v.title || '投票案') + '」？所有人的投票內容會一起刪掉，無法復原。')) return;
+        core.markNotificationsDeleted(v.id);              // v15
         var vref = db.collection('votes').doc(v.id);
         vref.collection('ballots').get().then(function (snap) {
             var jobs = [];
@@ -2220,20 +2248,43 @@
     }
 
     /* ---------- LINE 分享文字 ---------- */
+    // v15：使用者指定格式 — 只留標題、投票方式、截止時間（不列說明與選項，請大家進系統看）
     function copyVoteNotice() {
         var v = viewingVote();
         if (!v) return;
-        var opts = voteOptions(v);
         var t = '【投票通知】' + (v.title || '投票案') + '\n';
-        if (v.desc) t += v.desc + '\n';
         t += '------------------------------\n';
-        t += '投票方式：' + (v.mode === 'multi' ? '可多選（不限幾項）' : '單選') + (v.allowCustom ? '，可自行填寫其他答案' : '') + '\n';
+        t += '投票方式：' + (v.mode === 'multi' ? '可多選（不限幾項）' : '單選') + '\n';
         t += '截止時間：' + (v.deadline || '未設定') + '\n';
-        t += '選項：\n';
-        for (var i = 0; i < opts.length; i++) t += '  ' + (i + 1) + '. ' + opts[i].text + '\n';
-        if (v.allowComment) t += '（可填寫備註意見）\n';
         t += '------------------------------\n';
-        t += '請進入公司系統的「中區的民主聖地 → 投票問卷區」投票，謝謝！';
+        t += '請盡快進入系統的「中區的民主聖地 → 投票問卷區」投票唷！';
+        copyText(t);
+    }
+
+    // v15：團購開團通知（使用者指定格式；不列品項與單價，也不列誰買了什麼）
+    function copyGbNotice() {
+        var g = viewingGb();
+        if (!g) return;
+        var t = '【團購通知】\n';
+        t += (g.title || '團購') + ' 開團囉~\n';
+        t += '趕快+1 加起來 ! !\n';
+        t += (g.deadline || '未設定') + ' 截止收單\n';
+        t += '------------------------------\n';
+        t += '請盡快進入系統的「中區的民主聖地 → 團購 GOGO」登記唷！';
+        copyText(t);
+    }
+
+    // v15：公告 LINE 文字（使用者指定格式；跑馬燈與 VIP 框一律用【中區公告】）
+    function copyAnnNotice(id) {
+        var a = null;
+        for (var i = 0; i < announcements.length; i++) if (announcements[i].id === id) { a = announcements[i]; break; }
+        if (!a) return;
+        var t = '【中區公告】' + (a.title || '') + '\n';
+        t += '------------------------------\n';
+        t += (a.body || '') + '\n';
+        t += '------------------------------\n';
+        t += '公告期間：' + (a.startDate || '—') + ' ~ ' + (a.endDate || '—') + '\n';
+        t += '詳情請見系統「中區的民主聖地」公告唷！';
         copyText(t);
     }
 
@@ -2597,7 +2648,14 @@
                  '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.openGbEditor(\'' + g.id + '\')">編輯內容</button>';
         }
         h += '<button class="demo-btn demo-btn-danger" onclick="DemocracyModule.deleteGb()">刪除這一團</button>';
-        h += '</div></div>';
+        h += '</div>';
+        // v15：開團中才顯示開團通知（已結束的團發開團通知沒有意義）
+        if (!locked) {
+            h += '<div class="demo-row" style="margin-top:12px;">' +
+                 '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyGbNotice()">複製開團通知（LINE）</button>' +
+                 '</div><div class="demo-muted" style="margin-top:8px;">複製後直接貼到 LINE 群組即可。</div>';
+        }
+        h += '</div>';
 
         if (!gbOrdersReady) return h + '<div class="demo-card"><div class="demo-empty">載入團購資料…</div></div>';
 
@@ -2822,7 +2880,10 @@
                 data.createdBy = myName();
                 data.createdAt = nowStr();
                 data.logs = [logLine('開團，截止 ' + deadline)];
-                db.collection('groupbuys').add(data).then(function (ref) { adminGbId = ref.id; }).catch(dbErr);
+                db.collection('groupbuys').add(data).then(function (ref) {
+                    adminGbId = ref.id;
+                    notifyNew('groupbuy', ref.id, '團購開團：' + data.title, '截止時間：' + deadline, deadline);   // v15
+                }).catch(dbErr);
             }
         });
     }
@@ -2958,6 +3019,7 @@
         var g = viewingGb();
         if (!g) return;
         if (!confirm('確定刪除「' + (g.title || '團購案') + '」？所有人的登記內容會一起刪掉，無法復原。')) return;
+        core.markNotificationsDeleted(g.id);              // v15
         var gref = db.collection('groupbuys').doc(g.id);
         gref.collection('orders').get().then(function (snap) {
             var jobs = [];
@@ -3300,6 +3362,8 @@
         deleteVote: deleteVote,
         copyVoteNotice: copyVoteNotice,
         copyVoteResult: copyVoteResult,
+        copyGbNotice: copyGbNotice,         // v15
+        copyAnnNotice: copyAnnNotice,       // v15
 
         openGb: openGb,
         gbSetQty: gbSetQty,

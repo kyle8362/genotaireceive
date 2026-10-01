@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v102
+ * 模組：成員設定管理 (memberSettings)  ─ v103
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -8,6 +8,9 @@
  * v102 變更（系統 v1.1.0）：新增第五分頁「📜 讀取紀錄」（creator / senior），
  *          顯示 usage_logs 最近 50 筆，一次性讀取、不做即時監聽；
  *          「任務完成統整」查詢後寫入一筆讀取紀錄（core.logUsage）。
+ * v103 變更（系統 v1.2.0）：新增分頁「📣 發布通知」（creator / senior / admin）：
+ *          手動發布通知（必填結束時間）＋發布紀錄（最近 30 筆、狀態、已讀 N／M、未讀名單、撤回）。
+ *          通知的資料規則集中在 core（index.html 的通知中心區塊），本模組只負責畫面。
  *
  * 內含三個分頁：
  *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
@@ -28,8 +31,14 @@
         { key: 'sales',  label: '⚙️ 標籤選單', roles: ['creator', 'senior'] },
         { key: 'assign', label: '👤 指派帳號', roles: ['creator', 'senior'] },
         { key: 'stats',  label: '📊 任務完成統整', roles: ['creator', 'senior'] },
-        { key: 'logs',   label: '📜 讀取紀錄', roles: ['creator', 'senior'] }     // v102
+        { key: 'logs',   label: '📜 讀取紀錄', roles: ['creator', 'senior'] },    // v102
+        { key: 'notify', label: '📣 發布通知', roles: ['creator', 'senior', 'admin'] }   // v103
     ];
+
+    // v103：發布紀錄的狀態文字（狀態本身由 core.notifStatus 判斷）
+    var NOTIF_STATUS_LABEL = {
+        active: '🟢 有效', scheduled: '🕒 尚未開始', expired: '⚪ 已過期', revoked: '⚫ 已撤回', deleted: '🔴 案件已刪除'
+    };
 
     // v96：統整區間超過此天數會先提示（原在 index.html）
     var STATS_WARN_DAYS = 92;
@@ -145,6 +154,18 @@
     #memberSettingsView .logs-table td.num { text-align: right; }
     #memberSettingsView .logs-table tr.heavy td { color: var(--danger); font-weight: 700; }
 
+    /* ⑥ 發布通知（v103） */
+    #memberSettingsView .notif-form { max-width: 900px; display: grid; gap: 10px; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 14px; margin-bottom: 18px; box-sizing: border-box; }
+    #memberSettingsView .notif-form label { display: block; font-size: 0.8rem; color: var(--text-light); margin-bottom: 3px; }
+    #memberSettingsView .notif-form input, #memberSettingsView .notif-form textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.9rem; }
+    #memberSettingsView .notif-form textarea { min-height: 80px; resize: vertical; }
+    #memberSettingsView .notif-form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    #memberSettingsView .notif-form-row > div { flex: 1 1 160px; }
+    #memberSettingsView .notif-sec-title { font-weight: 700; margin: 0 0 8px; max-width: 900px; }
+    #memberSettingsView .notif-read-btn { background: none; border: 1px solid #d1d5db; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-family: inherit; font-size: 0.8rem; }
+    #memberSettingsView .notif-read-btn:hover { border-color: var(--primary); color: var(--primary); }
+    #memberSettingsView .logs-table tr.notif-unread-row td { background: #fff7ed; color: #9a3412; white-space: normal; font-size: 0.82rem; }
+
     /* ③ 指派帳號 */
     #memberSettingsView .assign-section { border: 1px solid #eee; padding: 12px; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
     #memberSettingsView .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
@@ -247,6 +268,25 @@
             <div class="ms-body" id="msLogsDisplay"></div>
         </div>
 
+        <!-- ⑥ 發布通知（v103） -->
+        <div class="ms-panel" id="msPanel-notify">
+            <div class="ms-panel-desc">發布的通知會出現在全員的 🔔 信箱（遊戲信件：同仁點開後就從他的信箱消失），到結束時間自動下架。民主聖地的新公告、新投票、新團購會自動發布，也列在下方的發布紀錄。</div>
+            <div class="notif-form">
+                <div><label>標題（必填）</label><input type="text" id="msNotifTitle" maxlength="60" placeholder="例如：10/20 系統維護通知"></div>
+                <div><label>內容</label><textarea id="msNotifBody" placeholder="通知內容（可換行）"></textarea></div>
+                <div class="notif-form-row">
+                    <div><label>結束日期（必填）</label><input type="date" id="msNotifEndDate"></div>
+                    <div><label>結束時間</label><input type="time" id="msNotifEndTime" value="23:59"></div>
+                    <div style="flex:0 0 auto;"><button class="btn btn-save" id="msNotifPublishBtn" onclick="MemberSettingsModule.publishNotif()">發布通知</button></div>
+                </div>
+            </div>
+            <div class="logs-head">
+                <div class="notif-sec-title" style="margin:0;">發布紀錄 <span class="logs-info" id="msNotifInfo"></span></div>
+                <button class="btn btn-save" onclick="MemberSettingsModule.loadNotifHistory()">重新整理</button>
+            </div>
+            <div class="ms-body" id="msNotifDisplay"></div>
+        </div>
+
         <!-- ③ 指派帳號 -->
         <div class="ms-panel" id="msPanel-assign">
             <!-- v97：說明文字與儲存按鈕同一行，總寬對齊下方區塊的 900px -->
@@ -313,6 +353,7 @@
         else if (key === 'assign') renderAssignRules();
         else if (key === 'stats') initStats();
         else if (key === 'logs') loadUsageLogs();
+        else if (key === 'notify') loadNotifHistory();
     }
 
     /* =================================================================
@@ -806,6 +847,111 @@
             });
     }
 
+    /* =================================================================
+     * ⑥ 發布通知（v103）
+     *   發布紀錄＝notifications 最近 NOTIF_LIMIT 筆（＝保留上限）＋全員 notif_reads，
+     *   一次性 .get()（約 40 次讀取），按「重新整理」才重讀。
+     * ================================================================= */
+    function nowMinute() {
+        var d = new Date(), p = function (n) { return ('0' + n).slice(-2); };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    }
+
+    function publishNotif() {
+        if (core.denyViewOnly()) return;
+        var title = document.getElementById('msNotifTitle').value.trim();
+        var body = document.getElementById('msNotifBody').value.trim();
+        var date = document.getElementById('msNotifEndDate').value;
+        var time = document.getElementById('msNotifEndTime').value || '23:59';
+        if (!title) return alert('請填寫標題');
+        if (!date) return alert('請選擇結束日期');
+        var expireAt = date + ' ' + time;
+        if (expireAt <= nowMinute()) return alert('結束時間必須晚於現在');
+        if (!confirm('確定發布這則通知給全員？\n\n' + title + '\n結束時間：' + expireAt)) return;
+
+        var btn = document.getElementById('msNotifPublishBtn');
+        btn.disabled = true;
+        core.createNotification({ kind: 'manual', title: title, body: body, expireAt: expireAt })
+            .then(function () {
+                document.getElementById('msNotifTitle').value = '';
+                document.getElementById('msNotifBody').value = '';
+                btn.disabled = false;
+                alert('已發布');
+                loadNotifHistory();
+            })
+            .catch(function (e) {
+                btn.disabled = false;
+                alert('發布失敗：' + (e.message || e.code));
+            });
+    }
+
+    var notifUnreadNames = {};   // 發布紀錄中各通知的未讀名單（點「已讀 N／M」展開用）
+
+    function loadNotifHistory() {
+        var display = document.getElementById('msNotifDisplay');
+        var info = document.getElementById('msNotifInfo');
+        if (!display) return;
+        display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--primary);">⏳ 讀取中...</div>';
+
+        Promise.all([
+            core.db.collection('notifications').orderBy('createdAt', 'desc').limit(core.NOTIF_LIMIT).get(),
+            core.db.collection('notif_reads').get()
+        ]).then(function (res) {
+            var readsByUser = {};
+            res[1].forEach(function (d) { var r = d.data(); if (r.username) readsByUser[r.username] = r.readIds || []; });
+            var now = nowMinute();
+            var canRevoke = core.hasRole(['creator', 'senior', 'admin']);
+            notifUnreadNames = {};
+            info.innerText = '（最近 ' + core.NOTIF_LIMIT + ' 筆，共 ' + res[0].size + ' 筆）';
+            if (res[0].empty) {
+                display.innerHTML = '<div style="text-align:center; padding:24px; color:#9ca3af;">目前沒有發布紀錄</div>';
+                return;
+            }
+            var rows = res[0].docs.map(function (d) {
+                var n = d.data(); n.id = d.id;
+                var st = core.notifStatus(n, now);
+                var k = core.NOTIF_KIND[n.kind] || core.NOTIF_KIND.manual;
+                var aud = core.notifAudience(n);
+                var unread = aud.filter(function (u) { return (readsByUser[u.username] || []).indexOf(n.id) === -1; });
+                notifUnreadNames[n.id] = unread.map(function (u) { return core.getUserDisplayName(u.username); });
+                var ops = (canRevoke && (st === 'active' || st === 'scheduled'))
+                    ? '<button class="notif-read-btn" onclick="MemberSettingsModule.revokeNotif(\'' + n.id + '\')">撤回</button>' : '';
+                return '<tr>' +
+                    '<td>' + core.escAttr((n.createdAt || '').slice(5, 16)) + '</td>' +
+                    '<td>' + k.ico + ' ' + k.label + '</td>' +
+                    '<td style="white-space:normal; min-width:140px;">' + core.escAttr(n.title) + '</td>' +
+                    '<td>' + core.escAttr(core.getUserDisplayName(n.createdBy || '')) + '</td>' +
+                    '<td>' + core.escAttr((n.expireAt || '—').slice(5)) + '</td>' +
+                    '<td>' + NOTIF_STATUS_LABEL[st] + '</td>' +
+                    '<td><button class="notif-read-btn" onclick="MemberSettingsModule.toggleUnread(\'' + n.id + '\')">已讀 ' +
+                        (aud.length - unread.length) + '／' + aud.length + '</button></td>' +
+                    '<td>' + ops + '</td></tr>' +
+                    '<tr class="notif-unread-row" id="msUnread_' + n.id + '" style="display:none;"><td colspan="8"></td></tr>';
+            }).join('');
+            display.innerHTML = '<div class="logs-wrap"><table class="logs-table">' +
+                '<thead><tr><th>發布時間</th><th>來源</th><th>標題</th><th>發布者</th><th>結束時間</th><th>狀態</th><th>已讀</th><th></th></tr></thead>' +
+                '<tbody>' + rows + '</tbody></table></div>';
+        }).catch(function (e) {
+            console.error('[notifications] 發布紀錄讀取失敗:', e);
+            display.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">讀取失敗：' + core.escAttr(e.message || e.code) + '</div>';
+        });
+    }
+
+    function toggleUnread(id) {
+        var row = document.getElementById('msUnread_' + id);
+        if (!row) return;
+        var names = notifUnreadNames[id] || [];
+        row.firstChild.innerText = names.length ? '未讀（' + names.length + '）：' + names.join('、') : '全員都已讀 🎉';
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+
+    function revokeNotif(id) {
+        if (core.denyViewOnly()) return;
+        if (!confirm('撤回這則通知？\n撤回後，還沒讀的同仁信箱裡就不會再出現。')) return;
+        core.revokeNotification(id).then(loadNotifHistory)
+            .catch(function (e) { alert('撤回失敗：' + (e.message || e.code)); });
+    }
+
     function renderStats(tasks, selectedUser, span) {
         var display = document.getElementById('statsResultDisplay');
         display.innerHTML = '';
@@ -934,6 +1080,10 @@
         saveAssignRules: saveAssignRules,
         updateStats: updateStats,
         loadUsageLogs: loadUsageLogs,       // v102
+        publishNotif: publishNotif,         // v103
+        loadNotifHistory: loadNotifHistory,
+        toggleUnread: toggleUnread,
+        revokeNotif: revokeNotif,
         openQuickPerm: openQuickPerm,
         closeQuickPerm: closeQuickPerm,
         applyQuickPerm: applyQuickPerm
