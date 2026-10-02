@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v15
+ * 模組：中區的民主聖地 (democracy)  ─ v16
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
@@ -13,6 +13,9 @@
  *      - 手機版首頁管理列「文具登記設定」顯示為「文具設定」
  *      - 系統 v1.2.0 通知中心：新公告／新投票／新團購自動發通知（notifyNew），
  *        刪除案件時通知改為「案件已刪除」（core.markNotificationsDeleted）；文具不發
+ *
+ * v16（系統 v1.2.3）：公告管理每則公告、投票管理、團購管理新增「🔔 重發通知」，
+ *      修改後由管理員手動重發：撤回該案件的舊通知，再以目前內容發「○○更新：標題」
  *
  * 連自己的 Firebase 專案（gbt-central-democracy），不動 AppCore.db。
  * 權限：permKey = 'democracy'，全員預設可進入（大家都要登記文具），
@@ -202,6 +205,42 @@
         if (!core.createNotification) return;
         core.createNotification({ kind: kind, refId: refId, title: title, body: body, expireAt: expireAt, showFrom: showFrom || null })
             .catch(function (e) { console.warn('[democracy] 通知發布失敗（不影響案件）:', e.code || e.message); });
+    }
+
+    // v16：「重發通知」— 案件修改後由管理員手動觸發（改錯字之類不想打擾大家，所以不自動發）。
+    //      先撤回這個案件還有效的舊通知，再用「目前」的內容發一封新的；已讀過舊通知的人也會收到新的。
+    function renotify(kind, refId, label, title, body, expireAt, showFrom) {
+        if (core.denyViewOnly()) return;
+        if (!core.revokeNotificationsByRef) return;
+        if (!confirm('確定要重新通知全員？\n\n' + label + '：' + title +
+                     '\n\n舊的通知會自動撤回，已經讀過的同仁也會收到這封新的通知。')) return;
+        core.revokeNotificationsByRef(refId)
+            .then(function () {
+                return core.createNotification({ kind: kind, refId: refId, title: label + '更新：' + title,
+                                                 body: body, expireAt: expireAt, showFrom: showFrom || null });
+            })
+            .then(function () { alert('已重新發送通知'); })
+            .catch(function (e) { alert('重發失敗：' + (e.message || e.code)); });
+    }
+    function renotifyAnn(id) {
+        var a = findById(announcements, id);
+        if (!a) return;
+        if (a.enabled === false) { alert('這則公告已停用，請先啟用再重發通知。'); return; }
+        if (a.endDate && core.getTodayStr() > a.endDate) { alert('這則公告已過期，無法重發通知。'); return; }
+        renotify('announcement', a.id, '公告', a.title || '', a.body || '',
+                 a.endDate + ' 23:59', a.startDate ? a.startDate + ' 00:00' : null);
+    }
+    function renotifyVote() {
+        var v = viewingVote();
+        if (!v) return;
+        if (isLocked(v)) { alert('這個投票已結束，無法重發通知。'); return; }
+        renotify('vote', v.id, '投票', v.title || '投票案', '截止時間：' + (v.deadline || '未設定'), v.deadline || null);
+    }
+    function renotifyGb() {
+        var g = viewingGb();
+        if (!g) return;
+        if (isLocked(g)) { alert('這一團已結束，無法重發通知。'); return; }
+        renotify('groupbuy', g.id, '團購', g.title || '團購案', '截止時間：' + (g.deadline || '未設定'), g.deadline || null);
     }
 
     function copyText(text) {
@@ -798,6 +837,7 @@
                      '<td><div class="demo-row">' +
                      '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.openAnnEditor(\'' + a.id + '\')">編輯</button>' +
                      '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.copyAnnNotice(\'' + a.id + '\')">複製 LINE</button>' +   // v15
+                     '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.renotifyAnn(\'' + a.id + '\')">🔔 重發通知</button>' +   // v16
                      '<button class="demo-btn demo-btn-ghost demo-btn-sm" onclick="DemocracyModule.toggleAnn(\'' + a.id + '\')">' +
                      (a.enabled === false ? '啟用' : '停用') + '</button>' +
                      '<button class="demo-btn demo-btn-danger demo-btn-sm" onclick="DemocracyModule.deleteAnn(\'' + a.id + '\')">刪除</button>' +
@@ -2059,6 +2099,7 @@
              '<div class="demo-row">' +
              '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyVoteNotice()">複製開案通知（LINE）</button>' +
              '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyVoteResult()">複製統計結果（LINE）</button>' +
+             (locked ? '' : '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.renotifyVote()">🔔 重發通知</button>') +   // v16
              '</div><div class="demo-muted" style="margin-top:8px;">複製後直接貼到 LINE 群組即可。</div></div>';
         return h;
     }
@@ -2653,6 +2694,7 @@
         if (!locked) {
             h += '<div class="demo-row" style="margin-top:12px;">' +
                  '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyGbNotice()">複製開團通知（LINE）</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.renotifyGb()">🔔 重發通知</button>' +   // v16
                  '</div><div class="demo-muted" style="margin-top:8px;">複製後直接貼到 LINE 群組即可。</div>';
         }
         h += '</div>';
@@ -3364,6 +3406,9 @@
         copyVoteResult: copyVoteResult,
         copyGbNotice: copyGbNotice,         // v15
         copyAnnNotice: copyAnnNotice,       // v15
+        renotifyAnn: renotifyAnn,           // v16
+        renotifyVote: renotifyVote,
+        renotifyGb: renotifyGb,
 
         openGb: openGb,
         gbSetQty: gbSetQty,
