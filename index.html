@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.2.1 Modular · 預約通知)</title>
+    <title>中區收送件進度追蹤系統 (v1.2.2 Modular · 搜尋七天)</title>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -443,9 +443,10 @@
                                 <button type="button" class="sfp-close" onclick="window.closeSearchPanel()">✕</button>
                             </div>
                             <select id="searchRangeSelect" class="search-range-select" onchange="window.handleSearchRangeChange()">
-                                <option value="7">近 7 天</option>
+                                <!-- v1.2.2：預設改為近 7 天（原 30 天，讀取量約 4 倍），需要更長再手動切換 -->
+                                <option value="7" selected>近 7 天</option>
                                 <option value="15">近 15 天</option>
-                                <option value="30" selected>近 30 天</option>
+                                <option value="30">近 30 天</option>
                                 <option value="custom">自訂區間 (最多 30 天)</option>
                             </select>
                             <div id="searchCustomRange" style="display:none;">
@@ -644,7 +645,8 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.2.1';   // v1.2.1：手動通知可預約發送（開始時間）
+    const APP_VERSION = '1.2.2';   // v1.2.2：搜尋任務預設區間改為近 7 天（降低讀取量）
+                                   // v1.2.1：手動通知可預約發送（開始時間）
                                    // v1.2.0：通知中心（遊戲信件、手動發布、民主聖地自動通知、發布紀錄）＋民主聖地 LINE 文字
                                    // v1.1.0：UX 調整（方案 C 卡片、Tab bar、骨架畫面、16px 輸入框、100dvh、Enter 登入）＋讀取紀錄
     let salesDefaultInitDone = false;   // 確保預設值初始化整個頁面只跑一次
@@ -1724,7 +1726,7 @@
     // ==========================================
     function getSearchRange() {
         const sel = document.getElementById('searchRangeSelect');
-        const mode = sel ? sel.value : '30';
+        const mode = sel ? sel.value : '7';   // v1.2.2：預設 7 天
         const today = getTodayStr();
 
         if (mode !== 'custom') {
