@@ -5,7 +5,14 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.2.4 Modular · 公告全文)</title>
+    <title>中區收送件進度追蹤系統 (v1.3.0 Modular · 必讀通知)</title>
+    <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
+         手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
+         display 維持 browser，不改變現有開啟方式 -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="apple-mobile-web-app-title" content="基米中區系統">
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -246,6 +253,23 @@
         .notif-item-time { color: #9ca3af; font-size: 0.72rem; margin-top: 4px; }
         .notif-empty { text-align: center; color: #9ca3af; padding: 28px 0; }
         .notif-detail-body { white-space: pre-wrap; word-break: break-word; line-height: 1.6; color: var(--text-main); }
+
+        /* v1.3.0：必讀通知（公告／手動通知超過 2 天未讀）— 蓋住整個系統，讀完才能使用；
+           z-index 2500：高於一般彈窗 2100，低於強制更新 3000 */
+        #notifMustModal { display: none; position: fixed; inset: 0; z-index: 2500; background: rgba(15, 23, 42, 0.72); justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; }
+        #notifMustModal.open { display: flex; }
+        #notifMustModal .must-card { background: #fff; border-radius: 14px; width: 520px; max-width: 100%; max-height: 90vh; max-height: 90dvh; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; }
+        #notifMustModal .must-head { padding: 18px 20px 12px; border-bottom: 1px solid #eee; }
+        #notifMustModal .must-head h3 { margin: 0 0 6px; color: #b91c1c; font-size: 1.15rem; }
+        #notifMustModal .must-head p { margin: 0; color: var(--text-main); font-size: 0.92rem; line-height: 1.6; }
+        #notifMustModal .must-list { padding: 14px 20px 18px; overflow-y: auto; }
+        #notifMustModal .must-item { border: 1px solid #fecaca; background: #fff7f7; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+        #notifMustModal .must-item.done { border-color: #bbf7d0; background: #f0fdf4; }
+        #notifMustModal .must-title { font-weight: 700; margin-bottom: 6px; }
+        #notifMustModal .must-body { white-space: pre-wrap; word-break: break-word; line-height: 1.6; font-size: 0.9rem; color: var(--text-main); }
+        #notifMustModal .must-meta { color: #9ca3af; font-size: 0.75rem; margin-top: 6px; }
+        #notifMustModal .must-btn { margin-top: 10px; border: 0; border-radius: 8px; padding: 9px 16px; background: var(--primary); color: #fff; font-weight: 700; font-family: inherit; cursor: pointer; }
+        #notifMustModal .must-ok { margin-top: 10px; color: #15803d; font-weight: 700; font-size: 0.9rem; }
 
         /* v1.1.0：任務載入中的骨架畫面 */
         .sk-block { background: linear-gradient(90deg, #eef2f6 25%, #f8fafc 37%, #eef2f6 63%); background-size: 400% 100%; animation: sk-shimmer 1.4s ease infinite; }
@@ -549,6 +573,17 @@
         <div class="modal-btns"><button class="btn btn-save" onclick="closeNotifDetail()">關閉</button></div>
     </div>
 </div>
+<!-- v1.3.0：必讀通知 — 沒有關閉鈕，逐則按「我已閱讀」後自動解除 -->
+<div id="notifMustModal" role="alertdialog" aria-modal="true" aria-labelledby="notifMustTitle">
+    <div class="must-card">
+        <div class="must-head">
+            <h3 id="notifMustTitle">⚠️ 您有重要通知未讀取</h3>
+            <p>請讀取後再使用系統，預防重要通知尚未收到。</p>
+        </div>
+        <div class="must-list" id="notifMustList"></div>
+    </div>
+</div>
+
 <!-- v1.2.0：每天第一次進入系統的未讀提醒 -->
 <div class="modal-overlay" id="notifPromptModal">
     <div class="modal-card" style="width: 340px; text-align:center;">
@@ -645,7 +680,9 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.2.4';   // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
+    const APP_VERSION = '1.3.0';   // v1.3.0：必讀通知（公告／手動通知超過 2 天未讀，每天第一次打開時擋住系統，讀完才能用）
+                                   //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
+                                   // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
                                    // v1.2.2：搜尋任務預設區間改為近 7 天（降低讀取量）
                                    // v1.2.1：手動通知可預約發送（開始時間）
@@ -861,8 +898,11 @@
         //         只是用手上的資料重新判斷，不會讀資料庫。
         setInterval(renderNotifUI, 60000);
         // 多聽 1 筆：回來的筆數 ≤ 30 時，代表資料庫裡的通知已全部在手上，才能安全清理 readIds
+        // v1.3.0 修正：includeMetadataChanges。有本機快取時，第一次快照來自快取；伺服器確認「資料沒變」時
+        //   預設不會再觸發，notifSnapReady 永遠是 false → 每日提醒與必讀都不會跳（v1.2.0 起的 bug）。
+        //   只有 metadata 變化的快照不計讀取費用。
         unsubNotifs = db.collection('notifications').orderBy('createdAt', 'desc').limit(NOTIF_LIMIT + 1)
-            .onSnapshot(snap => {
+            .onSnapshot({ includeMetadataChanges: true }, snap => {
                 state.notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 if (!snap.metadata.fromCache) notifSnapReady = true;
                 renderNotifUI();
@@ -887,6 +927,7 @@
         const bubble = document.getElementById('notifBubble');
         if (bubble) bubble.classList.toggle('show', n > 0);
         if (document.getElementById('notifModal').style.display === 'flex') renderNotifList();
+        if (document.getElementById('notifMustModal').classList.contains('open')) renderMustRead();   // v1.3.0：例如管理員撤回時同步解除
     }
 
     function renderNotifList() {
@@ -963,10 +1004,11 @@
     function maybePromptNotifs() {
         if (notifPromptChecked || !notifSnapReady || !notifReadsReady) return;
         notifPromptChecked = true;
-        const key = 'tt_notif_prompt_' + state.currentUser.name, today = getTodayStr();
-        if (localStorage.getItem(key) === today) return;
         setTimeout(() => {
             if (document.getElementById('force-update-screen')) return;
+            if (maybeBlockMustRead()) return;          // v1.3.0：有逾期必讀時優先擋，不再跳一般提醒
+            const key = 'tt_notif_prompt_' + state.currentUser.name, today = getTodayStr();
+            if (localStorage.getItem(key) === today) return;
             const n = myUnreadNotifs().length;
             if (!n) return;
             localStorage.setItem(key, today);
@@ -975,6 +1017,57 @@
                 `您還有 <b style="color:#ef4444;">${n}</b> 則訊息尚未讀取，<br>請盡快點選${where} 🔔 查看`;
             document.getElementById('notifPromptModal').style.display = 'flex';
         }, Math.max(0, initAppAt + 4500 - Date.now()));
+    }
+
+    // v1.3.0：必讀通知。公告與手動通知「出現在信箱後超過 48 小時仍未讀」→ 每天第一次打開時擋住整個系統，
+    //   逐則按「我已閱讀」後才解除（投票、團購不算必要性通知，不擋）。
+    //   當天一旦開始擋，重新整理也繼續擋（避免用重新整理跳過）；當天第一次打開時沒有逾期的，就等到隔天才擋。
+    //   只看自己的未讀，2 天內有讀的人永遠不會看到。
+    const MUST_READ_KINDS = ['announcement', 'manual'];
+    const MUST_READ_HOURS = 48;
+    let mustReadIds = [];
+    function overdueMustRead() {
+        const d = new Date(Date.now() - MUST_READ_HOURS * 3600e3), p = n => String(n).padStart(2, '0');
+        const cutoff = formatDateLocal(d) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+        return myUnreadNotifs().filter(n => MUST_READ_KINDS.includes(n.kind) &&
+            (n.showFrom || n.createdAt || '').slice(0, 16) <= cutoff);   // 預約通知從發送時間起算
+    }
+    function maybeBlockMustRead() {
+        const u = state.currentUser.name, today = getTodayStr();
+        const kChecked = 'tt_mustread_checked_' + u, kActive = 'tt_mustread_active_' + u;
+        const list = overdueMustRead();
+        if (localStorage.getItem(kChecked) !== today) {          // 今天第一次打開
+            localStorage.setItem(kChecked, today);
+            if (list.length) localStorage.setItem(kActive, today); else localStorage.removeItem(kActive);
+        }
+        if (!list.length || localStorage.getItem(kActive) !== today) return false;
+        mustReadIds = list.map(n => n.id);
+        renderMustRead();
+        document.getElementById('notifMustModal').classList.add('open');
+        return true;
+    }
+    function renderMustRead() {
+        const box = document.getElementById('notifMustList');
+        const isDone = id => state.notifReadIds.includes(id) || !state.notifs.some(n => n.id === id);   // 已讀或已被移除都算完成
+        box.innerHTML = mustReadIds.map(id => {
+            const n = state.notifs.find(x => x.id === id);
+            if (!n) return '';
+            const k = NOTIF_KIND[n.kind] || NOTIF_KIND.manual, done = isDone(id);
+            return `<div class="must-item ${done ? 'done' : ''}">` +
+                `<div class="must-title">${k.ico} ${escAttr(n.title)}</div>` +
+                `<div class="must-body">${escAttr(n.body || '（無內容）')}</div>` +
+                `<div class="must-meta">${escAttr((n.showFrom || n.createdAt || '').slice(0, 16))}　${escAttr(getUserDisplayName(n.createdBy || ''))}</div>` +
+                (done ? '<div class="must-ok">✓ 已閱讀</div>'
+                      : `<button type="button" class="must-btn" onclick="confirmMustRead('${n.id}')">我已閱讀</button>`) +
+                `</div>`;
+        }).join('');
+        if (mustReadIds.every(isDone)) {   // 全部讀完 → 解除
+            setTimeout(() => document.getElementById('notifMustModal').classList.remove('open'), 700);
+        }
+    }
+    function confirmMustRead(id) {
+        markNotifRead(id);
+        renderMustRead();
     }
 
     // 給模組使用：發布通知（member-settings 手動發布、democracy 新案件自動發布）
@@ -2215,7 +2308,7 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=84"></script>
-<script src="modules/member-settings.module.js?v=104"></script>
+<script src="modules/member-settings.module.js?v=105"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
 <script src="modules/democracy.module.js?v=16"></script>
 <script src="modules/gift.module.js?v=100"></script>
