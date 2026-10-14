@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v16
+ * 模組：中區的民主聖地 (democracy)  ─ v17
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
@@ -16,6 +16,8 @@
  *
  * v16（系統 v1.2.3）：公告管理每則公告、投票管理、團購管理新增「🔔 重發通知」，
  *      修改後由管理員手動重發：撤回該案件的舊通知，再以目前內容發「○○更新：標題」
+ *
+ * v17（系統 v1.3.1）：VIP 框公告的內容照輸入時的換行顯示（跑馬燈仍為一行）
  *
  * 連自己的 Firebase 專案（gbt-central-democracy），不動 AppCore.db。
  * 權限：permKey = 'democracy'，全員預設可進入（大家都要登記文具），
@@ -334,6 +336,7 @@
     #democracyView .demo-ongoing.demo-vip { background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid var(--danger); color: #991b1b; }
     #democracyView .demo-ongoing.demo-vip b { color: #7f1d1d; }
     #democracyView .demo-ongoing.demo-vip span { min-width: 0; word-break: break-word; }
+    #democracyView .demo-ongoing.demo-vip .demo-vip-body { display: block; white-space: pre-line; margin-top: 4px; }   /* v17：保留換行 */
 
     /* --- 首頁功能卡 --- */
     #democracyView .demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
@@ -708,7 +711,7 @@
             var a = list[i];
             h += '<div class="demo-ongoing demo-vip">' +
                  '<span>🚨 <b>重要公告</b> 🚨：' + linkify(a.title) +
-                 (a.body ? '　' + linkify(String(a.body).replace(/\s*\n\s*/g, ' ')) : '') +
+                 (a.body ? '<span class="demo-vip-body">' + linkify(String(a.body).trim()) + '</span>' : '') +   // v17：內容另起一行並保留換行
                  '</span></div>';
         }
         return h;
