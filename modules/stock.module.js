@@ -1,9 +1,12 @@
 /* =====================================================================
- * 模組：QIAGEN 備庫存系統 (stock)  ─ v84
+ * 模組：QIAGEN 備庫存系統 (stock)  ─ v85
  * ---------------------------------------------------------------------
  * 以 iframe 內嵌外部庫存系統網頁，點左側按鈕即在右側顯示。
  * 權限：permKey = 'stock'，由「成員設定管理 → 成員權限」控管。
  * 要改網址只動下方 STOCK_URL 一行。
+ *
+ * v85（系統 v1.3.2）：改連公司 Tailscale 內網網址（舊 railway.app 撤除），只限電腦使用；
+ *      手機版不載入內嵌網頁，改顯示「請使用電腦版開啟」；連不上時提示確認 Tailscale 已開啟
  * ===================================================================== */
 (function () {
     'use strict';
@@ -11,7 +14,8 @@
     var core = null;
 
     /* ---------- 設定區 ---------- */
-    var STOCK_URL = 'https://qiagen-stock-production.up.railway.app/';
+    var STOCK_URL = 'https://mac-mini.tail42a147.ts.net:8444/';   // v85：Tailscale 內網，需先開啟 Tailscale
+    var MOBILE_MQ = window.matchMedia('(max-width: 768px)');      // 與 index.html 的手機版斷點一致
 
     // 未在「成員權限」個別勾選時的預設值
     //   ['creator','senior']         = 僅創世神／高級管理者
@@ -41,6 +45,9 @@
     #stockView .stock-frame-wrap { position: relative; flex-grow: 1; min-height: 560px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
     #stockView iframe { width: 100%; height: 100%; border: 0; display: block; }
     #stockView .stock-loading { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: #fff; color: var(--primary); font-size: 0.95rem; }
+    #stockView .stock-mobile-note { display: none; padding: 28px 18px; background: #fff; border: 1px solid var(--border); border-radius: 10px; text-align: center; color: var(--text-main); line-height: 1.8; }
+    #stockView .stock-mobile-note .ico { font-size: 2.4rem; }
+    #stockView .stock-mobile-note .hint { font-size: 0.85rem; color: var(--text-light); }
     #stockView .stock-blocked { display: none; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 8px; font-size: 0.88rem; line-height: 1.7; margin-bottom: 10px; }
 
     @media (max-width: 768px) {
@@ -48,6 +55,9 @@
         #stockView .stock-actions { width: 100%; }
         #stockView .stock-btn { flex: 1; text-align: center; padding: 10px 12px; }
         #stockView .stock-frame-wrap { min-height: 72vh; }
+        /* v85：手機版不支援（需 Tailscale），只顯示提示 */
+        #stockView .stock-actions, #stockView .stock-frame-wrap, #stockView .stock-blocked { display: none !important; }
+        #stockView .stock-mobile-note { display: block; }
     }
     `;
 
@@ -66,7 +76,13 @@
         </div>
 
         <div class="stock-blocked" id="stockBlocked">
-            ⚠️ <b>此頁面無法內嵌顯示</b>　外部系統可能禁止內嵌或需先登入，請改用「新視窗開啟」。
+            ⚠️ <b>無法連線到備庫存系統</b>　請確認電腦已開啟並登入 Tailscale，再按「重新載入」；或改用「新視窗開啟」。
+        </div>
+
+        <div class="stock-mobile-note">
+            <div class="ico">💻</div>
+            <b>備庫存系統請使用電腦版開啟</b>
+            <div class="hint">需透過公司 Tailscale 網路連線，手機版暫不支援。</div>
         </div>
 
         <div class="stock-frame-wrap" id="stockFrameWrap">
@@ -130,7 +146,7 @@
             core.mountView(VIEW_HTML);
         },
 
-        activate: function () { if (!loaded) loadFrame(); },
+        activate: function () { if (!loaded && !MOBILE_MQ.matches) loadFrame(); },   // v85：手機版不載入
 
         reload: reload,
         openExternal: openExternal
