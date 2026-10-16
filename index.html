@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.3.2 Modular · 庫存換址)</title>
+    <title>中區收送件進度追蹤系統 (v1.4.0 Modular · 扇形新增)</title>
     <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
          手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
          display 維持 browser，不改變現有開啟方式 -->
@@ -201,6 +201,17 @@
         .history-dot:hover { color: var(--text-main); }
         .fab { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: var(--primary); color: white; border-radius: 50%; font-size: 32px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; z-index: 800; }
         .fab:hover { transform: scale(1.05); background: #0d9488; }
+        /* v1.4.0：新增任務扇形快捷選單。點 ＋ 展開五個分類（＋ 旋轉成 ×），點分類後開新增彈窗並帶入分類。
+           遮罩 860 > Tab bar 850；展開時 ＋ 與圓圈 870 浮在遮罩上。圓圈固定白底主色字。 */
+        .fab.open { transform: rotate(135deg); z-index: 870; }
+        .fab.open:hover { transform: rotate(135deg) scale(1.05); }
+        .fab-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 860; opacity: 0; visibility: hidden; transition: opacity .2s, visibility .2s; }
+        .fab-mask.open { opacity: 1; visibility: visible; }
+        .fab-fan { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; z-index: 870; pointer-events: none; }
+        .fab-fan-btn { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; border: none; background: #fff; color: var(--primary); font-family: inherit; font-size: 15px; font-weight: 600; padding: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.25); cursor: pointer; opacity: 0; transform: scale(.3); pointer-events: none; transition: transform .18s ease, opacity .15s ease, background .15s; }
+        .fab-fan.open .fab-fan-btn { opacity: 1; transform: translate(var(--dx), var(--dy)); pointer-events: auto; transition: transform .32s cubic-bezier(.3, 1.6, .5, 1) var(--d), opacity .15s ease var(--d), background .15s; }
+        .fab-fan.open .fab-fan-btn:hover { transform: translate(var(--dx), var(--dy)) scale(1.08); background: #ecfdf5; }
+        @media (prefers-reduced-motion: reduce) { .fab, .fab-mask, .fab-fan-btn, .fab-fan.open .fab-fan-btn { transition: none; } }
 
         /* v1.1.0：手機版 ⋮ 選單。掛在 body 下（main 有 overflow 會裁切），位置由 JS 計算 */
         #taskMoreMenu { display: none; position: fixed; z-index: 2050; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 6px; min-width: 150px; }
@@ -280,8 +291,8 @@
         @media (prefers-reduced-motion: reduce) { .sk-block { animation: none; } .mtab-pill, .mtab .mtab-ico { transition: none; } }
         @media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
             #notifModal .modal-card, #notifDetailModal .modal-card { animation: view-in-r .22s cubic-bezier(.2, .8, .2, 1) both; }   /* v1.2.0 */
-            .view-section.view-enter-r > :not(.fab) { animation: view-in-r .22s cubic-bezier(.2, .8, .2, 1) both; }
-            .view-section.view-enter-l > :not(.fab) { animation: view-in-l .22s cubic-bezier(.2, .8, .2, 1) both; }
+            .view-section.view-enter-r > :not(.fab):not(.fab-mask):not(.fab-fan) { animation: view-in-r .22s cubic-bezier(.2, .8, .2, 1) both; }
+            .view-section.view-enter-l > :not(.fab):not(.fab-mask):not(.fab-fan) { animation: view-in-l .22s cubic-bezier(.2, .8, .2, 1) both; }
         }
 
         /* ---------- 共用 Modal 基底（模組會沿用這些 class） ---------- */
@@ -344,6 +355,11 @@
             /* v1.1.0：☰ 移除後頂部只需避開瀏海；底部預留 Tab bar（58）＋間距（10）＋留白（16）＋ Home 指示條 */
             main { padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(58px + 10px + 16px + env(safe-area-inset-bottom)); width: 100%; max-width: 100%; overflow-x: hidden; }
             .fab { bottom: calc(58px + 10px + 12px + env(safe-area-inset-bottom)); right: 20px; width: 50px; height: 50px; font-size: 28px; }
+            .fab-fan { bottom: calc(58px + 10px + 12px + env(safe-area-inset-bottom)); right: 20px; width: 50px; height: 50px; }   /* v1.4.0：扇形圓心對齊手機版 ＋ */
+            /* v1.4.0：任務彈窗貼齊上方；高度由 fitTaskModalToViewport() 依鍵盤上方的可視範圍設定，內容在彈窗內捲動 */
+            #taskModal { align-items: flex-start; padding-top: calc(10px + env(safe-area-inset-top)); box-sizing: border-box; }
+            #taskModal .modal-card { max-height: calc(100% - 10px); padding: 1.2rem; box-sizing: border-box; }
+            #taskModal::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 100vh; background: rgba(0,0,0,0.5); pointer-events: none; }   /* v1.4.0：遮罩往下延伸，蓋住彈窗與鍵盤工具列之間露出的背景 */
 
             /* v1.1.0：iOS 輸入框字級 < 16px 會自動放大。模組內選擇器權重較高，故只對字級用 !important 統一蓋過
                （只影響 font-size，checkbox 等元件不會有視覺變化） */
@@ -495,7 +511,16 @@
             </header>
             <div id="taskWarnBanner" style="display:none;"></div>
             <div class="task-container" id="taskListContainer"></div>
-            <button class="fab" onclick="window.openModal()">+</button>
+            <button class="fab" id="fabBtn" onclick="window.toggleFabFan()" aria-label="新增任務" aria-expanded="false">+</button>
+            <!-- v1.4.0：新增任務扇形快捷選單（圓圈位置由 --dx/--dy 決定，半徑 140px，每顆延遲 35ms 彈出） -->
+            <div class="fab-mask" id="fabMask" onclick="window.closeFabFan()"></div>
+            <div class="fab-fan" id="fabFan">
+                <button type="button" class="fab-fan-btn" style="--dx:-140px; --dy:0px; --d:0ms;" aria-label="定序收件" tabindex="-1" onclick="window.openModalWithCat('定序收件')">定序</button>
+                <button type="button" class="fab-fan-btn" style="--dx:-129.3px; --dy:-53.6px; --d:35ms;" aria-label="引子送件" tabindex="-1" onclick="window.openModalWithCat('引子送件')">引子</button>
+                <button type="button" class="fab-fan-btn" style="--dx:-99px; --dy:-99px; --d:70ms;" aria-label="產前收件" tabindex="-1" onclick="window.openModalWithCat('產前收件')">產前</button>
+                <button type="button" class="fab-fan-btn" style="--dx:-53.6px; --dy:-129.3px; --d:105ms;" aria-label="業務交辦事項" tabindex="-1" onclick="window.openModalWithCat('業務交辦事項')">其它</button>
+                <button type="button" class="fab-fan-btn" style="--dx:0px; --dy:-140px; --d:140ms;" aria-label="NGS收件" tabindex="-1" onclick="window.openModalWithCat('NGS收件')">NGS</button>
+            </div>
         </div>
 
         <div id="noAccessView" class="view-section">
@@ -681,7 +706,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.3.2';   // v1.3.2：備庫存改連 Tailscale 內網網址（只限電腦），手機版顯示「請使用電腦版開啟」
+    const APP_VERSION = '1.4.0';   // v1.4.0：新增任務改為扇形快捷選單（點 ＋ 先選分類：定序／引子／產前／其它／NGS，再開彈窗並帶入分類）；手機版任務彈窗不再被鍵盤推上去
                                    //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
                                    // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
@@ -1491,7 +1516,7 @@
 
     // Esc 收起
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeSearchPanel();
+        if (e.key === 'Escape') { closeSearchPanel(); closeFabFan(); }   // v1.4.0：一併收合扇形選單
     });
 
     function renderHistory() {
@@ -1541,6 +1566,7 @@
         state.activeTab = tab;
         document.getElementById('notifModal').style.display = 'none';         // v1.2.0：點其他 Tab 就離開通知頁
         document.getElementById('notifDetailModal').style.display = 'none';
+        closeFabFan();   // v1.4.0：切換分頁時收合扇形選單
 
         // 1) 全部隱藏
         document.getElementById('taskView').classList.remove('active');
@@ -1666,11 +1692,39 @@
         }
     }
 
-    function openModal(taskId=null) {
+    // v1.4.0：新增任務扇形快捷選單
+    function setFabFan(open) {
+        const fab = document.getElementById('fabBtn');
+        if (!fab) return;
+        fab.classList.toggle('open', open);
+        fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.getElementById('fabMask').classList.toggle('open', open);
+        document.getElementById('fabFan').classList.toggle('open', open);
+        document.querySelectorAll('#fabFan .fab-fan-btn').forEach(b => { b.tabIndex = open ? 0 : -1; });
+    }
+    function toggleFabFan() { setFabFan(!document.getElementById('fabBtn').classList.contains('open')); }
+    function closeFabFan() { setFabFan(false); }
+    function openModalWithCat(cat) { closeFabFan(); openModal(null, cat); }
+
+    // v1.4.0：iOS 鍵盤出現時只縮小「可視範圍」（visualViewport），fixed 的彈窗不會跟著縮，整頁會被往上推。
+    //         手機版改成讓彈窗的位置與高度貼齊可視範圍，標題固定在上方、內容在彈窗內捲動。
+    function fitTaskModalToViewport() {
+        const m = document.getElementById('taskModal'), vv = window.visualViewport;
+        if (!vv || !MOBILE_MQ.matches || m.style.display !== 'flex') { m.style.top = ''; m.style.height = ''; return; }
+        m.style.top = vv.offsetTop + 'px';
+        m.style.height = vv.height + 'px';
+    }
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', fitTaskModalToViewport);
+        window.visualViewport.addEventListener('scroll', fitTaskModalToViewport);
+    }
+
+    function openModal(taskId=null, presetCat=null) {   // v1.4.0：presetCat＝新增時預設帶入的分類（扇形選單傳入）
         populateSalesDropdowns();
         const editor=document.getElementById('inputTitle');
         document.getElementById('taskModal').style.display='flex';
-        editor.focus();
+        fitTaskModalToViewport();
+        if (!MOBILE_MQ.matches) editor.focus();   // v1.4.0：手機版不自動叫出鍵盤，先讓同仁看到標題與歸屬項目
         document.getElementById('ngs-form-container').style.display = 'none';
         document.getElementById('ngsUnit').value = '';
         document.getElementById('ngsPI').value = '';
@@ -1720,11 +1774,16 @@
             document.getElementById('modalTitle').innerText='新增案件/任務';
             editor.innerHTML='';
             document.getElementById('btnSaveTask').innerText='確認新增';
-            document.getElementById('inputCategory').value = '定序收件';
+            document.getElementById('inputCategory').value = ORDERED_CATEGORIES.includes(presetCat) ? presetCat : '定序收件';
+            handleCategoryChange();   // v1.4.0：NGS 專用欄位跟著分類顯示／隱藏
         }
     }
 
-    function closeModal() { document.getElementById('taskModal').style.display='none'; state.editingTaskId=null; }
+    function closeModal() {
+        document.getElementById('taskModal').style.display='none'; state.editingTaskId=null;
+        fitTaskModalToViewport();   // v1.4.0：清掉手機版設定的位置與高度
+        if (MOBILE_MQ.matches) window.scrollTo(0, 0);   // v1.4.0：iOS 收起鍵盤後頁面可能停在被推上去的位置
+    }
 
     function saveTask() {
         const htmlContent = document.getElementById('inputTitle').innerHTML.trim(); const category = document.getElementById('inputCategory').value;
