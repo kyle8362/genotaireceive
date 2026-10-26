@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.4.1 Modular · 按鈕修正)</title>
+    <title>中區收送件進度追蹤系統 (v1.5.0 Modular · 登入改版)</title>
     <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
          手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
          display 維持 browser，不改變現有開啟方式 -->
@@ -35,14 +35,98 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: var(--bg); color: var(--text-main); height: 100vh; height: 100dvh; display: flex; overflow: hidden; }   /* v1.1.0：100dvh 避免 iOS 網址列吃掉底部，100vh 為舊瀏覽器 fallback */
 
-        /* Auth Screen */
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 2000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
-        .auth-box { background: white; padding: 2.5rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 320px; text-align: center; border: 1px solid var(--border); position: relative; }
-        .auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
-        .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; font-weight: 600; font-size: 1rem; transition: background 0.3s; }
-        .auth-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+        /* ---------- v1.5.0：登入畫面改版（品牌區＋波浪＋風車＋光圈＋登入卡片）----------
+           色彩取自 App 圖示：主色 #3FADAA、淡薄荷 #F0FAF9。登入按鈕依使用者決定用較深的 #2F9895（白字對比較好）。
+           手機：上下排列（品牌區約 300px，卡片上緣壓在波浪上）；電腦：左 52% 品牌區、右側卡片置中。 */
+        #auth-screen { position: fixed; inset: 0; z-index: 2000; background: #F0FAF9; display: flex; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        html.tt-has-user #auth-screen { visibility: hidden; }   /* 保持登入：還原前不先閃出登入畫面 */
+        html.tt-splash-pending body::before { content: ''; position: fixed; inset: 0; background: #3FADAA; z-index: 2899; }   /* 開場動畫建立前先蓋上主色，避免閃白 */
+        .auth-brand { position: relative; background: #3FADAA; color: #fff; overflow: hidden; flex-shrink: 0; display: flex; justify-content: center; }
+        .auth-brand-inner { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; text-align: center; animation: auth-brand-in .8s cubic-bezier(.65, 0, .35, 1) both; }
+        .auth-logo-wrap { position: relative; width: 112px; height: 112px; }
+        .auth-logo { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
+        .auth-ring { position: absolute; inset: 0; border: 1.5px solid rgba(255,255,255,0.75); border-radius: 50%; animation: auth-ring 2.8s ease-out infinite; }
+        .auth-ring.r2 { animation-delay: 1.4s; }
+        .auth-brand-title { margin-top: 16px; font-size: 30px; font-weight: 500; letter-spacing: 5px; padding-left: 5px; }
+        .auth-brand-sub { margin-top: 5px; font-size: 16px; letter-spacing: 4px; padding-left: 4px; opacity: 0.88; }
+        .auth-waves { position: absolute; left: 0; right: 0; bottom: -1px; height: 70px; z-index: 2; overflow: hidden; pointer-events: none; }
+        .auth-wave { position: absolute; left: 0; bottom: 0; width: 200%; height: 100%; display: block; animation: auth-wave 9s linear infinite; }
+        .auth-wave.back { animation-duration: 14s; animation-direction: reverse; }
+        /* 風車：柱子從品牌區最底部往上，z-index 低於波浪，波浪流動時柱底永遠被蓋住、不會有空隙。大小用寬高設定，不用 scale（會被旋轉動畫覆蓋） */
+        .auth-mill { position: absolute; bottom: 0; z-index: 1; color: rgba(255,255,255,0.55); pointer-events: none; }
+        .auth-mill .mill-pole { position: absolute; left: 50%; bottom: 0; width: 10px; margin-left: -5px; background: currentColor; clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); }
+        .auth-mill .mill-blades { position: absolute; left: 0; top: 0; width: 100%; display: block; animation: auth-spin 6s linear infinite; }
+        .auth-mill.m1 { left: 6%; width: 64px; height: 185px; }
+        .auth-mill.m2 { right: 7%; width: 50px; height: 148px; }
+        .auth-mill.m2 .mill-blades { animation-duration: 8.5s; }
+        .auth-mill.m1 .mill-pole { top: 32px; }
+        .auth-mill.m2 .mill-pole { top: 25px; width: 8px; margin-left: -4px; }
+        .auth-main { position: relative; z-index: 4; display: flex; justify-content: center; }
+        .auth-box { box-sizing: border-box; width: 100%; max-width: 420px; background: #fff; border-radius: 18px; box-shadow: 0 12px 32px rgba(63,173,170,0.18), 0 2px 6px rgba(15,110,86,0.06); padding: 26px 22px 22px; animation: auth-card-in-up .8s cubic-bezier(.65, 0, .35, 1) .2s both; }
+        .auth-box.shake { animation: auth-shake .42s ease; }
+        .auth-card-title { font-size: 19px; font-weight: 500; color: #134E4A; }
+        .auth-card-sub { margin-top: 4px; font-size: 12.5px; color: #6b7280; }
+        .auth-field { display: flex; align-items: center; gap: 8px; height: 46px; margin-top: 12px; padding: 0 6px 0 12px; border: 1px solid #D1E7E5; border-radius: 12px; background: #fff; box-sizing: border-box; transition: border-color .2s, box-shadow .2s; }
+        .auth-box .auth-card-sub + .auth-field { margin-top: 18px; }
+        .auth-field:focus-within { border-color: #3FADAA; box-shadow: 0 0 0 3px rgba(63,173,170,0.16); }
+        .auth-field > svg { flex-shrink: 0; width: 18px; height: 18px; color: #3FADAA; }
+        .auth-field input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-size: 16px; font-family: inherit; color: var(--text-main); padding: 0; }
+        .auth-eye { flex-shrink: 0; width: 36px; height: 36px; border: 0; background: none; color: #94a3b8; cursor: pointer; display: grid; place-items: center; border-radius: 8px; padding: 0; }
+        .auth-eye svg { width: 20px; height: 20px; }
+        .auth-err { display: none; margin-top: 10px; font-size: 13px; color: #dc2626; text-align: center; }
+        .auth-err.show { display: block; }
+        .auth-btn { display: grid; place-items: center; width: 100%; height: 48px; margin-top: 16px; border: none; border-radius: 12px; background: #2F9895; color: #fff; font-size: 16px; font-weight: 600; font-family: inherit; letter-spacing: 2px; cursor: pointer; transition: background .2s; }
+        @media (hover: hover) { .auth-btn:hover:not(:disabled) { background: #278581; } }
+        .auth-btn:disabled { cursor: default; }
+        .auth-btn.ok { background: #0F6E56; }
+        .auth-btn-spin { width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; box-sizing: border-box; animation: auth-spin .8s linear infinite; }
+        .auth-btn svg { width: 22px; height: 22px; }
+        .switch-auth { margin-top: 16px; font-size: 14px; color: #3FADAA; text-align: center; cursor: pointer; }
+        @keyframes auth-ring { from { transform: scale(.85); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
+        @keyframes auth-wave { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes auth-spin { to { transform: rotate(360deg); } }
+        @keyframes auth-brand-in { from { opacity: 0; transform: translateY(-14px) scale(.92); } to { opacity: 1; transform: none; } }
+        @keyframes auth-card-in-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+        @keyframes auth-card-in-right { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+        @keyframes auth-shake { 0%, 100% { transform: none; } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+        @media (max-width: 768px) {
+            #auth-screen { flex-direction: column; }
+            .auth-brand { height: 360px; align-items: flex-start; padding-top: calc(52px + env(safe-area-inset-top)); box-sizing: border-box; }
+            .auth-main { margin-top: -28px; padding: 0 18px calc(24px + env(safe-area-inset-bottom)); }
+        }
+        @media (min-width: 769px) {
+            #auth-screen { flex-direction: row; background: #3FADAA; }
+            .auth-brand { width: 52%; align-items: center; padding: 0 70px 10vh 0; box-sizing: border-box; }   /* 右側讓給流動交界，內容往左置中 */
+            .auth-logo-wrap { width: 108px; height: 108px; }
+            .auth-brand-title { margin-top: 18px; font-size: 32px; }
+            .auth-brand-sub { margin-top: 6px; font-size: 15px; }
+            .auth-waves { height: 110px; }
+            .auth-mill.m1 { left: 9%; width: 92px; height: 300px; }
+            .auth-mill.m2 { right: 24%; width: 72px; height: 235px; }
+            .auth-mill.m1 .mill-pole { top: 46px; width: 14px; margin-left: -7px; }
+            .auth-mill.m2 .mill-pole { top: 36px; width: 11px; margin-left: -5.5px; }
+            .auth-main { flex: 1; align-items: center; padding: 24px 24px 24px 110px; background: #F0FAF9; }
+            /* v1.5.0：左右交界是兩層上下流動的波浪（同底部波浪的配色），取代直線切割 */
+            .auth-main::before { content: ''; position: absolute; top: 0; bottom: 0; left: -139px; width: 140px; pointer-events: none;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='400' viewBox='0 0 140 400' preserveAspectRatio='none'%3E%3Cpath fill='%23F0FAF9' d='M140 0H74C34 50 34 150 74 200S114 350 74 400H140Z'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='400' viewBox='0 0 140 400' preserveAspectRatio='none'%3E%3Cpath fill='%23E1F5F3' d='M140 0H38C-2 50-2 150 38 200S78 350 38 400H140Z'/%3E%3C/svg%3E"); background-repeat: repeat-y; background-size: 140px 400px; animation: auth-edge 16s linear infinite; }
+            @keyframes auth-edge { from { background-position: 0 0, 0 0; } to { background-position: 0 400px, 0 -400px; } }
+            .auth-box { width: 340px; animation-name: auth-card-in-right; }
+        }
+
+        /* v1.5.0：登入轉場（B 旋轉展開）與每日開場動畫共用的圖層。
+           背景層 2900 蓋住系統（含 Tab bar、必讀通知 2500），LOGO 前景層 2990；最後系統畫面暫提到 2950（並給 --bg 底色）圓形展開；強制更新畫面 3000 永遠最上 */
+        .tt-cover { position: fixed; inset: 0; z-index: 2900; background: #3FADAA; }
+        .tt-cover-fg { position: fixed; inset: 0; z-index: 2990; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .tt-fly-logo { position: fixed; z-index: 2990; display: block; pointer-events: none; transform-origin: 50% 50%; }
+        .tt-sp-logo { position: relative; width: 120px; height: 120px; }
+        .tt-sp-logo img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
+        .tt-sp-ring { position: absolute; inset: 0; border: 1.5px solid rgba(255,255,255,0.8); border-radius: 50%; opacity: 0; }
+        .tt-sp-greet { margin-top: 22px; min-height: 1.4em; font-size: 20px; letter-spacing: 2px; padding-left: 2px; opacity: 0; }
+        @media (min-width: 769px) { .tt-sp-logo { width: 162px; height: 162px; } .tt-sp-greet { margin-top: 28px; font-size: 30px; letter-spacing: 3px; padding-left: 3px; } }
+        @media (prefers-reduced-motion: reduce) {
+            #auth-screen *, #auth-screen *::before, #auth-screen *::after { animation: none !important; transition: none !important; }
+        }
         #registerModal .input-group input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-        .switch-auth { margin-top: 15px; font-size: 0.9rem; color: var(--text-light); cursor: pointer; text-decoration: underline; }
 
         /* Layout Structure */
         #app-screen { display: flex; width: 100%; height: 100%; position: relative; }
@@ -404,16 +488,54 @@
     </style>
 </head>
 <body>
+<script>
+    // v1.5.0：在畫面第一次繪製前判斷（不依賴任何主程式）。只讀 localStorage，失敗就照舊顯示登入畫面
+    (function () {
+        try {
+            if (!localStorage.getItem('tt_current_user')) return;
+            var de = document.documentElement, d = new Date();
+            de.classList.add('tt-has-user');
+            var today = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (localStorage.getItem('tt_splash_date') !== today && !reduce) de.classList.add('tt-splash-pending');
+        } catch (e) {}
+    })();
+</script>
 
 <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div id="auth-screen">
-    <div class="auth-box" id="authBox">
-        <h2 id="auth-title" style="color:#0f766e">系統登入</h2>
-        <input type="text" id="username" placeholder="帳號" autofocus>
-        <input type="password" id="password" placeholder="密碼">
-        <button class="auth-btn" id="btnAuthAction" onclick="window.handleAuth()">登入</button>
-        <div class="switch-auth" id="switchAuthLink" onclick="window.openRegisterModal()">沒有帳號？註冊新帳號</div>
+    <!-- v1.5.0：登入畫面改版。品牌區（LOGO＋光圈、風車、兩層波浪）＋登入卡片 -->
+    <div class="auth-brand">
+        <div class="auth-mill m1" aria-hidden="true"><div class="mill-pole"></div><svg class="mill-blades" viewBox="-50 -50 100 100"><g fill="currentColor"><path d="M0 0C7-12 7-34 0-47C-7-34-7-12 0 0Z"/><path d="M0 0C7-12 7-34 0-47C-7-34-7-12 0 0Z" transform="rotate(120)"/><path d="M0 0C7-12 7-34 0-47C-7-34-7-12 0 0Z" transform="rotate(240)"/></g><circle r="6" fill="#fff"/></svg></div>
+        <div class="auth-mill m2" aria-hidden="true"><div class="mill-pole"></div><svg class="mill-blades" viewBox="-50 -50 100 100"><g fill="currentColor"><path d="M0 0C7-12 7-34 0-47C-7-34-7-12 0 0Z"/><path d="M0 0C7-12 7-34 0-47C-7-34-7-12 0 0Z" transform="rotate(120)"/><path d="M0 0C7-12 7-34 0-47C-7-34-7-12 0 0Z" transform="rotate(240)"/></g><circle r="6" fill="#fff"/></svg></div>
+        <div class="auth-brand-inner">
+            <div class="auth-logo-wrap"><span class="auth-ring"></span><span class="auth-ring r2"></span><img class="auth-logo" id="authLogo" src="logo-white.png" alt="基龍米克斯"></div>
+            <div class="auth-brand-title">基龍米克斯</div>
+            <div class="auth-brand-sub">中區系統</div>
+        </div>
+        <div class="auth-waves" aria-hidden="true">
+            <svg class="auth-wave back" viewBox="0 0 1440 100" preserveAspectRatio="none"><path fill="#E1F5F3" d="M0 38C120 8 240 8 360 38S600 68 720 38S960 8 1080 38S1320 68 1440 38V100H0Z"/></svg>
+            <svg class="auth-wave" viewBox="0 0 1440 100" preserveAspectRatio="none"><path fill="#F0FAF9" d="M0 55C120 25 240 25 360 55S600 85 720 55S960 25 1080 55S1320 85 1440 55V100H0Z"/></svg>
+        </div>
+    </div>
+    <div class="auth-main">
+        <div class="auth-box" id="authBox">
+            <div class="auth-card-title">歡迎使用</div>
+            <div class="auth-card-sub">請登入您的帳號</div>
+            <div class="auth-field">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                <input type="text" id="username" placeholder="帳號" autocomplete="username" autocapitalize="off" spellcheck="false">
+            </div>
+            <div class="auth-field">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                <input type="password" id="password" placeholder="密碼" autocomplete="current-password">
+                <button type="button" class="auth-eye" id="authEye" aria-label="顯示密碼" onclick="window.togglePasswordVisible()"></button>
+            </div>
+            <div class="auth-err" id="authErr" role="alert"></div>
+            <button class="auth-btn" id="btnAuthAction" onclick="window.handleAuth()">登入</button>
+            <div class="switch-auth" id="switchAuthLink" onclick="window.openRegisterModal()">沒有帳號？申請新帳號</div>
+        </div>
     </div>
 </div>
 
@@ -712,7 +834,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.4.1';   // v1.4.1：＋ 按鈕手機版修正（點過後 hover 放大卡住、＋ 字元在 iPhone 偏下導致旋轉時晃動）
+    const APP_VERSION = '1.5.0';   // v1.5.0：登入畫面改版（品牌區／波浪／風車／光圈）、手動登入的旋轉展開轉場、每日開場動畫（含問候語）、App 圖示 LOGO 修正為正圓
                                    //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
                                    // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
@@ -2107,7 +2229,10 @@
     async function handleAuth() {
         const u = document.getElementById('username').value.trim(); const p = document.getElementById('password').value.trim();
         const btn = document.getElementById('btnAuthAction');
-        if(!u || !p) return alert('請輸入帳號密碼'); btn.disabled = true;
+        if (!u || !p) { showAuthError('請輸入帳號和密碼'); return; }   // v1.5.0：不跳 alert，改紅字＋卡片輕晃
+        hideAuthError();
+        btn.disabled = true; setAuthBtn('loading');
+        let okUser = null;
         try {
             // v93：移除硬編碼的萬用登入。
             //      原本 Admin/固定密碼會繞過資料庫直接以 creator 身分登入，
@@ -2120,11 +2245,172 @@
             else {
                 const user = q.docs[0].data();
                 if (!user.isApproved) alert('⚠️ 您的帳號尚未通過審核。');
-                else loginSuccess(user.username, user.role || 'user');
+                else okUser = user;
             }
         } catch (e) { alert(e.message || '發生錯誤'); console.error(e); }
-        finally { btn.disabled = false; }
+        finally { if (!okUser) { btn.disabled = false; setAuthBtn('idle'); } }
+        // v1.5.0：成功 → 按鈕打勾停 0.4 秒 → 旋轉展開轉場（按鈕維持 disabled，轉場中不能再送出）
+        if (okUser) { setAuthBtn('ok'); setTimeout(() => playLoginTransition(okUser.username, okUser.role || 'user'), 400); }
     }
+
+    // ==========================================
+    // v1.5.0：登入畫面互動、登入轉場（B 旋轉展開）、每日開場動畫
+    // ==========================================
+    const REDUCED_MOTION_MQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const EASE_MAIN = 'cubic-bezier(.65, 0, .35, 1)';
+    const ICON_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+    const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    document.getElementById('authEye').innerHTML = ICON_EYE;
+
+    function togglePasswordVisible() {
+        const pw = document.getElementById('password'), eye = document.getElementById('authEye');
+        const show = pw.type === 'password';
+        pw.type = show ? 'text' : 'password';
+        eye.innerHTML = show ? ICON_EYE_OFF : ICON_EYE;
+        eye.setAttribute('aria-label', show ? '隱藏密碼' : '顯示密碼');
+    }
+    function setAuthBtn(mode) {   // idle / loading / ok
+        const btn = document.getElementById('btnAuthAction');
+        btn.classList.toggle('ok', mode === 'ok');
+        if (mode === 'loading') { btn.innerHTML = '<span class="auth-btn-spin"></span>'; btn.setAttribute('aria-label', '登入中'); }
+        else if (mode === 'ok') { btn.innerHTML = ICON_CHECK; btn.setAttribute('aria-label', '登入成功'); }
+        else { btn.textContent = '登入'; btn.removeAttribute('aria-label'); }
+    }
+    function showAuthError(msg) {
+        const err = document.getElementById('authErr'), box = document.getElementById('authBox');
+        err.textContent = msg; err.classList.add('show');
+        box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+    }
+    function hideAuthError() { document.getElementById('authErr').classList.remove('show'); }
+    ['username', 'password'].forEach(id => document.getElementById(id).addEventListener('input', hideAuthError));
+
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    function markSplashToday() { try { localStorage.setItem('tt_splash_date', getTodayStr()); } catch (e) {} }
+
+    // 進入系統：系統畫面從中心以圓形展開，圓圈外仍是主色。
+    // #app-screen 平常是透明的（透出 body 的 --bg）；展開時後面墊的是主色層，所以要暫時給它 --bg 底色，
+    // 否則圓圈裡的任務看板會透成主色（使用者 2026-10-26 實測回報）。
+    function revealAppCircle(ms) {   // 暫時把 #app-screen 提到背景層之上，以 clip-path 圓形展開
+        const app = document.getElementById('app-screen');
+        const r = Math.ceil(Math.hypot(window.innerWidth, window.innerHeight) / 2) + 2;
+        app.style.zIndex = '2950';
+        app.style.backgroundColor = 'var(--bg)';
+        app.style.clipPath = app.style.webkitClipPath = 'circle(0px at 50% 50%)';
+        void app.offsetWidth;
+        app.style.transition = 'clip-path ' + ms + 'ms ' + EASE_MAIN + ', -webkit-clip-path ' + ms + 'ms ' + EASE_MAIN;
+        app.style.clipPath = app.style.webkitClipPath = 'circle(' + r + 'px at 50% 50%)';
+    }
+    function clearAppReveal() {
+        const app = document.getElementById('app-screen');
+        app.style.transition = ''; app.style.clipPath = ''; app.style.webkitClipPath = ''; app.style.zIndex = ''; app.style.backgroundColor = '';
+    }
+
+    // 二、手動登入成功後的轉場（約 2 秒）。開始時就 loginSuccess()，系統在遮罩後面載入，展開時已準備好
+    async function playLoginTransition(username, role) {
+        markSplashToday();   // 今天已看過轉場 → 重新整理不再播每日開場動畫
+        if (REDUCED_MOTION_MQ.matches) { loginSuccess(username, role); return; }
+        const src = document.getElementById('authLogo'), rect = src.getBoundingClientRect();
+        const cover = document.createElement('div'); cover.className = 'tt-cover'; cover.style.opacity = '0';
+        const logo = document.createElement('img'); logo.className = 'tt-fly-logo'; logo.src = src.src; logo.alt = '';
+        Object.assign(logo.style, { left: rect.left + 'px', top: rect.top + 'px', width: rect.width + 'px', height: rect.height + 'px' });
+        document.body.append(cover, logo);
+        src.style.visibility = 'hidden';
+        // 1、2：卡片與品牌文字淡出；3：主色鋪滿
+        const box = document.getElementById('authBox'), inner = document.querySelector('#auth-screen .auth-brand-inner');
+        box.style.animation = 'none'; inner.style.animation = 'none';
+        box.style.transition = 'opacity 320ms ' + EASE_MAIN + ', transform 320ms ' + EASE_MAIN;
+        document.querySelectorAll('#auth-screen .auth-brand-title, #auth-screen .auth-brand-sub').forEach(el => { el.style.transition = 'opacity 260ms ease'; el.style.opacity = '0'; });
+        box.style.opacity = '0'; box.style.transform = 'translateY(24px) scale(.97)';
+        cover.style.transition = 'opacity 360ms ease';
+        void cover.offsetWidth; cover.style.opacity = '1';
+        await wait(140);
+        loginSuccess(username, role);   // 系統畫面在遮罩後面開始載入（initApp 會隱藏登入畫面）
+        // 4：LOGO 移到正中央並放大到 1.1
+        const dx = window.innerWidth / 2 - (rect.left + rect.width / 2), dy = window.innerHeight / 2 - (rect.top + rect.height / 2);
+        logo.style.transition = 'transform 460ms ' + EASE_MAIN;
+        logo.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.1)';
+        await wait(460);
+        // 5：原地旋轉一圈並放大到 1.35
+        logo.style.transition = 'transform 760ms ' + EASE_MAIN;
+        logo.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.35) rotate(360deg)';
+        await wait(760);
+        // 6：系統畫面從中心以圓形展開，LOGO 淡出
+        logo.style.transition = 'opacity 300ms ease'; logo.style.opacity = '0';
+        revealAppCircle(700);
+        await wait(700);
+        // 7：清除
+        cover.remove(); logo.remove(); clearAppReveal();
+        src.style.visibility = '';
+    }
+
+    // 三、每日開場動畫（保持登入、今天第一次打開）
+    function shouldPlaySplash() {
+        try {
+            return localStorage.getItem('tt_splash_date') !== getTodayStr() && !REDUCED_MOTION_MQ.matches &&
+                   !document.getElementById('force-update-screen') && !document.getElementById('maintenance-screen');
+        } catch (e) { return false; }
+    }
+    function splashGreeting(name) {
+        const h = new Date().getHours();
+        const t = h < 11 ? '早安' : (h < 18 ? '午安' : '晚安');
+        return name ? t + '，' + name : t;
+    }
+    let splashState = null;
+    function startSplash() {
+        const bg = document.createElement('div'); bg.className = 'tt-cover';
+        const fg = document.createElement('div'); fg.className = 'tt-cover-fg';
+        fg.innerHTML = '<div class="tt-sp-logo"><span class="tt-sp-ring"></span><span class="tt-sp-ring"></span><img src="logo-white.png" alt=""></div>' +
+                       '<div class="tt-sp-greet"></div>';   // 點一下跳過的功能保留，不顯示提示字
+        document.body.append(bg, fg);
+        document.documentElement.classList.remove('tt-splash-pending');
+        splashState = { bg, fg, timers: [], done: false };
+        fg.addEventListener('click', endSplash);
+        bg.addEventListener('click', endSplash);
+        // 2：LOGO 彈出
+        const logo = fg.querySelector('.tt-sp-logo');
+        logo.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.2, .9, .3, 1.2)', fill: 'forwards' });
+        // 稱謂：有快取直接用；沒有（每台裝置只會一次）最多等 1 秒讓成員資料載入，等不到就只顯示時段問候
+        let cached = null;
+        try { cached = localStorage.getItem('tt_display_name'); } catch (e) {}
+        if (cached) { runSplash(cached); return; }
+        const t0 = Date.now();
+        (function poll() {
+            if (!splashState || splashState.done) return;
+            const rec = getCurrentUserRecord();
+            if (rec) runSplash(getUserDisplayName(state.currentUser.name));
+            else if (Date.now() - t0 >= 1000) runSplash('');
+            else splashState.timers.push(setTimeout(poll, 100));
+        })();
+    }
+    function runSplash(name) {
+        const s = splashState; if (!s || s.done) return;
+        const logo = s.fg.querySelector('.tt-sp-logo'), greet = s.fg.querySelector('.tt-sp-greet');
+        greet.textContent = splashGreeting(name);   // 稱謂是使用者可編輯的資料，一律用 textContent
+        const at = (ms, fn) => s.timers.push(setTimeout(() => { if (!s.done) fn(); }, ms));
+        // 3：光圈擴散（第二圈延遲 200ms）
+        s.fg.querySelectorAll('.tt-sp-ring').forEach((ring, i) =>
+            ring.animate([{ transform: 'scale(.85)', opacity: 0.9 }, { transform: 'scale(1.6)', opacity: 0 }], { duration: 900, delay: 300 + i * 200, easing: 'ease-out', fill: 'both' }));
+        // 4：問候語淡入
+        greet.animate([{ transform: 'translateY(8px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 400, delay: 520, easing: 'ease-out', fill: 'forwards' });
+        // 5：LOGO 旋轉一圈並放大到 1.15
+        at(640, () => logo.animate([{ transform: 'scale(1) rotate(0deg)' }, { transform: 'scale(1.15) rotate(360deg)' }], { duration: 800, easing: EASE_MAIN, fill: 'forwards' }));
+        // 6：LOGO 與問候語淡出，系統畫面以圓形展開
+        at(1260, () => { s.fg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, easing: 'ease', fill: 'forwards' }); s.fg.style.pointerEvents = 'none'; revealAppCircle(560); });
+        // 7：清除
+        at(1840, endSplash);
+    }
+    function endSplash() {   // 播完或點一下跳過
+        const s = splashState; if (!s || s.done) return;
+        s.done = true;
+        s.timers.forEach(clearTimeout);
+        s.bg.remove(); s.fg.remove();
+        clearAppReveal();
+        document.documentElement.classList.remove('tt-splash-pending');
+        markSplashToday();
+        splashState = null;
+    }
+
 
     // v1.1.0：登入框按 Enter 送出。注音／中文輸入法選字時的 Enter（isComposing，舊版 Safari 為 keyCode 229）不觸發；
     //         按鈕 disabled（登入進行中）時不重複送出。註冊視窗依使用者決定不加。
@@ -2171,6 +2457,7 @@
 
     function logout() {
         localStorage.removeItem('tt_current_user');
+        localStorage.removeItem('tt_display_name');   // v1.5.0：開場動畫問候語用的稱謂快取
         location.reload();
     }
 
@@ -2309,7 +2596,11 @@
         const storedUser = localStorage.getItem('tt_current_user');
         if (storedUser) {
             state.currentUser = JSON.parse(storedUser);
+            if (shouldPlaySplash()) startSplash();   // v1.5.0：每日開場動畫，系統在開場層後面照常載入
+            else document.documentElement.classList.remove('tt-splash-pending');
             initApp();
+        } else if (!MOBILE_MQ.matches) {
+            document.getElementById('username').focus();   // v1.5.0：取代原本的 autofocus，手機版不自動叫出鍵盤
         }
 
         // Firestore listeners（核心資料，透過事件廣播給模組）
@@ -2323,6 +2614,7 @@
             // 管理員若在他人登入期間調整角色/權限，這裡即時同步
             if (state.currentUser) {
                 const rec = getCurrentUserRecord();
+                if (rec) { try { localStorage.setItem('tt_display_name', rec.nickname || rec.username); } catch (e) {} }   // v1.5.0
                 // v1.0.0：帳號已被刪除 → 強制登出（v55 曾有此功能，v71 大改版時遺失）。
                 //         只認伺服器回傳的快照：開頁時的本機快取可能還不完整，若據此判斷會誤踢正常帳號。
                 //         此處只登出、不寫入 Firestore。
