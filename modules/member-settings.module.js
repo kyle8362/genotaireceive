@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v106
+ * 模組：成員設定管理 (memberSettings)  ─ v107
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -17,6 +17,7 @@
  * v106 變更（系統 v1.6.0）：新增分頁「☎️ 分機表」（creator / senior）：貼上 Excel 匯入分機表（預覽、
  *          手機號碼一律清掉、與目前資料的差異）＋辦公室資訊編輯，存在 settings/extensions（整份 1 個文件）。
  *          權限名稱改用 core.roleLabel（與側邊欄個人卡片共用）。
+ * v107 變更（系統 v1.6.1）：匯入分機表時另外記錄 listUpdatedAt（分機查詢標題顯示這個日期；存辦公室資訊不會改到它）。
  *
  * 內含三個分頁：
  *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
@@ -1205,10 +1206,11 @@
         if (!confirm('確定用這份資料取代目前的分機表？\n\n共 ' + extPreview.length + ' 人')) return;
         var btn = document.getElementById('msExtSaveBtn');
         if (btn) btn.disabled = true;
-        var patch = { list: extPreview, updatedAt: extNowSec(), updatedBy: core.state.currentUser.name };
+        var now = extNowSec();
+        var patch = { list: extPreview, listUpdatedAt: now, updatedAt: now, updatedBy: core.state.currentUser.name };
         core.db.collection('settings').doc('extensions').set(patch, { merge: true })
             .then(function () {
-                extCurrent = { list: patch.list, offices: (extCurrent && extCurrent.offices) || [], updatedAt: patch.updatedAt, updatedBy: patch.updatedBy };
+                extCurrent = { list: patch.list, offices: (extCurrent && extCurrent.offices) || [], listUpdatedAt: patch.listUpdatedAt, updatedAt: patch.updatedAt, updatedBy: patch.updatedBy };
                 core.setExtensionsData(extCurrent);   // 分機查詢立即顯示新資料
                 document.getElementById('msExtImport').value = '';
                 clearExtPreview();
@@ -1258,7 +1260,7 @@
         var patch = { offices: offices, updatedAt: extNowSec(), updatedBy: core.state.currentUser.name };
         core.db.collection('settings').doc('extensions').set(patch, { merge: true })
             .then(function () {
-                extCurrent = { list: (extCurrent && extCurrent.list) || [], offices: offices, updatedAt: patch.updatedAt, updatedBy: patch.updatedBy };
+                extCurrent = { list: (extCurrent && extCurrent.list) || [], offices: offices, listUpdatedAt: (extCurrent && extCurrent.listUpdatedAt) || '', updatedAt: patch.updatedAt, updatedBy: patch.updatedBy };
                 extOffices = offices.map(function (o) { return { name: o.name, tel: o.tel, fax: o.fax, addr: o.addr }; });
                 core.setExtensionsData(extCurrent);
                 renderExtCurrent();
