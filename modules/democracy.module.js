@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v17
+ * 模組：中區的民主聖地 (democracy)  ─ v18
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
@@ -18,6 +18,11 @@
  *      修改後由管理員手動重發：撤回該案件的舊通知，再以目前內容發「○○更新：標題」
  *
  * v17（系統 v1.3.1）：VIP 框公告的內容照輸入時的換行顯示（跑馬燈仍為一行）
+ *
+ * v18（系統 v1.7.0）：文具／投票／團購統一用「📣 發送通知」（openNotifyComposer）：系統先擬好標題與內容，
+ *      管理員可修改、可預約，預設撤回這一案之前的通知。取代投票、團購的「🔔 重發通知」與建立時的自動通知；
+ *      建立投票、開團、文具開新單成功後自動開啟發送視窗（按取消＝不發）。刪除文具單時通知改為「案件已刪除」。
+ *      對外新增 getCaseStatus／openCase，讓通知全文的「前往」按鈕直接打開那一案。公告的通知與重發維持原樣
  *
  * 連自己的 Firebase 專案（gbt-central-democracy），不動 AppCore.db。
  * 權限：permKey = 'democracy'，全員預設可進入（大家都要登記文具），
@@ -52,6 +57,7 @@
     var homeSettings = {};           // settings/home
     var catalog = [];                // 常用品項
     var orders = [];                 // 文具單（新→舊）
+    var ordersReady = false, votesReady = false, gbsReady = false;   // v18：第一次快照回來後才是 true
     var entries = [];                // 目前檢視單的所有登記
     var viewOrderId = null;          // 管理員檢視中的單 id（一般人固定看最新單）
     var unsubEntries = null;         // 登記監聽的取消函式
@@ -232,17 +238,94 @@
         renotify('announcement', a.id, '公告', a.title || '', a.body || '',
                  a.endDate + ' 23:59', a.startDate ? a.startDate + ' 00:00' : null);
     }
-    function renotifyVote() {
+    // v18：「📣 發送通知」— 文具／投票／團購共用。系統先擬好內容，管理員可修改後再送出（可預約、預設撤回這一案的舊通知）
+    var NOTIFY_CFG = {
+        stationery: { label: '文具', go: '前往登記' },
+        vote:       { label: '投票', go: '前往投票' },
+        groupbuy:   { label: '團購', go: '前往登記' }
+    };
+    function notifyDefaults(kind, c) {
+        var dl = c.deadline || '未設定';
+        if (kind === 'stationery') return { title: '文具登記開始：' + (c.title || '文具採購單'),
+                                             body: '登記截止：' + dl + '\n需要文具的同仁請在截止前完成登記。' };
+        if (kind === 'vote') return { title: '投票提醒：' + (c.title || '投票案'),
+                                      body: '投票方式：' + (c.mode === 'multi' ? '多選' : '單選') + '（記名）\n截止時間：' + dl + '\n還沒投票的同仁請記得投票。' };
+        return { title: '團購提醒：' + (c.title || '團購案'),
+                 body: '截止時間：' + dl + '\n想參加的同仁請在截止前登記 +1。' };
+    }
+    function openNotifyComposer(kind, c, justCreated) {
+        if (core.denyViewOnly()) return;
+        if (!c || !c.id || !core.createNotification) return;
+        var cfg = NOTIFY_CFG[kind], d = notifyDefaults(kind, c);
+        var dl = String(c.deadline || '').split(' ');
+        var body =
+            (justCreated ? '<div class="demo-muted" style="margin-bottom:10px;">' + cfg.label + '已建立。要通知大家的話，確認內容後按「發送通知」；按「取消」就不發通知。</div>' : '') +
+            '<div class="dm-field"><label>標題（必填）</label><input id="dmNtTitle" maxlength="60" value="' + esc(d.title) + '"></div>' +
+            '<div class="dm-field"><label>內容</label><textarea id="dmNtBody">' + esc(d.body) + '</textarea></div>' +
+            '<div class="dm-field"><label>開始日期（選填，預約發送；留空＝立即發送）</label><input type="date" id="dmNtStartDate"></div>' +
+            '<div class="dm-field"><label>開始時間</label><input type="time" id="dmNtStartTime" value="08:00"></div>' +
+            '<div class="dm-field"><label>結束日期（必填）</label><input type="date" id="dmNtEndDate" value="' + esc(dl[0] || '') + '"></div>' +
+            '<div class="dm-field"><label>結束時間</label><input type="time" id="dmNtEndTime" value="' + esc(dl[1] || '23:59') + '"></div>' +
+            '<div class="demo-muted" style="margin:2px 0 10px;">🔗 通知全文下方會有「' + cfg.go + '」按鈕，直接打開〔' + esc(c.title || cfg.label) + '〕</div>' +
+            '<div class="dm-field"><label><input type="checkbox" id="dmNtRevoke" checked style="width:auto; margin-right:6px; vertical-align:middle;">撤回這一案之前發過的通知</label></div>';
+        openModal(justCreated ? '已建立，要發送通知嗎？' : '📣 發送通知', body, '發送通知', function () {
+            var title = document.getElementById('dmNtTitle').value.trim();
+            var text = document.getElementById('dmNtBody').value.trim();
+            var sd = document.getElementById('dmNtStartDate').value, st = document.getElementById('dmNtStartTime').value || '00:00';
+            var ed = document.getElementById('dmNtEndDate').value, et = document.getElementById('dmNtEndTime').value || '23:59';
+            if (!title) { alert('請填寫標題'); return false; }
+            if (!ed) { alert('請填寫結束日期'); return false; }
+            var expireAt = ed + ' ' + et, showFrom = sd ? sd + ' ' + st : null, now = nowStr();
+            if (expireAt <= now) { alert('結束時間必須晚於現在'); return false; }
+            if (showFrom && expireAt <= showFrom) { alert('結束時間必須晚於開始時間'); return false; }
+            if (showFrom && showFrom <= now) showFrom = null;          // 開始時間已過＝立即發送（同成員設定的手動通知）
+            var revoke = document.getElementById('dmNtRevoke').checked && core.revokeNotificationsByRef;
+            (revoke ? core.revokeNotificationsByRef(c.id) : Promise.resolve())
+                .then(function () {
+                    return core.createNotification({ kind: kind, refId: c.id, title: title, body: text, showFrom: showFrom, expireAt: expireAt });
+                })
+                .then(function () { alert('已發送通知'); })
+                .catch(function (e) { alert('發送失敗：' + (e.message || e.code)); });
+        });
+    }
+    function notifyOrder() {
+        var o = viewingOrder();
+        if (!o) return;
+        if (isLocked(o)) { alert('這張單已結單，無法發送通知。'); return; }
+        openNotifyComposer('stationery', o);
+    }
+    function notifyVote() {
         var v = viewingVote();
         if (!v) return;
-        if (isLocked(v)) { alert('這個投票已結束，無法重發通知。'); return; }
-        renotify('vote', v.id, '投票', v.title || '投票案', '截止時間：' + (v.deadline || '未設定'), v.deadline || null);
+        if (isLocked(v)) { alert('這個投票已結束，無法發送通知。'); return; }
+        openNotifyComposer('vote', v);
     }
-    function renotifyGb() {
+    function notifyGb() {
         var g = viewingGb();
         if (!g) return;
-        if (isLocked(g)) { alert('這一團已結束，無法重發通知。'); return; }
-        renotify('groupbuy', g.id, '團購', g.title || '團購案', '截止時間：' + (g.deadline || '未設定'), g.deadline || null);
+        if (isLocked(g)) { alert('這一團已結束，無法發送通知。'); return; }
+        openNotifyComposer('groupbuy', g);
+    }
+
+    // v18：通知全文的「前往」按鈕用。資料已載入就直接判斷；還沒打開過民主聖地分頁就讀那一案（1 筆）
+    var CASE_COL = { stationery: 'stationeryOrders', vote: 'votes', groupbuy: 'groupbuys' };
+    function getCaseStatus(kind, refId) {
+        var col = CASE_COL[kind];
+        if (!col || !refId) return Promise.resolve('open');
+        function judge(c) { return !c ? 'deleted' : (isLocked(c) ? 'ended' : 'open'); }
+        var ready = kind === 'stationery' ? ordersReady : (kind === 'vote' ? votesReady : gbsReady);
+        var list = kind === 'stationery' ? orders : (kind === 'vote' ? votes : groupbuys);
+        if (ready) return Promise.resolve(judge(findById(list, refId)));
+        return db.collection(col).doc(refId).get()
+            .then(function (doc) { return judge(doc.exists ? doc.data() : null); })
+            .catch(function () { return 'open'; });              // 讀不到就讓使用者照樣前往
+    }
+    // 由 core 先切到民主聖地分頁再呼叫；資料快照還沒回來時，詳細頁會先顯示「載入中」
+    function openCase(kind, refId) {
+        attachListener();
+        if (kind === 'vote') openVote(refId);
+        else if (kind === 'groupbuy') openGb(refId);
+        else showScreen('stationery');
     }
 
     function copyText(text) {
@@ -1128,6 +1211,7 @@
         var order = latestOrder();
         var h = '';
 
+        if (!order && !ordersReady) return '<div class="demo-card"><div class="demo-empty">載入中…</div></div>';   // v18
         if (!order) {
             h += '<div class="demo-card"><div class="demo-empty">目前沒有進行中的文具採購單。<br>等管理員開單後就可以登記了。</div></div>';
             return h;
@@ -1508,7 +1592,8 @@
             h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.reopenOrder()">重新開啟並延長截止</button>';
         } else {
             h += '<button class="demo-btn demo-btn-warn" onclick="DemocracyModule.lockOrder()">提前結束登記</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.changeDeadline()">修改結單時間</button>';
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.changeDeadline()">修改結單時間</button>' +
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.notifyOrder()">📣 發送通知</button>';   // v18
         }
         h += '<button class="demo-btn demo-btn-danger" onclick="DemocracyModule.deleteOrder()">刪除這張單</button>';
         h += '</div></div>';
@@ -1611,6 +1696,7 @@
                 viewOrderId = ref.id;
                 pendingLoadedFor = null;
                 toDelete.forEach(hardDeleteOrder);
+                openNotifyComposer('stationery', { id: ref.id, title: title, deadline: deadline }, true);   // v18
             }).catch(dbErr);
         });
     }
@@ -1622,7 +1708,9 @@
             var jobs = [];
             snap.forEach(function (d) { jobs.push(d.ref.delete()); });
             return Promise.all(jobs);
-        }).then(function () { return oref.delete(); }).catch(dbErr);
+        }).then(function () { return oref.delete(); })
+          .then(function () { if (core.markNotificationsDeleted) core.markNotificationsDeleted(orderId); })   // v18：通知改為「案件已刪除」
+          .catch(dbErr);
     }
 
     function lockOrder() {
@@ -1880,7 +1968,7 @@
     /* ---------- 一般人：投票與結果 ---------- */
     function htmlVoteDetail() {
         var v = findById(votes, currentVoteId);
-        if (!v) return '<div class="demo-card"><div class="demo-empty">這個投票案已經不存在了。</div></div>';
+        if (!v) return '<div class="demo-card"><div class="demo-empty">' + (votesReady ? '這個投票案已經不存在了。' : '載入中…') + '</div></div>';
 
         var h = '<button class="demo-back" onclick="DemocracyModule.go(\'vote\')">← 返回投票清單</button>';
         h += '<div class="demo-order-bar">' +
@@ -2102,7 +2190,7 @@
              '<div class="demo-row">' +
              '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyVoteNotice()">複製開案通知（LINE）</button>' +
              '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyVoteResult()">複製統計結果（LINE）</button>' +
-             (locked ? '' : '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.renotifyVote()">🔔 重發通知</button>') +   // v16
+             (locked ? '' : '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.notifyVote()">📣 發送通知</button>') +   // v18
              '</div><div class="demo-muted" style="margin-top:8px;">複製後直接貼到 LINE 群組即可。</div></div>';
         return h;
     }
@@ -2219,7 +2307,8 @@
                 data.logs = [logLine('建立投票，截止 ' + deadline)];
                 db.collection('votes').add(data).then(function (ref) {
                     adminVoteId = ref.id;
-                    notifyNew('vote', ref.id, '新投票：' + data.title, '截止時間：' + deadline, deadline);   // v15
+                    // v18：不再自動發通知，改成自動開啟「📣 發送通知」（建立用的彈窗此時已關閉）
+                    openNotifyComposer('vote', { id: ref.id, title: data.title, deadline: deadline, mode: data.mode }, true);
                 }).catch(dbErr);
             }
         });
@@ -2481,7 +2570,7 @@
     /* ---------- 一般人：團購登記 ---------- */
     function htmlGbDetail() {
         var g = findById(groupbuys, currentGbId);
-        if (!g) return '<div class="demo-card"><div class="demo-empty">這個團購案已經不存在了。</div></div>';
+        if (!g) return '<div class="demo-card"><div class="demo-empty">' + (gbsReady ? '這個團購案已經不存在了。' : '載入中…') + '</div></div>';
 
         var h = '<button class="demo-back" onclick="DemocracyModule.go(\'groupbuy\')">← 返回團購清單</button>';
         h += '<div class="demo-order-bar">' +
@@ -2697,7 +2786,7 @@
         if (!locked) {
             h += '<div class="demo-row" style="margin-top:12px;">' +
                  '<button class="demo-btn demo-btn-primary" onclick="DemocracyModule.copyGbNotice()">複製開團通知（LINE）</button>' +
-                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.renotifyGb()">🔔 重發通知</button>' +   // v16
+                 '<button class="demo-btn demo-btn-ghost" onclick="DemocracyModule.notifyGb()">📣 發送通知</button>' +   // v18
                  '</div><div class="demo-muted" style="margin-top:8px;">複製後直接貼到 LINE 群組即可。</div>';
         }
         h += '</div>';
@@ -2927,7 +3016,7 @@
                 data.logs = [logLine('開團，截止 ' + deadline)];
                 db.collection('groupbuys').add(data).then(function (ref) {
                     adminGbId = ref.id;
-                    notifyNew('groupbuy', ref.id, '團購開團：' + data.title, '截止時間：' + deadline, deadline);   // v15
+                    openNotifyComposer('groupbuy', { id: ref.id, title: data.title, deadline: deadline }, true);   // v18
                 }).catch(dbErr);
             }
         });
@@ -3207,6 +3296,7 @@
             orders = docsToArray(snap).sort(function (a, b) {
                 return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
             });
+            ordersReady = true;
             attachEntriesListener();
             render();
         }, dbErr);
@@ -3215,6 +3305,7 @@
             votes = docsToArray(snap).sort(function (a, b) {
                 return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
             });
+            votesReady = true;
             attachBallotsListener();
             render();
         }, dbErr);
@@ -3223,6 +3314,7 @@
             groupbuys = docsToArray(snap).sort(function (a, b) {
                 return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
             });
+            gbsReady = true;
             attachGbListener();
             render();
         }, dbErr);
@@ -3410,8 +3502,11 @@
         copyGbNotice: copyGbNotice,         // v15
         copyAnnNotice: copyAnnNotice,       // v15
         renotifyAnn: renotifyAnn,           // v16
-        renotifyVote: renotifyVote,
-        renotifyGb: renotifyGb,
+        notifyOrder: notifyOrder,           // v18：📣 發送通知
+        notifyVote: notifyVote,
+        notifyGb: notifyGb,
+        getCaseStatus: getCaseStatus,       // v18：通知全文的「前往」按鈕
+        openCase: openCase,
 
         openGb: openGb,
         gbSetQty: gbSetQty,

@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.6.1 Modular · 部門選單)</title>
+    <title>中區收送件進度追蹤系統 (v1.7.0 Modular · 發送通知)</title>
     <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
          手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
          display 維持 browser，不改變現有開啟方式 -->
@@ -413,6 +413,10 @@
         .notif-item-time { color: #9ca3af; font-size: 0.72rem; margin-top: 4px; }
         .notif-empty { text-align: center; color: #9ca3af; padding: 28px 0; }
         .notif-detail-body { white-space: pre-wrap; word-break: break-word; line-height: 1.6; color: var(--text-main); }
+        /* v1.7.0：通知全文下方的「前往登記／前往投票」 */
+        .notif-go-btn { display: block; width: 100%; height: 44px; margin-top: 16px; flex-shrink: 0; border: 0; border-radius: 10px; background: #0d9488; color: #fff; font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer; }
+        .notif-go-btn:disabled { opacity: 0.7; cursor: default; }
+        .notif-go-btn.ended { background: #9ca3af; }
 
         /* v1.3.0：必讀通知（公告／手動通知超過 2 天未讀）— 蓋住整個系統，讀完才能使用；
            z-index 2500：高於一般彈窗 2100，低於強制更新 3000 */
@@ -803,6 +807,7 @@
         <div class="notif-head"><button type="button" class="notif-back" onclick="closeNotifDetail()" aria-label="返回">‹</button><h3 id="notifDetailTitle"></h3></div>
         <div class="notif-item-time" id="notifDetailMeta" style="margin:-4px 0 12px;"></div>
         <div class="notif-detail-body" id="notifDetailBody"></div>
+        <button type="button" class="notif-go-btn" id="notifGoBtn" style="display:none;"></button>   <!-- v1.7.0：前往登記／前往投票 -->
         <div class="modal-btns"><button class="btn btn-save" onclick="closeNotifDetail()">關閉</button></div>
     </div>
 </div>
@@ -928,7 +933,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.6.1';   // v1.6.1：分機查詢的部門篩選從按鈕（約 45 個，把查詢結果擠到下面）改成搜尋框旁的下拉選單；標題後顯示分機表更新日期
+    const APP_VERSION = '1.7.0';   // v1.7.0：民主聖地文具／投票／團購「📣 發送通知」（可修改、可預約）；通知全文加「前往登記／前往投票」按鈕（democracy v18）
                                    //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
                                    // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
@@ -997,7 +1002,7 @@
     }
     function hasRole(roles) { return !!state.currentUser && roles.includes(state.currentUser.role); }
     // v1.6.0：權限的中文名稱（側邊欄個人卡片與成員設定共用）
-    const ROLE_LABELS = { creator: '🟣 創世神', senior: '高級管理者', admin: '管理者', user: '一般者' };
+    const ROLE_LABELS = { creator: '創世神', senior: '高級管理者', admin: '管理者', user: '一般者' };
     function roleLabel(role) { return ROLE_LABELS[role] || ROLE_LABELS.user; }
 
     // ==========================================
@@ -1105,9 +1110,11 @@
     const NOTIF_KIND = {
         manual:       { ico: '📣', label: '手動' },
         announcement: { ico: '📢', label: '公告' },                     // v1.2.4：公告不跳頁，直接顯示全文（含「公告更新」）
-        vote:         { ico: '🗳️', label: '投票', screen: 'vote' },
-        groupbuy:     { ico: '🛒', label: '團購', screen: 'groupbuy' }
+        vote:         { ico: '🗳️', label: '投票' },                       // v1.7.0：不再直接跳頁，先顯示全文＋「前往投票」按鈕
+        groupbuy:     { ico: '🛒', label: '團購' },
+        stationery:   { ico: '🖊️', label: '文具' }                        // v1.7.0：文具登記（不是必讀）
     };
+    const NOTIF_CASE_GO = { stationery: '前往登記', vote: '前往投票', groupbuy: '前往登記' };   // v1.7.0：通知全文下方的按鈕文字
     let unsubNotifs = null;
     let notifSnapReady = false, notifReadsReady = false, notifPromptChecked = false, initAppAt = 0;
     state.notifs = [];
@@ -1381,17 +1388,41 @@
         if (!n) return;
         markNotifRead(id);
         closeNotifMailbox();
-        const k = NOTIF_KIND[n.kind];
-        if (k && k.screen) {
-            switchTab('democracy');
-            if (state.activeTab === 'democracy' && window.DemocracyModule) window.DemocracyModule.go(k.screen);
-        } else {
-            document.getElementById('notifDetailTitle').textContent = n.title || '';
-            document.getElementById('notifDetailMeta').textContent = (n.showFrom || n.createdAt || '').slice(0, 16) + '　' + NOTIF_SIGNER;
-            document.getElementById('notifDetailBody').textContent = n.body || '';
-            document.getElementById('notifDetailModal').style.display = 'flex';
-            updateTabBar();
-        }
+        // v1.7.0：所有通知都先顯示全文；民主聖地案件類（文具／投票／團購）下方加「前往」按鈕
+        document.getElementById('notifDetailTitle').textContent = n.title || '';
+        document.getElementById('notifDetailMeta').textContent = (n.showFrom || n.createdAt || '').slice(0, 16) + '　' + NOTIF_SIGNER;
+        document.getElementById('notifDetailBody').textContent = n.body || '';
+        renderNotifGo(n);
+        document.getElementById('notifDetailModal').style.display = 'flex';
+        updateTabBar();
+    }
+    // v1.7.0：「前往登記／前往投票」：先問民主聖地這一案的狀態（判斷中顯示載入中；已結束或已刪除就變灰、不跳頁）
+    function renderNotifGo(n) {
+        const btn = document.getElementById('notifGoBtn'), label = NOTIF_CASE_GO[n.kind], dm = window.DemocracyModule;
+        btn.onclick = null;
+        btn.className = 'notif-go-btn';
+        if (!label || !n.refId || !dm || !dm.getCaseStatus || !canAccessView('democracy')) { btn.style.display = 'none'; return; }
+        btn.style.display = '';
+        btn.disabled = true;
+        btn.textContent = '載入中…';
+        btn.dataset.for = n.id;
+        dm.getCaseStatus(n.kind, n.refId).then(st => {
+            if (btn.dataset.for !== n.id) return;                 // 期間已經換看別則通知
+            btn.disabled = false;
+            if (st === 'open') {
+                btn.textContent = label;
+                btn.onclick = () => goNotifCase(n.kind, n.refId);
+            } else {
+                btn.classList.add('ended');
+                btn.textContent = '此案已結束';
+                btn.onclick = () => alert('這一案已經結束了');
+            }
+        });
+    }
+    function goNotifCase(kind, refId) {
+        closeNotifPages();                                        // 直接離開通知頁，不回信箱
+        switchTab('democracy');
+        if (state.activeTab === 'democracy' && window.DemocracyModule) window.DemocracyModule.openCase(kind, refId);
     }
     function markNotifRead(id) {
         if (!state.currentUser || !state.notifReadIds || state.notifReadIds.includes(id)) return;
@@ -2934,7 +2965,7 @@
 <script src="modules/stock.module.js?v=85"></script>
 <script src="modules/member-settings.module.js?v=107"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
-<script src="modules/democracy.module.js?v=17"></script>
+<script src="modules/democracy.module.js?v=18"></script>
 <script src="modules/gift.module.js?v=100"></script>
 
 <script>
