@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.7.0 Modular · 發送通知)</title>
+    <title>中區收送件進度追蹤系統 (v1.7.1 Modular · 辦公室資訊)</title>
     <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
          手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
          display 維持 browser，不改變現有開啟方式 -->
@@ -398,8 +398,16 @@
         .ext-copy:hover { border-color: var(--primary); color: var(--primary); }
         .ext-hl { background: #fef08a; border-radius: 2px; }
         .ext-empty { text-align: center; padding: 28px 0; color: #9ca3af; font-size: 0.9rem; }
-        .ext-office { background: #f9fafb; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.6; }
-        .ext-office b { color: var(--text-main); }
+        /* v1.7.1：「🏢 辦公室資訊」切換按鈕與辦公室卡片 */
+        .ext-mode-btn { flex-shrink: 0; border: 1px solid var(--primary); background: #fff; color: var(--primary); border-radius: 16px; padding: 5px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
+        .ext-mode-btn:hover { background: var(--primary-light); }
+        .ext-mode-btn.on { background: var(--primary); color: #fff; }
+        #extPanel.offices .ext-filter { display: none; }
+        .ext-office { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px 6px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .ext-office-name { font-weight: 700; font-size: 1rem; color: var(--text-main); margin-bottom: 4px; }
+        .ext-office-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid #f3f4f6; font-size: 0.9rem; }
+        .ext-office-lbl { flex: 0 0 34px; color: #9ca3af; font-size: 0.8rem; }
+        .ext-office-val { flex: 1; min-width: 0; word-break: break-all; color: var(--text-main); }
         .ext-toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(17,24,39,0.88); color: #fff; font-size: 0.85rem; padding: 7px 14px; border-radius: 18px; pointer-events: none; opacity: 0; transition: opacity .2s; white-space: nowrap; }
         .ext-toast.show { opacity: 1; }
         .notif-bubble.show { display: block; }
@@ -817,6 +825,7 @@
     <div class="ext-head">
         <button type="button" class="notif-back" onclick="closeExtPanel()" aria-label="返回">‹</button>
         <h3 id="extTitle">☎️ 分機查詢<span class="ext-date" id="extDate"></span></h3>
+        <button type="button" class="ext-mode-btn" id="extModeBtn" onclick="toggleExtOffices()">🏢 辦公室資訊</button>
         <button type="button" class="ext-close" onclick="closeExtPanel()" title="關閉" aria-label="關閉">✕</button>
     </div>
     <div class="ext-filter">
@@ -933,7 +942,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.7.0';   // v1.7.0：民主聖地文具／投票／團購「📣 發送通知」（可修改、可預約）；通知全文加「前往登記／前往投票」按鈕（democracy v18）
+    const APP_VERSION = '1.7.1';   // v1.7.1：分機查詢新增「🏢 辦公室資訊」切換按鈕，辦公室資訊改成一格一格的卡片（電話／傳真／地址可複製）
                                    //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
                                    // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
@@ -1235,7 +1244,7 @@
     //   姓名、部門一律經 escAttr 輸出。
     // ==========================================
     const EXT_CACHE_KEY = 'tt_ext_cache';
-    const extState = { data: null, fetched: false, loading: false, error: '', dept: 'all' };
+    const extState = { data: null, fetched: false, loading: false, error: '', dept: 'all', offices: false };   // v1.7.1：offices＝目前顯示辦公室資訊
     let extToastTimer = null;
 
     function extNorm(s) { return String(s == null ? '' : s).replace(/[\s　]+/g, '').toLowerCase(); }   // 忽略空白與全形空白
@@ -1249,6 +1258,7 @@
             try { const c = JSON.parse(localStorage.getItem(EXT_CACHE_KEY) || 'null'); if (c && Array.isArray(c.list)) extState.data = c; } catch (e) {}
         }
         fetchExtensions();
+        setExtOfficesMode(false);   // v1.7.1：每次打開都從分機列表開始
         renderExtDepts();
         renderExtList();
         document.getElementById('extMask').classList.add('open');
@@ -1304,6 +1314,19 @@
             `<option value="${v}"${(v === 'all' ? extState.dept === 'all' : extState.dept === depts[v]) ? ' selected' : ''}>${escAttr(label)}</option>`
         ).join('');
     }
+    // v1.7.1：分機列表 ⇄ 辦公室資訊
+    function setExtOfficesMode(on) {
+        extState.offices = on;
+        document.getElementById('extPanel').classList.toggle('offices', on);
+        const btn = document.getElementById('extModeBtn');
+        btn.classList.toggle('on', on);
+        btn.textContent = on ? '☎️ 分機列表' : '🏢 辦公室資訊';
+    }
+    function toggleExtOffices() {
+        setExtOfficesMode(!extState.offices);
+        renderExtList();
+        document.getElementById('extList').scrollTop = 0;
+    }
     function setExtDept(i) {
         extState.dept = i === 'all' ? 'all' : extDeptList()[Number(i)];
         renderExtDepts();
@@ -1333,6 +1356,15 @@
             box.innerHTML = `<div class="ext-empty">${escAttr(msg)}</div>`;
             return;
         }
+        if (extState.offices) {   // v1.7.1：辦公室資訊卡片
+            const row = (lbl, v) => v ? `<div class="ext-office-row"><span class="ext-office-lbl">${lbl}</span><span class="ext-office-val">${escAttr(v)}</span>` +
+                `<button type="button" class="ext-copy" data-v="${escAttr(v)}" data-l="${lbl}" onclick="copyExt(this.dataset.v, this.dataset.l)">複製</button></div>` : '';
+            box.innerHTML = d.offices.length
+                ? d.offices.map(o => `<div class="ext-office"><div class="ext-office-name">${escAttr(o.name)}</div>` +
+                    row('電話', o.tel) + row('傳真', o.fax) + row('地址', o.addr) + `</div>`).join('')
+                : '<div class="ext-empty">尚未填寫辦公室資訊</div>';
+            return;
+        }
         const q = extNorm(document.getElementById('extSearch').value);
         const rows = d.list.filter(r => (extState.dept === 'all' || (r.dept || '') === extState.dept) &&
             (!q || extNorm(r.dept).includes(q) || extNorm(r.name).includes(q) || extNorm(r.ext).includes(q)));
@@ -1350,18 +1382,11 @@
                 (r.ext ? `<button type="button" class="ext-copy" data-ext="${escAttr(r.ext)}" onclick="copyExt(this.dataset.ext)">複製</button>` : '') + `</div>`
             ).join('');
         });
-        if (!q && extState.dept === 'all' && d.offices.length) {
-            html += '<div class="ext-group-title">辦公室資訊</div>' + d.offices.map(o =>
-                `<div class="ext-office"><b>${escAttr(o.name)}</b>` +
-                (o.tel ? `<br>電話：${escAttr(o.tel)}` : '') + (o.fax ? `<br>傳真：${escAttr(o.fax)}` : '') +
-                (o.addr ? `<br>地址：${escAttr(o.addr)}` : '') + `</div>`
-            ).join('');
-        }
         box.innerHTML = html;
     }
 
-    function copyExt(ext) {
-        const done = () => showExtToast('已複製分機 ' + ext);
+    function copyExt(ext, label) {   // v1.7.1：label＝辦公室資訊的「電話／傳真／地址」
+        const done = () => showExtToast(label ? '已複製' + label : '已複製分機 ' + ext);
         const fallback = () => {   // http（例如同 Wi-Fi 的本機測試）沒有 navigator.clipboard
             const t = document.createElement('textarea');
             t.value = ext; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
