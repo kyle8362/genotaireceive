@@ -1,5 +1,5 @@
 /* =====================================================================
- * 模組：成員設定管理 (memberSettings)  ─ v105
+ * 模組：成員設定管理 (memberSettings)  ─ v106
  * ---------------------------------------------------------------------
  * v85 變更：由「浮動彈窗」改為「右側主畫面分頁」，
  *          操作方式與 QIAGEN 採購進度一致（點左側按鈕 → 右側顯示）。
@@ -14,6 +14,9 @@
  * v104 變更（系統 v1.2.1）：手動發布可設開始日期／時間（預約發送，寫入 showFrom）；
  *          發布紀錄的「尚未開始」會顯示預約發送時間，發送前也可以撤回。
  * v105 變更（系統 v1.3.0）：發布通知說明加上「超過 2 天未讀會被要求先讀完」（規則在 core）。
+ * v106 變更（系統 v1.6.0）：新增分頁「☎️ 分機表」（creator / senior）：貼上 Excel 匯入分機表（預覽、
+ *          手機號碼一律清掉、與目前資料的差異）＋辦公室資訊編輯，存在 settings/extensions（整份 1 個文件）。
+ *          權限名稱改用 core.roleLabel（與側邊欄個人卡片共用）。
  *
  * 內含三個分頁：
  *   ① 成員權限   ② 標籤選單（NGS 負責業務）   ③ 指派帳號
@@ -35,7 +38,8 @@
         { key: 'assign', label: '👤 指派帳號', roles: ['creator', 'senior'] },
         { key: 'stats',  label: '📊 任務完成統整', roles: ['creator', 'senior'] },
         { key: 'logs',   label: '📜 讀取紀錄', roles: ['creator', 'senior'] },    // v102
-        { key: 'notify', label: '📣 發布通知', roles: ['creator', 'senior', 'admin'] }   // v103
+        { key: 'notify', label: '📣 發布通知', roles: ['creator', 'senior', 'admin'] },  // v103
+        { key: 'extensions', label: '☎️ 分機表', roles: ['creator', 'senior'] }         // v106：使用者指定只有創世神、高級管理者能更新
     ];
 
     // v103：發布紀錄的狀態文字（狀態本身由 core.notifStatus 判斷）
@@ -169,6 +173,20 @@
     #memberSettingsView .notif-read-btn:hover { border-color: var(--primary); color: var(--primary); }
     #memberSettingsView .logs-table tr.notif-unread-row td { background: #fff7ed; color: #9a3412; white-space: normal; font-size: 0.82rem; }
 
+    /* ⑦ 分機表（v106） */
+    #memberSettingsView .ext-sec { max-width: 900px; margin-bottom: 26px; }
+    #memberSettingsView .ext-scroll { max-height: 320px; overflow: auto; }
+    #memberSettingsView .ext-import-text { width: 100%; box-sizing: border-box; min-height: 140px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; resize: vertical; }
+    #memberSettingsView .ext-btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    #memberSettingsView .ext-btn-ghost { background: #fff; border: 1px solid #d1d5db; color: var(--text-main); }
+    #memberSettingsView .ext-btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+    #memberSettingsView .logs-wrap.ext-scroll { background: #fff; }
+    #memberSettingsView .logs-table tr.ext-warn td { background: #fef9c3; }
+    #memberSettingsView .ext-summary { font-size: 0.85rem; line-height: 1.8; margin: 4px 0 10px; }
+    #memberSettingsView .ext-summary .warn { color: #b45309; font-weight: 600; }
+    #memberSettingsView .ext-office-row { display: grid; grid-template-columns: 1.1fr 1fr 1fr 2fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+    #memberSettingsView .ext-office-row input { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.9rem; }
+
     /* ③ 指派帳號 */
     #memberSettingsView .assign-section { border: 1px solid #eee; padding: 12px; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
     #memberSettingsView .assign-sec-title { font-weight: bold; margin-bottom: 8px; color: var(--primary); font-size: 0.95rem; }
@@ -198,6 +216,8 @@
         #memberSettingsView .stats-filter-row { flex-direction: column; max-width: 100%; }
         #memberSettingsView .stats-filter-row input, #memberSettingsView .stats-filter-row select { width: 100%; box-sizing: border-box; }
         #memberSettingsView .stats-result-area { max-width: 100%; }
+        #memberSettingsView .ext-office-row { grid-template-columns: 1fr; background: #f9fafb; border: 1px solid #eee; border-radius: 8px; padding: 10px; }   /* v106 */
+        #memberSettingsView .ext-import-text { font-size: 16px; }   /* 避免 iOS 聚焦時自動放大 */
     }
     `;
 
@@ -296,6 +316,34 @@
             <div class="ms-body" id="msNotifDisplay"></div>
         </div>
 
+        <!-- ⑦ 分機表（v106） -->
+        <div class="ms-panel" id="msPanel-extensions">
+            <div class="ms-panel-desc">側邊欄 ☎️ 分機查詢的資料來源。只存部門、姓名、分機三個欄位，不存手機號碼。同仁第一次打開分機查詢時才讀取（1 筆）。</div>
+            <div class="ext-sec">
+                <div class="logs-head">
+                    <div class="notif-sec-title" style="margin:0;">目前的分機表 <span class="logs-info" id="msExtInfo"></span></div>
+                    <button class="btn btn-save" onclick="MemberSettingsModule.loadExtTable()">重新整理</button>
+                </div>
+                <div id="msExtCurrent"></div>
+            </div>
+            <div class="ext-sec">
+                <div class="notif-sec-title">匯入新的分機表</div>
+                <div class="ms-panel-desc">請用「分機表轉換器」把 PDF 轉成 Excel，選取「部門、姓名、分機」三欄（含或不含標題列都可以），複製後貼到下方。</div>
+                <textarea class="ext-import-text" id="msExtImport" placeholder="在這裡貼上從 Excel 複製的內容" oninput="MemberSettingsModule.clearExtPreview()"></textarea>
+                <div class="ext-btn-row"><button class="btn ext-btn-ghost" onclick="MemberSettingsModule.previewExt()">預覽</button></div>
+                <div id="msExtPreview"></div>
+            </div>
+            <div class="ext-sec">
+                <div class="notif-sec-title">辦公室資訊</div>
+                <div class="ms-panel-desc" style="margin-bottom:10px;">顯示在分機查詢清單最下方（沒有搜尋、部門選「全部」時）。傳真、地址可不填。</div>
+                <div id="msExtOffices"></div>
+                <div class="ext-btn-row">
+                    <button class="btn ext-btn-ghost" onclick="MemberSettingsModule.addExtOffice()">＋ 新增辦公室</button>
+                    <button class="btn btn-save" onclick="MemberSettingsModule.saveExtOffices()">儲存辦公室資訊</button>
+                </div>
+            </div>
+        </div>
+
         <!-- ③ 指派帳號 -->
         <div class="ms-panel" id="msPanel-assign">
             <!-- v97：說明文字與儲存按鈕同一行，總寬對齊下方區塊的 900px -->
@@ -363,6 +411,7 @@
         else if (key === 'stats') initStats();
         else if (key === 'logs') loadUsageLogs();
         else if (key === 'notify') loadNotifHistory();
+        else if (key === 'extensions') loadExtTable();
     }
 
     /* =================================================================
@@ -428,9 +477,9 @@
             li.className = 'user-item';
 
             var badgeClass = 'role-user', badgeText = '一般者';
-            if (user.role === 'creator') { badgeClass = 'role-creator'; badgeText = '🟣 創世神'; }
-            else if (user.role === 'senior') { badgeClass = 'role-senior'; badgeText = '高級管理者'; }
-            else if (user.role === 'admin') { badgeClass = 'role-admin'; badgeText = '管理者'; }
+            if (user.role === 'creator') { badgeClass = 'role-creator'; badgeText = core.roleLabel('creator'); }   // v106：名稱改由 core 提供
+            else if (user.role === 'senior') { badgeClass = 'role-senior'; badgeText = core.roleLabel('senior'); }
+            else if (user.role === 'admin') { badgeClass = 'role-admin'; badgeText = core.roleLabel('admin'); }
             if (!user.isApproved) { badgeClass = 'role-pending'; badgeText = '待審核'; }
 
             var isTargetCreator = (user.role === 'creator');
@@ -1037,6 +1086,189 @@
     }
 
     /* =================================================================
+     * ⑦ 分機表（v106）
+     *   資料：settings/extensions = { list: [{dept, name, ext}], offices: [{name, tel, fax, addr}], updatedAt, updatedBy }
+     *   整份放在 1 個文件，切到分頁時一次性 .get()（1 筆），按「重新整理」才重讀。
+     *   GitHub 專案是公開的，分機資料一律不寫進程式碼；手機號碼匯入時一律清掉。
+     * ================================================================= */
+    var EXT_PHONE_RE = /(?:\+?886[-\s]?|0)9\d{2}[-\s]?\d{3}[-\s]?\d{3}/;   // 09xx-xxx-xxx、0912345678、+886 912…
+    var extCurrent = null;   // 資料庫裡目前的分機表（null＝尚未匯入）
+    var extPreview = null;   // 預覽中的新清單
+    var extOffices = [];     // 編輯中的辦公室資訊
+
+    function extClean(s) { return String(s == null ? '' : s).replace(/　/g, ' ').replace(/\s+/g, ' ').trim(); }   // 全形空白統一處理
+    function extKey(r) { return r.dept + '\u0001' + r.name; }   // 差異比對：部門＋姓名
+    function extNowSec() { return nowMinute() + ':' + ('0' + new Date().getSeconds()).slice(-2); }
+    function extTableHtml(list, warnEmpty) {
+        return '<div class="logs-wrap ext-scroll"><table class="logs-table">' +
+            '<thead><tr><th>#</th><th>部門</th><th>姓名</th><th>分機</th></tr></thead><tbody>' +
+            list.map(function (r, i) {
+                var warn = warnEmpty && (!r.dept || !r.ext);
+                return '<tr' + (warn ? ' class="ext-warn"' : '') + '><td>' + (i + 1) + '</td><td>' + core.escAttr(r.dept) + '</td><td>' +
+                    core.escAttr(r.name) + '</td><td>' + core.escAttr(r.ext) + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+    }
+    function extDeptCount(list) {
+        var seen = {};
+        list.forEach(function (r) { seen[r.dept] = true; });
+        return Object.keys(seen).length;
+    }
+
+    function loadExtTable() {
+        var box = document.getElementById('msExtCurrent');
+        if (!box) return;
+        box.innerHTML = '<div style="text-align:center; padding:24px; color:var(--primary);">⏳ 讀取中...</div>';
+        core.db.collection('settings').doc('extensions').get()
+            .then(function (doc) {
+                extCurrent = doc.exists ? doc.data() : null;
+                extOffices = ((extCurrent && extCurrent.offices) || []).map(function (o) {
+                    return { name: o.name || '', tel: o.tel || '', fax: o.fax || '', addr: o.addr || '' };
+                });
+                renderExtCurrent();
+                renderExtOffices();
+            })
+            .catch(function (e) {
+                console.error('[extensions] 讀取失敗:', e);
+                box.innerHTML = '<div style="text-align:center; padding:24px; color:var(--danger);">讀取失敗：' + core.escAttr(e.message || e.code) + '</div>';
+            });
+    }
+
+    function renderExtCurrent() {
+        var box = document.getElementById('msExtCurrent');
+        var info = document.getElementById('msExtInfo');
+        var list = (extCurrent && extCurrent.list) || [];
+        if (!list.length) {
+            info.innerText = '';
+            box.innerHTML = '<div style="text-align:center; padding:24px; color:#9ca3af;">尚未匯入分機表</div>';
+            return;
+        }
+        info.innerText = '共 ' + list.length + ' 人、' + extDeptCount(list) + ' 個部門　最後更新 ' + (extCurrent.updatedAt || '-') +
+                         (extCurrent.updatedBy ? '（' + core.getUserDisplayName(extCurrent.updatedBy) + '）' : '');
+        box.innerHTML = extTableHtml(list, false);
+    }
+
+    function clearExtPreview() {
+        extPreview = null;
+        document.getElementById('msExtPreview').innerHTML = '';
+    }
+
+    // 解析從 Excel 複製的內容（Tab 分隔）：部門、姓名、分機
+    function previewExt() {
+        var text = document.getElementById('msExtImport').value;
+        var list = [], phones = 0, noName = 0, first = true;
+        text.split(/\r?\n/).forEach(function (line) {
+            if (!extClean(line)) return;
+            var cells = line.split('\t').map(function (c) {
+                c = extClean(c);
+                if (EXT_PHONE_RE.test(c)) { phones++; return ''; }   // 手機號碼一律清掉
+                return c;
+            });
+            var r = { dept: cells[0] || '', name: cells[1] || '', ext: cells[2] || '' };
+            var isHeader = first && /部門/.test(r.dept) && /姓名/.test(r.name);   // 只看第一列
+            first = false;
+            if (isHeader) return;
+            if (!r.name) { noName++; return; }
+            list.push(r);
+        });
+        var box = document.getElementById('msExtPreview');
+        if (!list.length) {
+            extPreview = null;
+            box.innerHTML = '<div class="ext-summary"><span class="warn">沒有可匯入的資料，請確認貼上的是「部門、姓名、分機」三欄。</span></div>';
+            return;
+        }
+        extPreview = list;
+
+        var oldMap = {}, newMap = {}, added = 0, removed = 0, changed = 0;
+        ((extCurrent && extCurrent.list) || []).forEach(function (r) { oldMap[extKey(r)] = r; });
+        list.forEach(function (r) {
+            newMap[extKey(r)] = r;
+            var o = oldMap[extKey(r)];
+            if (!o) added++;
+            else if ((o.ext || '') !== r.ext) changed++;
+        });
+        Object.keys(oldMap).forEach(function (k) { if (!newMap[k]) removed++; });
+        var warnRows = list.filter(function (r) { return !r.dept || !r.ext; }).length;
+
+        box.innerHTML = '<div class="ext-summary">' +
+            (phones ? '<span class="warn">⚠️ 已略過 ' + phones + ' 個手機號碼</span><br>' : '') +
+            (noName ? '<span class="warn">已略過 ' + noName + ' 列沒有姓名的資料</span><br>' : '') +
+            '共 <b>' + list.length + '</b> 人、<b>' + extDeptCount(list) + '</b> 個部門' +
+            (warnRows ? '，<span class="warn">' + warnRows + ' 列部門或分機空白（黃色標示，仍可匯入）</span>' : '') + '<br>' +
+            '和目前資料相比：新增 <b>' + added + '</b> 人、移除 <b>' + removed + '</b> 人、分機變更 <b>' + changed + '</b> 人' +
+            '</div>' + extTableHtml(list, true) +
+            '<div class="ext-btn-row"><button class="btn btn-save" id="msExtSaveBtn" onclick="MemberSettingsModule.saveExtList()">確認更新</button></div>';
+    }
+
+    function saveExtList() {
+        if (core.denyViewOnly()) return;
+        if (!extPreview) return;
+        if (!confirm('確定用這份資料取代目前的分機表？\n\n共 ' + extPreview.length + ' 人')) return;
+        var btn = document.getElementById('msExtSaveBtn');
+        if (btn) btn.disabled = true;
+        var patch = { list: extPreview, updatedAt: extNowSec(), updatedBy: core.state.currentUser.name };
+        core.db.collection('settings').doc('extensions').set(patch, { merge: true })
+            .then(function () {
+                extCurrent = { list: patch.list, offices: (extCurrent && extCurrent.offices) || [], updatedAt: patch.updatedAt, updatedBy: patch.updatedBy };
+                core.setExtensionsData(extCurrent);   // 分機查詢立即顯示新資料
+                document.getElementById('msExtImport').value = '';
+                clearExtPreview();
+                renderExtCurrent();
+                alert('已更新分機表');
+            })
+            .catch(function (e) {
+                if (btn) btn.disabled = false;
+                alert('更新失敗：' + (e.message || e.code));
+            });
+    }
+
+    function renderExtOffices() {
+        var box = document.getElementById('msExtOffices');
+        if (!box) return;
+        if (!extOffices.length) {
+            box.innerHTML = '<div style="color:#9ca3af; font-size:0.85rem; margin-bottom:8px;">尚未設定辦公室資訊</div>';
+            return;
+        }
+        var field = function (i, key, ph) {
+            return '<input type="text" value="' + core.escAttr(extOffices[i][key]) + '" placeholder="' + ph + '"' +
+                   ' oninput="MemberSettingsModule.editExtOffice(' + i + ', \'' + key + '\', this.value)">';
+        };
+        box.innerHTML = extOffices.map(function (o, i) {
+            return '<div class="ext-office-row">' + field(i, 'name', '名稱（必填）') + field(i, 'tel', '電話') +
+                   field(i, 'fax', '傳真（選填）') + field(i, 'addr', '地址（選填）') +
+                   '<button type="button" class="btn-reject" style="margin-left:0;" onclick="MemberSettingsModule.deleteExtOffice(' + i + ')">刪除</button></div>';
+        }).join('');
+    }
+    function addExtOffice() {
+        extOffices.push({ name: '', tel: '', fax: '', addr: '' });
+        renderExtOffices();
+    }
+    function editExtOffice(i, key, value) { if (extOffices[i]) extOffices[i][key] = value; }
+    function deleteExtOffice(i) {
+        var o = extOffices[i];
+        if (o && (o.name || o.tel) && !confirm('確定刪除「' + (o.name || '未命名') + '」？（按「儲存辦公室資訊」後才會生效）')) return;
+        extOffices.splice(i, 1);
+        renderExtOffices();
+    }
+    function saveExtOffices() {
+        if (core.denyViewOnly()) return;
+        var offices = extOffices.map(function (o) {
+            return { name: extClean(o.name), tel: extClean(o.tel), fax: extClean(o.fax), addr: extClean(o.addr) };
+        });
+        if (offices.some(function (o) { return !o.name; })) return alert('每個辦公室都要填寫名稱');
+        var patch = { offices: offices, updatedAt: extNowSec(), updatedBy: core.state.currentUser.name };
+        core.db.collection('settings').doc('extensions').set(patch, { merge: true })
+            .then(function () {
+                extCurrent = { list: (extCurrent && extCurrent.list) || [], offices: offices, updatedAt: patch.updatedAt, updatedBy: patch.updatedBy };
+                extOffices = offices.map(function (o) { return { name: o.name, tel: o.tel, fax: o.fax, addr: o.addr }; });
+                core.setExtensionsData(extCurrent);
+                renderExtCurrent();
+                renderExtOffices();
+                alert('已儲存辦公室資訊');
+            })
+            .catch(function (e) { alert('儲存失敗：' + (e.message || e.code)); });
+    }
+
+    /* =================================================================
      * 分頁是否正在顯示（供事件即時刷新用）
      * ================================================================= */
     function isVisible() {
@@ -1101,6 +1333,14 @@
         loadNotifHistory: loadNotifHistory,
         toggleUnread: toggleUnread,
         revokeNotif: revokeNotif,
+        loadExtTable: loadExtTable,         // v106
+        previewExt: previewExt,
+        clearExtPreview: clearExtPreview,
+        saveExtList: saveExtList,
+        addExtOffice: addExtOffice,
+        editExtOffice: editExtOffice,
+        deleteExtOffice: deleteExtOffice,
+        saveExtOffices: saveExtOffices,
         openQuickPerm: openQuickPerm,
         closeQuickPerm: closeQuickPerm,
         applyQuickPerm: applyQuickPerm

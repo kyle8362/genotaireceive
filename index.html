@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.5.0 Modular · 登入改版)</title>
+    <title>中區收送件進度追蹤系統 (v1.6.0 Modular · 分機查詢)</title>
     <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
          手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
          display 維持 browser，不改變現有開啟方式 -->
@@ -145,9 +145,30 @@
 
         #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 900; backdrop-filter: blur(2px); }
 
-        .user-profile { display: flex; align-items: center; gap: 10px; padding-bottom: 1.5rem; margin-bottom: 0.5rem; }
-        .avatar { width: 40px; height: 40px; background: var(--primary); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; flex-shrink: 0; }
-        .logout-link { font-size: 0.8rem; color: var(--danger); cursor: pointer; margin-top: 2px;}
+        /* v1.6.0：側邊欄個人區改版 — 品牌區（取代頭像）＋個人卡片（稱謂、權限標籤、🔔／☎️）＋底部登出列 */
+        .sidebar-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .sidebar-brand-logo { width: 34px; height: 34px; border-radius: 50%; background: #3FADAA; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sidebar-brand-logo img { width: 26px; height: 26px; border-radius: 50%; display: block; }
+        .sidebar-brand-name { font-size: 15px; font-weight: 600; color: #134E4A; line-height: 1.25; }
+        .sidebar-brand-sub { font-size: 11px; color: var(--text-light); letter-spacing: 2px; line-height: 1.3; }
+        .user-card { display: flex; align-items: center; gap: 8px; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
+        .user-card-info { min-width: 0; flex: 1; }
+        .user-card-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role-tag { display: inline-block; margin-top: 3px; font-size: 0.7rem; font-weight: 600; padding: 1px 8px; border-radius: 10px; border: 1px solid #d1d5db; background: #f3f4f6; color: #4b5563; }
+        .user-role-tag.role-creator { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }   /* 顏色同成員設定的權限徽章 */
+        .user-role-tag.role-senior  { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
+        .user-role-tag.role-admin   { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+        .user-role-tag.role-viewonly { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+        .user-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .user-card-actions .notif-bell-wrap { margin-left: 0; }
+        .user-card-btn, .user-card-actions .notif-bell { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border); background: #fff; font-size: 1.1rem; line-height: 1; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: inherit; transition: transform .15s, border-color .15s; }
+        .user-card-btn:hover, .user-card-actions .notif-bell:hover { border-color: var(--primary); transform: scale(1.06); }
+        .user-card-btn:active { transform: scale(.95); }
+        .user-card-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .sidebar-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 1.5rem calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #f3f4f6; background: var(--sidebar-bg); }
+        .sidebar-footer #appVersionLabel { font-size: 12px; color: #9ca3af; }
+        .sidebar-logout { border: 0; background: none; color: var(--danger); font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 6px; font-family: inherit; }
+        .sidebar-logout:hover { background: #fef2f2; }
 
         .sidebar-btn { padding: 10px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: block; font-size: 0.9rem; border: 1px solid transparent; width: 100%; white-space: nowrap; }
         .sidebar-btn:hover { opacity: 0.9; }
@@ -343,6 +364,38 @@
         .notif-back { display: none; border: 0; background: none; font-size: 1.9rem; line-height: 1; padding: 0 8px 0 0; cursor: pointer; color: var(--text-main); font-family: inherit; }
         .notif-bubble { display: none; position: absolute; top: calc(100% + 8px); right: -4px; background: #ef4444; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 20; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
         .notif-bubble::before { content: ""; position: absolute; top: -5px; right: 14px; border: 5px solid transparent; border-top: 0; border-bottom-color: #ef4444; }
+
+        /* v1.6.0：分機查詢面板 — 電腦版從側邊欄右側滑出（寬 420px），手機版全螢幕（樣式見手機版區塊） */
+        #extMask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1500; }
+        #extPanel { display: none; position: fixed; top: 0; bottom: 0; left: 280px; width: 420px; max-width: calc(100vw - 280px); background: #fff; z-index: 1501; box-shadow: 8px 0 24px rgba(0,0,0,0.12); flex-direction: column; box-sizing: border-box; padding: 18px 18px 12px; }
+        #extMask.open { display: block; animation: ext-fade .22s ease both; }
+        #extPanel.open { display: flex; animation: ext-slide .22s cubic-bezier(.2, .8, .2, 1) both; }
+        @keyframes ext-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ext-slide { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { #extMask.open, #extPanel.open { animation: none; } }
+        .ext-head { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+        .ext-head h3 { margin: 0; flex: 1; font-size: 1.15rem; }
+        .ext-close { border: 0; background: none; font-size: 1.3rem; line-height: 1; cursor: pointer; color: var(--text-light); padding: 4px 6px; border-radius: 6px; font-family: inherit; }
+        .ext-close:hover { background: #f3f4f6; color: var(--text-main); }
+        .ext-search { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem; font-family: inherit; }
+        .ext-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+        .ext-depts { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 6px; }
+        .ext-dept { border: 1px solid var(--border); background: #fff; border-radius: 14px; padding: 4px 11px; font-size: 0.8rem; cursor: pointer; white-space: nowrap; font-family: inherit; color: var(--text-main); }
+        .ext-dept.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .ext-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+        .ext-group-title { font-size: 0.75rem; font-weight: 700; color: var(--primary); margin: 14px 0 4px; }
+        .ext-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #f3f4f6; }
+        .ext-name { flex: 1; min-width: 0; font-size: 0.95rem; }
+        .ext-num { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.95rem; color: var(--text-main); }
+        .ext-copy { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 3px 9px; font-size: 0.75rem; cursor: pointer; color: var(--text-light); font-family: inherit; }
+        .ext-copy:hover { border-color: var(--primary); color: var(--primary); }
+        .ext-hl { background: #fef08a; border-radius: 2px; }
+        .ext-empty { text-align: center; padding: 28px 0; color: #9ca3af; font-size: 0.9rem; }
+        .ext-office { background: #f9fafb; border: 1px solid #eee; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 0.85rem; line-height: 1.6; }
+        .ext-office b { color: var(--text-main); }
+        .ext-updated { font-size: 0.72rem; color: #9ca3af; text-align: center; padding: 14px 0 4px; }
+        .ext-toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(17,24,39,0.88); color: #fff; font-size: 0.85rem; padding: 7px 14px; border-radius: 18px; pointer-events: none; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+        .ext-toast.show { opacity: 1; }
         .notif-bubble.show { display: block; }
         .notif-list { max-height: 60vh; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
         .notif-item { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 8px; background: #fff; cursor: pointer; text-align: left; width: 100%; font-family: inherit; }
@@ -475,6 +528,19 @@
             .notif-back { display: block; }
             #notifDetailModal .notif-detail-body { flex: 1; overflow-y: auto; }
 
+            /* v1.6.0：手機版分機查詢＝全螢幕頁面（比照通知信箱），左上「‹」返回，底部留給 Tab bar */
+            #extMask { display: none !important; }
+            #extPanel { left: 0; right: 0; width: auto; max-width: none; z-index: 840; box-shadow: none; background: var(--bg);
+                bottom: calc(58px + 10px + env(safe-area-inset-bottom)); padding: calc(14px + env(safe-area-inset-top)) 16px 8px; }
+            #extPanel.open { animation-name: view-in-r; }
+            .ext-close { display: none; }
+            .ext-search { font-size: 16px; }   /* 避免 iOS 聚焦時自動放大 */
+            .ext-depts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -16px; margin-right: -16px; padding: 0 16px; }
+            .ext-depts::-webkit-scrollbar { display: none; }
+            .ext-row { background: #fff; border-bottom: 0; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; }
+            .ext-toast { bottom: 16px; }
+            .sidebar-footer { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+
             /* v87：手機版日期列與搜尋面板 */
             .task-date-bar { gap: 6px; }
             /* v92：改為 auto，讓「當日」按鈕與日期框同一行 */
@@ -542,18 +608,28 @@
 <div id="app-screen" style="display:none;">
     <aside>
         <div class="sidebar-fixed">
-            <div class="user-profile">
-                <div class="avatar" id="userAvatar">U</div>
+            <!-- v1.6.0：品牌區（取代頭像） -->
+            <div class="sidebar-brand">
+                <span class="sidebar-brand-logo"><img src="logo-white.png" alt=""></span>
                 <div>
-                    <div style="font-weight: 600;" id="displayUsername">User</div>
-                    <div class="logout-link" onclick="window.logout()">登出帳號</div>
-                    <div id="appVersionLabel" style="font-size:0.72rem; color:#9ca3af; margin-top:3px;"></div>
+                    <div class="sidebar-brand-name">基龍米克斯</div>
+                    <div class="sidebar-brand-sub">中區系統</div>
                 </div>
-                <!-- v1.2.0：電腦版通知入口（手機版改在 Tab bar） -->
-                <span class="notif-bell-wrap">
-                    <button type="button" class="notif-bell" id="notifBell" onclick="openNotifMailbox()" title="通知" aria-label="通知"><span class="notif-bell-ico">🔔</span><span class="mtab-badge" id="notifBellBadge"></span></button>
-                    <span class="notif-bubble" id="notifBubble">尚未讀取通知</span>
-                </span>
+            </div>
+            <!-- v1.6.0：個人卡片（稱謂＋權限標籤＋🔔／☎️）；登出與版本號移到側邊欄最底部 -->
+            <div class="user-card">
+                <div class="user-card-info">
+                    <div class="user-card-name" id="displayUsername">User</div>
+                    <span class="user-role-tag" id="userRoleTag"></span>
+                </div>
+                <div class="user-card-actions">
+                    <!-- v1.2.0：電腦版通知入口（手機版改在 Tab bar） -->
+                    <span class="notif-bell-wrap">
+                        <button type="button" class="notif-bell" id="notifBell" onclick="openNotifMailbox()" title="通知" aria-label="通知"><span class="notif-bell-ico">🔔</span><span class="mtab-badge" id="notifBellBadge"></span></button>
+                        <span class="notif-bubble" id="notifBubble">尚未讀取通知</span>
+                    </span>
+                    <button type="button" class="user-card-btn" onclick="openExtPanel()" title="分機查詢" aria-label="分機查詢">☎️</button>
+                </div>
             </div>
 
             <button class="sidebar-btn btn-nav-active" id="btnTabTasks" onclick="window.switchTab('tasks')">📋 任務看板</button>
@@ -579,6 +655,12 @@
                 <h3>🕒 最近檢視紀錄</h3>
                 <ul class="history-list" id="historyList"></ul>
             </div>
+        </div>
+
+        <!-- v1.6.0：版本號與登出固定在側邊欄最底部（不隨捲動） -->
+        <div class="sidebar-footer">
+            <span id="appVersionLabel"></span>
+            <button type="button" class="sidebar-logout" onclick="window.logout()">登出</button>
         </div>
     </aside>
 
@@ -727,6 +809,19 @@
         <div class="modal-btns"><button class="btn btn-save" onclick="closeNotifDetail()">關閉</button></div>
     </div>
 </div>
+<!-- v1.6.0：分機查詢（資料存 Firestore settings/extensions，第一次開啟才讀取；不寫在程式碼裡） -->
+<div id="extMask" onclick="closeExtPanel()"></div>
+<div id="extPanel" role="dialog" aria-modal="true" aria-labelledby="extTitle">
+    <div class="ext-head">
+        <button type="button" class="notif-back" onclick="closeExtPanel()" aria-label="返回">‹</button>
+        <h3 id="extTitle">☎️ 分機查詢</h3>
+        <button type="button" class="ext-close" onclick="closeExtPanel()" title="關閉" aria-label="關閉">✕</button>
+    </div>
+    <input type="search" class="ext-search" id="extSearch" placeholder="輸入姓名、部門或分機號碼" autocomplete="off" oninput="renderExtList()">
+    <div class="ext-depts" id="extDepts"></div>
+    <div class="ext-list" id="extList"></div>
+    <div class="ext-toast" id="extToast"></div>
+</div>
 <!-- v1.3.0：必讀通知 — 沒有關閉鈕，逐則按「我已閱讀」後自動解除 -->
 <div id="notifMustModal" role="alertdialog" aria-modal="true" aria-labelledby="notifMustTitle">
     <div class="must-card">
@@ -834,7 +929,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.5.0';   // v1.5.0：登入畫面改版（品牌區／波浪／風車／光圈）、手動登入的旋轉展開轉場、每日開場動畫（含問候語）、App 圖示 LOGO 修正為正圓
+    const APP_VERSION = '1.6.0';   // v1.6.0：側邊欄個人區改版（品牌區、權限標籤、登出移到底部）、分機查詢（☎️）、成員設定新增分機表分頁
                                    //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
                                    // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
@@ -902,6 +997,9 @@
             .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
     }
     function hasRole(roles) { return !!state.currentUser && roles.includes(state.currentUser.role); }
+    // v1.6.0：權限的中文名稱（側邊欄個人卡片與成員設定共用）
+    const ROLE_LABELS = { creator: '🟣 創世神', senior: '高級管理者', admin: '管理者', user: '一般者' };
+    function roleLabel(role) { return ROLE_LABELS[role] || ROLE_LABELS.user; }
 
     // ==========================================
     // 3-1. 分頁使用權限（per-account）
@@ -1105,6 +1203,7 @@
     }
     function openNotifMailbox() {
         if (MOBILE_MQ.matches && isNotifPageOpen()) { closeNotifPages(); return; }
+        closeExtPanel();   // v1.6.0：手機版兩個全螢幕頁面不重疊
         document.getElementById('notifDetailModal').style.display = 'none';
         renderNotifList();
         document.getElementById('notifModal').style.display = 'flex';
@@ -1120,6 +1219,158 @@
         document.getElementById('notifModal').style.display = 'none';
         document.getElementById('notifDetailModal').style.display = 'none';
         updateTabBar();
+    }
+
+    // ==========================================
+    // v1.6.0：分機查詢
+    //   資料在 Firestore settings/extensions（list／offices／updatedAt／updatedBy），整份 1 個文件＝讀取 1 筆。
+    //   第一次打開面板才讀取，同一次開網頁不重複讀；localStorage 存一份（登出時刪除），
+    //   下次開網頁先顯示快取，再背景讀一次。不寫讀取紀錄（usage_logs）。
+    //   姓名、部門一律經 escAttr 輸出。
+    // ==========================================
+    const EXT_CACHE_KEY = 'tt_ext_cache';
+    const extState = { data: null, fetched: false, loading: false, error: '', dept: 'all' };
+    let extToastTimer = null;
+
+    function extNorm(s) { return String(s == null ? '' : s).replace(/[\s　]+/g, '').toLowerCase(); }   // 忽略空白與全形空白
+    function isExtPanelOpen() { return document.getElementById('extPanel').classList.contains('open'); }
+
+    function openExtPanel() {
+        if (MOBILE_MQ.matches && document.querySelector('aside').classList.contains('open')) toggleSidebar();   // 手機版先關側邊欄
+        document.getElementById('notifModal').style.display = 'none';
+        document.getElementById('notifDetailModal').style.display = 'none';
+        if (!extState.data) {
+            try { const c = JSON.parse(localStorage.getItem(EXT_CACHE_KEY) || 'null'); if (c && Array.isArray(c.list)) extState.data = c; } catch (e) {}
+        }
+        fetchExtensions();
+        renderExtDepts();
+        renderExtList();
+        document.getElementById('extMask').classList.add('open');
+        document.getElementById('extPanel').classList.add('open');
+        if (!MOBILE_MQ.matches) document.getElementById('extSearch').focus();   // 手機版不自動聚焦，避免鍵盤彈出
+        updateTabBar();
+    }
+    function closeExtPanel() {
+        const p = document.getElementById('extPanel');
+        if (!p.classList.contains('open')) return;
+        p.classList.remove('open');
+        document.getElementById('extMask').classList.remove('open');
+        updateTabBar();
+    }
+
+    function fetchExtensions() {
+        if (extState.fetched || extState.loading) return;
+        extState.loading = true;
+        db.collection('settings').doc('extensions').get()
+            .then(doc => {
+                extState.fetched = true;
+                extState.error = '';
+                setExtensionsData(doc.exists ? doc.data() : null);
+            })
+            .catch(e => { console.error('[extensions] 讀取失敗:', e); extState.error = '分機表讀取失敗，請稍後再試'; })
+            .finally(() => { extState.loading = false; if (isExtPanelOpen()) { renderExtDepts(); renderExtList(); } });
+    }
+
+    // 成員設定匯入後也呼叫這裡，分機查詢立即顯示新資料（不必重讀）
+    function setExtensionsData(d) {
+        extState.data = d ? { list: d.list || [], offices: d.offices || [], updatedAt: d.updatedAt || '' } : null;
+        extState.fetched = true;
+        try {
+            if (extState.data) localStorage.setItem(EXT_CACHE_KEY, JSON.stringify(extState.data));
+            else localStorage.removeItem(EXT_CACHE_KEY);
+        } catch (e) {}
+        if (isExtPanelOpen()) { renderExtDepts(); renderExtList(); }
+    }
+
+    function extDeptList() {
+        const seen = [];
+        (extState.data ? extState.data.list : []).forEach(r => { const k = r.dept || ''; if (!seen.includes(k)) seen.push(k); });
+        return seen;
+    }
+    function renderExtDepts() {
+        const depts = extDeptList();
+        if (extState.dept !== 'all' && !depts.includes(extState.dept)) extState.dept = 'all';
+        const box = document.getElementById('extDepts');
+        if (!depts.length) { box.innerHTML = ''; return; }
+        box.innerHTML = [['all', '全部']].concat(depts.map((k, i) => [i, k || '未填部門'])).map(([v, label]) =>
+            `<button type="button" class="ext-dept${(v === 'all' ? extState.dept === 'all' : extState.dept === depts[v]) ? ' active' : ''}" data-i="${v}" onclick="setExtDept(this.dataset.i)">${escAttr(label)}</button>`
+        ).join('');
+    }
+    function setExtDept(i) {
+        extState.dept = i === 'all' ? 'all' : extDeptList()[Number(i)];
+        renderExtDepts();
+        renderExtList();
+    }
+
+    // 搜尋符合的字加黃底：比對時忽略空白，所以先建「去掉空白後的字 → 原字位置」對照
+    function extHl(text, q) {
+        const s = String(text == null ? '' : text);
+        if (!q) return escAttr(s);
+        const chars = Array.from(s), map = [];
+        let norm = '';
+        chars.forEach((c, i) => { if (!/[\s　]/.test(c)) { norm += c.toLowerCase(); map.push(i); } });
+        const at = norm.indexOf(q);
+        if (at < 0) return escAttr(s);
+        const a = map[at], b = map[at + Array.from(q).length - 1] + 1;
+        return escAttr(chars.slice(0, a).join('')) + '<mark class="ext-hl">' + escAttr(chars.slice(a, b).join('')) + '</mark>' + escAttr(chars.slice(b).join(''));
+    }
+
+    function renderExtList() {
+        const box = document.getElementById('extList');
+        const d = extState.data;
+        if (!d) {
+            const msg = extState.loading ? '載入中…' : (extState.error || '尚未匯入分機表，請管理員到成員設定管理匯入');
+            box.innerHTML = `<div class="ext-empty">${escAttr(msg)}</div>`;
+            return;
+        }
+        const q = extNorm(document.getElementById('extSearch').value);
+        const rows = d.list.filter(r => (extState.dept === 'all' || (r.dept || '') === extState.dept) &&
+            (!q || extNorm(r.dept).includes(q) || extNorm(r.name).includes(q) || extNorm(r.ext).includes(q)));
+        // 依部門分組（照資料中出現的順序）
+        const groups = [], idx = {};
+        rows.forEach(r => {
+            const k = r.dept || '';
+            if (!(k in idx)) { idx[k] = groups.length; groups.push({ dept: k, rows: [] }); }
+            groups[idx[k]].rows.push(r);
+        });
+        let html = rows.length ? '' : '<div class="ext-empty">找不到符合的同仁</div>';
+        groups.forEach(g => {
+            html += `<div class="ext-group-title">${g.dept ? extHl(g.dept, q) : '未填部門'}</div>` + g.rows.map(r =>
+                `<div class="ext-row"><span class="ext-name">${extHl(r.name, q)}</span><span class="ext-num">${extHl(r.ext, q)}</span>` +
+                (r.ext ? `<button type="button" class="ext-copy" data-ext="${escAttr(r.ext)}" onclick="copyExt(this.dataset.ext)">複製</button>` : '') + `</div>`
+            ).join('');
+        });
+        if (!q && extState.dept === 'all' && d.offices.length) {
+            html += '<div class="ext-group-title">辦公室資訊</div>' + d.offices.map(o =>
+                `<div class="ext-office"><b>${escAttr(o.name)}</b>` +
+                (o.tel ? `<br>電話：${escAttr(o.tel)}` : '') + (o.fax ? `<br>傳真：${escAttr(o.fax)}` : '') +
+                (o.addr ? `<br>地址：${escAttr(o.addr)}` : '') + `</div>`
+            ).join('');
+        }
+        if (d.updatedAt) html += `<div class="ext-updated">分機表更新於 ${escAttr(String(d.updatedAt).slice(0, 10))}</div>`;
+        box.innerHTML = html;
+    }
+
+    function copyExt(ext) {
+        const done = () => showExtToast('已複製分機 ' + ext);
+        const fallback = () => {   // http（例如同 Wi-Fi 的本機測試）沒有 navigator.clipboard
+            const t = document.createElement('textarea');
+            t.value = ext; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+            document.body.appendChild(t); t.select();
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) {}
+            t.remove();
+            if (ok) done(); else prompt('請手動複製：', ext);
+        };
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(ext).then(done).catch(fallback);
+        else fallback();
+    }
+    function showExtToast(msg) {
+        const el = document.getElementById('extToast');
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(extToastTimer);
+        extToastTimer = setTimeout(() => el.classList.remove('show'), 1600);
     }
 
     // 點開一封：先從畫面移除（樂觀更新），再寫入已讀；寫入失敗也不影響這次的畫面
@@ -1319,6 +1570,7 @@
         createNotification, markNotificationsDeleted, revokeNotification,   // v1.2.0：通知中心
         revokeNotificationsByRef,                                           // v1.2.3
         notifStatus, notifAudience, notifReadDocId, NOTIF_KIND, NOTIF_LIMIT,
+        roleLabel, setExtensionsData,                                       // v1.6.0：權限名稱、分機表匯入後即時更新
         switchTab: (k) => switchTab(k),
         renderTasks: () => { if (state.activeTab === 'tasks') renderTasks(); },
 
@@ -1644,7 +1896,7 @@
 
     // Esc 收起
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { closeSearchPanel(); closeFabFan(); }   // v1.4.0：一併收合扇形選單
+        if (e.key === 'Escape') { closeSearchPanel(); closeFabFan(); closeExtPanel(); }   // v1.4.0：一併收合扇形選單；v1.6.0：分機查詢
     });
 
     function renderHistory() {
@@ -1694,6 +1946,7 @@
         state.activeTab = tab;
         document.getElementById('notifModal').style.display = 'none';         // v1.2.0：點其他 Tab 就離開通知頁
         document.getElementById('notifDetailModal').style.display = 'none';
+        closeExtPanel();   // v1.6.0：點其他 Tab 就離開分機查詢
         closeFabFan();   // v1.4.0：切換分頁時收合扇形選單
 
         // 1) 全部隱藏
@@ -1757,11 +2010,12 @@
         if (!bar) return;
         const onMainTab = ['tasks', 'tempTasks', 'customers'].includes(state.activeTab);
         const notifOpen = isNotifPageOpen();   // v1.2.0：通知頁開著時只亮 🔔
+        const extOpen = isExtPanelOpen();      // v1.6.0：分機查詢從「更多」進入，開著時亮「更多」
         bar.querySelectorAll('.mtab').forEach(btn => {
             const key = btn.dataset.tab;
             if (key !== 'more' && key !== 'notify') btn.style.display = canAccessView(key) ? '' : 'none';   // 🔔 與「更多」永遠顯示
             btn.classList.toggle('is-active', key === 'notify' ? notifOpen
-                : notifOpen ? false : key === 'more' ? !onMainTab : key === state.activeTab);
+                : notifOpen ? false : key === 'more' ? (!onMainTab || extOpen) : (!extOpen && key === state.activeTab));
         });
         positionTabPill();
     }
@@ -2458,6 +2712,7 @@
     function logout() {
         localStorage.removeItem('tt_current_user');
         localStorage.removeItem('tt_display_name');   // v1.5.0：開場動畫問候語用的稱謂快取
+        localStorage.removeItem(EXT_CACHE_KEY);       // v1.6.0：分機表快取（公用電腦登出後不留名單）
         location.reload();
     }
 
@@ -2479,7 +2734,11 @@
         if(!state.currentUser) return;
         const dispName = getUserDisplayName(state.currentUser.name);
         document.getElementById('displayUsername').innerText = dispName;
-        document.getElementById('userAvatar').innerText = dispName[0].toUpperCase();
+        // v1.6.0：權限標籤（訪客帳號顯示「唯讀」）
+        const roleTag = document.getElementById('userRoleTag');
+        const viewOnly = isViewOnly();
+        roleTag.textContent = viewOnly ? '唯讀' : roleLabel(state.currentUser.role);
+        roleTag.className = 'user-role-tag ' + (viewOnly ? 'role-viewonly' : 'role-' + state.currentUser.role);
 
         // 主分頁按鈕：依「該帳號的分頁使用權限」顯示或隱藏
         const canTasks = canAccess('tasks');
@@ -2671,7 +2930,7 @@
 <script src="modules/customer.module.js?v=83"></script>
 <script src="modules/purchase.module.js?v=90"></script>
 <script src="modules/stock.module.js?v=85"></script>
-<script src="modules/member-settings.module.js?v=105"></script>
+<script src="modules/member-settings.module.js?v=106"></script>
 <script src="modules/temp-receive.module.js?v=98"></script>
 <script src="modules/democracy.module.js?v=17"></script>
 <script src="modules/gift.module.js?v=100"></script>
