@@ -1,11 +1,12 @@
 /* =====================================================================
- * 模組：中區的民主聖地 (democracy)  ─ v18
+ * 模組：中區的民主聖地 (democracy)  ─ v19
  * ---------------------------------------------------------------------
  * 中區同仁的登記／投票／團購專區。已實作：
  *   1. 公告區（跑馬燈公告、VIP 框公告、起訖日期自動上下架、進行中提醒）
  *   2. 文具購買登記（常用品項、自動儲存、管理員開單鎖單與統整輸出）
  *   3. 投票問卷區（單選／多選／自填／備註、記名投票、統計與 LINE 文字）
  *   4. 團購 GOGO（多品項、我要 +1、管理員統整輸出）
+ *   5. 基因靈籤（v19，獨立網頁 jigong.html 以 iframe 內嵌，僅供娛樂、不讀寫資料庫）
  *
  * v15：LINE 分享文字定案（使用者指定格式）
  *      - 投票開案通知：只留標題、投票方式、截止時間（拿掉說明與選項）
@@ -23,6 +24,9 @@
  *      管理員可修改、可預約，預設撤回這一案之前的通知。取代投票、團購的「🔔 重發通知」與建立時的自動通知；
  *      建立投票、開團、文具開新單成功後自動開啟發送視窗（按取消＝不發）。刪除文具單時通知改為「案件已刪除」。
  *      對外新增 getCaseStatus／openCase，讓通知全文的「前往」按鈕直接打開那一案。公告的通知與重發維持原樣
+ *
+ * v19（系統 v1.8.0）：首頁新增第四張卡片「基因靈籤」（screen = 'fortune'），內嵌 jigong.html。
+ *      已載入時 render() 不重繪，避免資料庫監聽更新時 iframe 重新載入
  *
  * 連自己的 Firebase 專案（gbt-central-democracy），不動 AppCore.db。
  * 權限：permKey = 'democracy'，全員預設可進入（大家都要登記文具），
@@ -439,6 +443,9 @@
         font-family: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", sans-serif; }
     #democracyView .demo-tag-open { background: var(--primary-light); color: #115e59; }
     #democracyView .demo-tag-closed { background: var(--bg); color: var(--text-light); }
+    /* v19：基因靈籤（jigong.html 以 iframe 內嵌，高度由 fitFortuneFrame 依視窗調整） */
+    #democracyView .demo-tag-fortune { background: #fdecea; color: #9a1b12; }
+    #democracyView .demo-fortune-frame { display: block; width: 100%; height: 75vh; min-height: 420px; border: 0; border-radius: 10px; background: #2a0b0b; }
     #democracyView .demo-admin-bar { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; padding-bottom: 2px; }
     #democracyView .demo-admin-bar .demo-btn { padding: 11px 18px; font-size: 0.95rem; }
 
@@ -734,6 +741,11 @@
         }
         var el = document.getElementById('demoScreen');
         if (!el) return;
+        // v19：基因靈籤已載入時不重繪，否則資料庫監聽一更新，iframe 就會重新載入、參拜進度歸零
+        if (currentScreen === 'fortune') {
+            if (!document.getElementById('demoFortuneFrame')) { el.innerHTML = htmlFortune(); setTimeout(fitFortuneFrame, 0); }
+            return;
+        }
         if (currentScreen === 'stationery') el.innerHTML = htmlStationery();
         else if (currentScreen === 'stAdmin') el.innerHTML = htmlStationeryAdmin();
         else if (currentScreen === 'vote') el.innerHTML = htmlVoteList();
@@ -860,10 +872,35 @@
              '<div class="demo-entry-head"><span class="demo-entry-icon">🛒</span>' +
              '<span class="demo-entry-name">團購 GOGO</span></div>' +
              '<span id="demoGbTag">' + htmlGbTag() + '</span></div>';
+        h += '<div class="demo-entry demo-home-entry" onclick="DemocracyModule.go(\'fortune\')">' +
+             '<div class="demo-entry-head"><span class="demo-entry-icon">🧧</span>' +
+             '<span class="demo-entry-name">基因靈籤</span></div>' +
+             '<span class="demo-entry-tag demo-tag-fortune">誠心求一支籤（僅供娛樂）</span></div>';
         h += '</div>';
 
         return h;
     }
+
+    /* =================================================================
+     * v19：基因靈籤（獨立網頁 jigong.html，不讀寫資料庫）
+     * ================================================================= */
+    var FORTUNE_URL = 'jigong.html?v=1';   // 修改 jigong.html 後要換這裡的 ?v=
+
+    function htmlFortune() {
+        return '<iframe id="demoFortuneFrame" class="demo-fortune-frame" title="基因靈籤" src="' + FORTUNE_URL + '"></iframe>';
+    }
+
+    // iframe 高度＝視窗剩下的空間（手機版扣掉底部 Tab bar），頁面在 iframe 裡面捲動
+    function fitFortuneFrame() {
+        var f = document.getElementById('demoFortuneFrame');
+        if (!f || !f.getClientRects().length) return;
+        var bottom = 24;
+        var bar = document.getElementById('mobileTabBar');
+        if (bar && bar.getClientRects().length) bottom = bar.getBoundingClientRect().height + 20;
+        var h = window.innerHeight - f.getBoundingClientRect().top - bottom;
+        f.style.height = Math.max(420, Math.floor(h)) + 'px';
+    }
+    window.addEventListener('resize', fitFortuneFrame);
 
     // 管理按鈕列：放在標題右側，只在首頁且為管理員時出現
     function htmlAdminBar() {
