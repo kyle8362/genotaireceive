@@ -9,6 +9,9 @@
  *   CustomerModule.isLocationCategory(cat)   → 該任務分類是否要顯示位置 badge
  *   CustomerModule.renderLocationBadge(task) → 回傳 badge HTML（給任務看板用）
  *   CustomerModule.openFromTask(evt, key)    → 從任務跳到本頁並帶入關鍵字
+ *
+ * v84（系統 v1.8.1）：名錄網址改由 core.getGasUrl() 在登入後取得（存在 Firestore），
+ *      不再一開頁面、還沒登入就去抓名錄；改成收到 user:login 才預載
  * ===================================================================== */
 (function () {
     'use strict';
@@ -71,7 +74,8 @@
     function fetchCustomers(showLoading) {
         var loading = document.getElementById('custLoading');
         if (showLoading && loading) loading.style.display = 'block';
-        return fetch(core.GAS_API_URL)
+        return core.getGasUrl()
+            .then(function (url) { return fetch(url); })
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 customers = Array.isArray(data) ? data : [];
@@ -237,8 +241,10 @@
             core = appCore;
             core.injectStyle(CSS);
             core.mountView(VIEW_HTML);
-            // 預載客戶資料，供任務看板的位置 badge 使用
-            fetchCustomers(false).catch(function () { /* 靜默失敗，不阻擋登入 */ });
+            // 登入後才預載客戶資料，供任務看板的位置 badge 使用（v84）
+            core.on('user:login', function () {
+                fetchCustomers(false).catch(function () { /* 靜默失敗，不阻擋登入 */ });
+            });
         },
 
         activate: function () {
