@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "genomicstc",
     "public": ".",
     "ignore": [
       "firebase.json",
