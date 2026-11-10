@@ -1,0 +1,20 @@
+# push 到 main 就自動部署到 Firebase Hosting（tasktrack-app-206f8）
+# 需要 GitHub Secret：FIREBASE_SERVICE_ACCOUNT_TASKTRACK_APP_206F8（服務帳戶 JSON 金鑰）
+name: 部署到 Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TASKTRACK_APP_206F8 }}
+          channelId: live
+          projectId: tasktrack-app-206f8
