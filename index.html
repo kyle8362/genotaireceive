@@ -5,7 +5,7 @@
     <!-- v1.1.0：開放雙指縮放（改以手機版輸入框 16px 避免 iOS 自動放大）；viewport-fit=cover 讓 env(safe-area-inset-*) 生效 -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>中區收送件進度追蹤系統 (v1.8.1 Modular · 名錄保護)</title>
+    <title>中區收送件進度追蹤系統 (v1.8.2 Modular · 網址搬家)</title>
     <!-- v1.3.0：App 圖示與主畫面名稱。原圖 收件程式碼\icon-source.png（repo 外）；
          手機用的 apple-touch-icon／icon-192／icon-512 已把透明圓角補上底色（iOS 透明處會變黑），favicon 保留透明。
          display 維持 browser，不改變現有開啟方式 -->
@@ -14,6 +14,44 @@
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="apple-mobile-web-app-title" content="基米中區系統">
     <meta name="theme-color" content="#f3f4f6"><!-- 狀態列＝頁面背景色 --bg；不指定時 iOS 主畫面開啟會變黑色，指定 #3FADAA 會變綠色 -->
+
+    <!-- v1.8.2：舊網址（github.io）停用，顯示搬家提示卡，由同仁自己按按鈕前往新網址。
+         不自動跳轉（使用者決定：讓大家看完提醒、真的更新書籤）。兩邊是同一份程式，所以用 hostname 判斷；
+         放在 Firebase SDK 之前，window.stop() 後舊系統完全不載入。收尾時 repo 改私有、停 Pages，這段就不會再執行 -->
+    <script>
+    (function () {
+        var MOVED_HOSTS = ['kyle8362.github.io'];
+        var NEW_URL = 'https://genomicstc.web.app/';
+        if (MOVED_HOSTS.indexOf(location.hostname) < 0) return;
+        if (window.stop) window.stop();
+        document.documentElement.innerHTML =
+            '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
+            '<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#f3f4f6">' +
+            '<link rel="icon" type="image/png" href="favicon.png"><title>系統已搬家｜中區收送件系統</title><style>' +
+            '*{box-sizing:border-box}html,body{margin:0;min-height:100%}' +
+            'body{font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif;background:linear-gradient(160deg,#f0faf9 0%,#d7efed 100%);color:#1f2937;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px 16px}' +
+            '.card{background:#fff;border-radius:22px;box-shadow:0 12px 40px rgba(15,118,110,.15);max-width:440px;width:100%;padding:36px 28px 28px;text-align:center}' +
+            '.logo{width:88px;height:88px;border-radius:50%;display:block;margin:0 auto 14px}' +
+            'h1{font-size:26px;margin:0 0 8px;color:#0f766e}' +
+            '.sub{font-size:16px;color:#4b5563;margin:0 0 20px;line-height:1.6}' +
+            '.url{display:block;background:#f0faf9;border:2px dashed #3fadaa;border-radius:12px;padding:12px;font-size:20px;font-weight:700;color:#0f766e;text-decoration:none;word-break:break-all;margin-bottom:20px}' +
+            '.go{display:block;background:#2f9895;color:#fff;text-decoration:none;font-size:18px;font-weight:700;border-radius:12px;padding:14px;margin-bottom:20px}' +
+            '.go:hover{background:#0f766e}' +
+            '.tips{text-align:left;background:#fff7ed;border-radius:12px;padding:14px 16px;font-size:15px;line-height:1.75;color:#7c2d12}' +
+            '.tips b{color:#c2410c}' +
+            '</style></head><body><div class="card">' +
+            '<img class="logo" src="logo-round.png" alt="">' +
+            '<h1>系統已搬家囉！🏠</h1>' +
+            '<p class="sub">配合公司資安調整，中區收送件系統已搬到新網址</p>' +
+            '<a class="url" href="' + NEW_URL + '">genomicstc.web.app</a>' +
+            '<a class="go" href="' + NEW_URL + '">立即前往新網址 →</a>' +
+            '<div class="tips">' +
+            '📌 第一次開新網址要<b>重新登入</b><br>🔑 忘記密碼請找<b>楷沅</b>或<b>孟濡</b><br>' +
+            '📱 手機：刪掉主畫面舊圖示，用新網址重新加入<br>' +
+            '💻 電腦：記得更新書籤' +
+            '</div></div></body>';
+    })();
+    </script>
 
     <script src="https://unpkg.com/firebase@9.22.2/firebase-app-compat.js"></script>
     <script src="https://unpkg.com/firebase@9.22.2/firebase-firestore-compat.js"></script>
@@ -956,7 +994,7 @@
     // v1.0.0 起改用語意化版本「主.次.修補」（字串）。
     // 部署新版時務必同步調高此版號，並在 Firestore 的 settings/app_control
     // 文件將 minVersion 設為相同的字串（欄位類型選 string），即可強制所有開著舊分頁的使用者重新載入。
-    const APP_VERSION = '1.8.1';   // v1.8.1：客戶名錄網址改存 Firestore、登入後才抓名錄（customer v84）
+    const APP_VERSION = '1.8.2';   // v1.8.2：舊網址 github.io 顯示搬家提示卡（v1.8.1：客戶名錄網址改存 Firestore、登入後才抓名錄，customer v84）
                                    //         ＋通知提醒 bug 修正（includeMetadataChanges）＋App 圖示與主畫面名稱「基米中區系統」
                                    // v1.2.4：公告通知點開直接顯示全文（投票／團購仍跳到對應頁面）
                                    // v1.2.3：民主聖地公告／投票／團購可「重發通知」
