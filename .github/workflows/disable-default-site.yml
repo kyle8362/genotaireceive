@@ -1,0 +1,24 @@
+# 一次性：停用 Firebase 預設網站 tasktrack-app-206f8.web.app（IT 資安收尾）
+# 新版 Console 沒有「停用網站」按鈕，改用 firebase-tools 的 hosting:disable。
+# 只能在 GitHub → Actions 手動按「Run workflow」執行；正式網站 genomicstc 不受影響。
+# 執行成功、確認網址顯示 Site Not Found 後，這個檔案就刪除。
+name: 一次性：停用預設網站 tasktrack-app-206f8
+
+on:
+  workflow_dispatch:
+
+jobs:
+  disable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 停用 tasktrack-app-206f8（只停這個網站，不動 genomicstc）
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TASKTRACK_APP_206F8 }}
+        run: |
+          printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx -y firebase-tools@14 hosting:disable \
+            --project tasktrack-app-206f8 \
+            --site tasktrack-app-206f8 \
+            --force --non-interactive
+          rm -f "$RUNNER_TEMP/sa.json"
